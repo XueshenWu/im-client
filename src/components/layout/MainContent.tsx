@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Grid3x3, Upload as UploadIcon, FolderUp, RefreshCw, CheckCircle, Clock, Filter, Download, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function MainContent() {
   const [syncing, setSyncing] = useState(false)
@@ -16,7 +18,7 @@ export default function MainContent() {
   }
 
   return (
-    <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-8 overflow-auto">
+    <div className="flex-1 bg-gray-50 dark:bg-gray-900 overflow-auto" style={{ padding: '32px' }}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Gallery</h1>
@@ -26,7 +28,7 @@ export default function MainContent() {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-6 mb-8">
         {/* Upload Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow" style={{ padding: '24px' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
               Quick Upload
@@ -37,14 +39,14 @@ export default function MainContent() {
           </div>
 
           <div className="space-y-3">
-            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl transition-all font-medium shadow-sm hover:shadow-md">
+            <Button className="w-full h-auto py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl shadow-sm hover:shadow-md">
               <UploadIcon className="w-4 h-4" />
               Upload Images
-            </button>
-            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-500 text-gray-700 dark:text-gray-300 rounded-2xl transition-all font-medium">
+            </Button>
+            <Button variant="outline" className="w-full h-auto py-3 border-2 hover:border-blue-500 rounded-2xl">
               <FolderUp className="w-4 h-4" />
               Batch Upload
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -56,7 +58,7 @@ export default function MainContent() {
         </div>
 
         {/* Sync Status Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow" style={{ padding: '24px' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
               Sync Status
@@ -88,18 +90,18 @@ export default function MainContent() {
             </p>
           </div>
 
-          <button
+          <Button
             onClick={handleSync}
             disabled={syncing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-2xl transition-all font-medium disabled:opacity-50"
+            className="w-full h-auto py-3 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-2xl"
           >
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Sync Now'}
-          </button>
+          </Button>
         </div>
 
         {/* Storage Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow" style={{ padding: '24px' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
               Storage
@@ -129,21 +131,22 @@ export default function MainContent() {
       {/* Gallery Section */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* Toolbar */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="border-b border-gray-200 dark:border-gray-700" style={{ paddingLeft: '24px', paddingRight: '24px', paddingTop: '16px', paddingBottom: '16px' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gray-500" />
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="jpg">JPG</option>
-                  <option value="png">PNG</option>
-                  <option value="tif">TIF</option>
-                </select>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-[140px] text-sm rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="jpg">JPG</SelectItem>
+                    <SelectItem value="png">PNG</SelectItem>
+                    <SelectItem value="tif">TIF</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
               <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -159,21 +162,21 @@ export default function MainContent() {
 
             {selectedCount > 0 && (
               <div className="flex items-center gap-2">
-                <button className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors">
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 rounded-xl">
                   <Download className="w-4 h-4" />
                   Export
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors">
+                </Button>
+                <Button size="sm" variant="destructive" className="rounded-xl">
                   <Trash2 className="w-4 h-4" />
                   Delete
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </div>
 
         {/* Gallery Content */}
-        <div className="p-6 min-h-96">
+        <div className="min-h-96" style={{ padding: '24px' }}>
           <div className="text-center py-20">
             <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-3xl mb-4">
               <Grid3x3 className="w-12 h-12 text-gray-400 dark:text-gray-500" />
@@ -184,10 +187,10 @@ export default function MainContent() {
             <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
               Upload your first images to get started. Supports JPG, PNG, and TIF formats up to 4K resolution.
             </p>
-            <button className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl transition-all font-medium shadow-sm hover:shadow-md">
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl shadow-sm hover:shadow-md h-auto py-3 px-6">
               <UploadIcon className="w-4 h-4" />
               Upload Images
-            </button>
+            </Button>
           </div>
         </div>
       </div>

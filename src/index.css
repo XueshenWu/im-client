@@ -1,5 +1,90 @@
 @import "tailwindcss";
 
+:root {
+  /* Base colors - Light theme */
+  --background: 0 0% 98%;
+  --foreground: 222.2 47% 11%;
+
+  /* Card colors */
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47% 11%;
+
+  /* Popover colors */
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47% 11%;
+
+  /* Primary - Blue (matching your blue-600) */
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary - Purple (matching your purple-600) */
+  --secondary: 271 91% 65%;
+  --secondary-foreground: 0 0% 100%;
+
+  /* Muted colors */
+  --muted: 220 13% 96%;
+  --muted-foreground: 220 9% 46%;
+
+  /* Accent - Light blue/purple */
+  --accent: 221 83% 96%;
+  --accent-foreground: 221 83% 53%;
+
+  /* Destructive - Red */
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Border and input */
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+
+  /* Focus ring - Blue */
+  --ring: 221 83% 53%;
+
+  /* Border radius - matching your rounded-2xl (1rem = 16px) */
+  --radius: 1rem;
+}
+
+.dark {
+  /* Base colors - Dark theme */
+  --background: 222 47% 11%;
+  --foreground: 0 0% 98%;
+
+  /* Card colors */
+  --card: 222 47% 11%;
+  --card-foreground: 0 0% 98%;
+
+  /* Popover colors */
+  --popover: 222 47% 15%;
+  --popover-foreground: 0 0% 98%;
+
+  /* Primary - Lighter blue for dark mode */
+  --primary: 221 83% 60%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary - Lighter purple for dark mode */
+  --secondary: 271 91% 70%;
+  --secondary-foreground: 0 0% 100%;
+
+  /* Muted colors */
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+
+  /* Accent */
+  --accent: 217 33% 17%;
+  --accent-foreground: 221 83% 60%;
+
+  /* Destructive */
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 0 0% 98%;
+
+  /* Border and input */
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+
+  /* Focus ring */
+  --ring: 221 83% 60%;
+}
+
 * {
   margin: 0;
   padding: 0;
