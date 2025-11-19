@@ -23,6 +23,10 @@ declare global {
       minimizeWindow: () => void
       maximizeWindow: () => void
       closeWindow: () => void
+      getFilePath: (file: File) => string
+      expandPath: (path: string, recursive?: boolean) => Promise<string[]>
+      readLocalFile: (path: string) => Promise<ArrayBuffer | null>
+      openDialog: () => Promise<string[]>
     }
   }
 }
