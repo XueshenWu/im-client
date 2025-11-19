@@ -50,6 +50,24 @@ function createWindow() {
     },
   })
 
+  // Set Content Security Policy to allow API connections
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+          "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+          "img-src 'self' data: blob:; " +
+          "font-src 'self' data: https://fonts.gstatic.com;"
+        ]
+      }
+    })
+  })
+
   // Window control handlers
   ipcMain.on('minimize-window', () => {
     mainWindow.minimize()
@@ -100,6 +118,43 @@ function createWindow() {
     } catch (error) {
       console.error('Failed to read file:', filePath, error);
       return null;
+    }
+  });
+
+  ipcMain.handle('save-files-to-local', async (event, filePaths: string[]) => {
+    try {
+      // Get AppData directory for this app
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
+
+      // Ensure the directory exists
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      const savedFiles: string[] = [];
+
+      for (const filePath of filePaths) {
+        try {
+          const fileName = path.basename(filePath);
+          const destPath = path.join(appDataPath, fileName);
+
+          // Copy file to AppData
+          await fs.copyFile(filePath, destPath);
+          savedFiles.push(destPath);
+        } catch (error) {
+          console.error(`Failed to save file ${filePath}:`, error);
+        }
+      }
+
+      return {
+        success: true,
+        savedFiles,
+        directory: appDataPath,
+      };
+    } catch (error) {
+      console.error('Failed to save files to local:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   });
 

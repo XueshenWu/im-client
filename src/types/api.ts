@@ -89,3 +89,73 @@ export interface DeleteImageResponse {
   success: boolean
   message: string
 }
+
+// Chunked Upload Types
+export interface InitChunkedUploadRequest {
+  filename: string
+  totalSize: number
+  chunkSize: number
+  totalChunks: number
+  mimeType?: string
+}
+
+export interface InitChunkedUploadResponse {
+  success: boolean
+  data: {
+    sessionId: string
+    filename: string
+    totalChunks: number
+    chunkSize: number
+    expiresAt: string
+  }
+}
+
+export interface UploadChunkRequest {
+  chunk: Blob
+  chunkNumber: number
+}
+
+export interface UploadChunkResponse {
+  success: boolean
+  message: string
+  data: {
+    sessionId: string
+    chunkNumber: number
+    uploadedChunks: number
+    totalChunks: number
+    isComplete: boolean
+  }
+}
+
+export interface CompleteChunkedUploadResponse {
+  success: boolean
+  message: string
+  data: Image
+}
+
+export interface ChunkedUploadStatus {
+  success: boolean
+  data: {
+    sessionId: string
+    filename: string
+    originalName: string
+    status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'expired'
+    uploadedChunks: number
+    totalChunks: number
+    uploadedChunksList: number[]
+    progress: string
+    expiresAt: string
+    createdAt: string
+  }
+}
+
+export interface CancelChunkedUploadResponse {
+  success: boolean
+  message: string
+}
+
+export interface UploadImagesResponse {
+  success: boolean
+  message: string
+  data?: Image[]
+}

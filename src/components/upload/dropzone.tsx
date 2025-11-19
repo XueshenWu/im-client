@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { processBatchDrop, readFilesFromPaths } from '@/utils/batchProcessor';
 
 // --- Configuration ---
-const MAX_SIZE = 50 * 1024 * 1024;
+const MAX_SIZE = 200 * 1024 * 1024;
 
 // --- Types ---
 export interface FileWithPreview extends File {
