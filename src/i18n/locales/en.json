@@ -1,0 +1,75 @@
+{
+  "app": {
+    "title": "Image Management"
+  },
+  "navigation": {
+    "upload": "Upload",
+    "gallery": "Gallery",
+    "collections": "Collections",
+    "settings": "Settings"
+  },
+  "gallery": {
+    "title": "Gallery",
+    "cloudView": "Cloud View",
+    "localView": "Local View",
+    "sortBy": "Sort by:",
+    "name": "Name",
+    "size": "Size",
+    "type": "Type",
+    "lastModified": "Last Modified",
+    "noImages": "No images found",
+    "noImagesCloud": "No images found in cloud",
+    "syncToCloud": "Sync images to the cloud to see them here",
+    "noMoreImages": "No more images to load",
+    "loadingMore": "Loading more images...",
+    "selected": "selected",
+    "export": "Export",
+    "exporting": "Exporting...",
+    "clearSelection": "Clear Selection"
+  },
+  "contextMenu": {
+    "select": "Select",
+    "copyId": "Copy Image ID",
+    "viewDetails": "View Details",
+    "download": "Download",
+    "delete": "Delete"
+  },
+  "table": {
+    "preview": "Preview",
+    "filename": "Filename",
+    "format": "Format",
+    "size": "Size",
+    "lastModified": "Last Modified",
+    "actions": "Actions",
+    "rowsSelected": "row(s) selected",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page",
+    "of": "of",
+    "rowsPerPage": "Rows per page"
+  },
+  "upload": {
+    "title": "Upload Images",
+    "dragAndDrop": "Drag and drop images here",
+    "or": "or",
+    "browse": "Browse",
+    "uploading": "Uploading...",
+    "uploadSuccess": "Upload successful",
+    "uploadFailed": "Upload failed"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "reset": "Reset",
+    "apply": "Apply"
+  }
+}

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ImageItem } from '@/types/gallery';
 import type { Image } from '@/types/api';
 import CloudPhotoCard from './CloudPhotoCard';
 import { imageService } from '@/services/api';
+import { Button } from '@/components/ui/button';
+import JSZip from 'jszip';
+import { format } from 'date-fns';
 
 interface CloudPhotoWallProps {
   columnWidth?: number;
@@ -16,10 +20,20 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   columnWidth = 250,
   gap = 12
 }) => {
+  const { t } = useTranslation();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -33,10 +47,17 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
     loadingRef.current = true;
     setLoading(true);
     try {
-      const result = await imageService.getPaginatedImages({
+      const params: any = {
         limit: LIMIT,
         cursor: cursor,
-      });
+      };
+
+      if (sortBy) {
+        params.sortBy = sortBy;
+        params.sortOrder = sortOrder;
+      }
+
+      const result = await imageService.getPaginatedImages(params);
 
       if (result?.success && result.data) {
         if (result.data.length > 0) {
@@ -72,12 +93,141 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [cursor, hasMore]);
+  }, [cursor, hasMore, sortBy, sortOrder]);
 
-  // Initial load
+  // Handle sort changes - reset and reload
+  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+    if (sortBy === column) {
+      // Toggle between asc -> desc -> inactive
+      if (sortOrder === 'asc') {
+        setSortOrder('desc');
+      } else if (sortOrder === 'desc') {
+        setSortBy(null);
+        setSortOrder('desc');
+      }
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+
+    // Reset images and cursor to reload from beginning
+    setImages([]);
+    setCursor(undefined);
+    setHasMore(true);
+  };
+
+  // Selection handlers
+  const handleSelectImage = (imageId: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(imageId)) {
+        newSet.delete(imageId);
+      } else {
+        newSet.add(imageId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const handleStartSelection = (imageId: string) => {
+    setSelectionMode(true);
+    setSelectedIds(new Set([imageId]));
+  };
+
+  // Export handler
+  const handleExport = async () => {
+    if (selectedIds.size === 0) return;
+
+    setExporting(true);
+    try {
+      const zip = new JSZip();
+      const imagesFolder = zip.folder('images');
+      const invoiceItems: Array<{ name: string; format: string; size: string }> = [];
+
+      for (const imageId of Array.from(selectedIds)) {
+        const image = images.find((img) => img.id === imageId);
+        if (!image?.cloudData?.uuid) continue;
+
+        try {
+          const imageUrl = `${imageService.getImageFileUrl(image.cloudData.uuid)}?info=true`;
+          const response = await fetch(imageUrl);
+
+          if (!response.ok) {
+            console.error(`Failed to download image ${imageId}:`, response.statusText);
+            continue;
+          }
+
+          const blob = await response.blob();
+          const originalName = response.headers.get('x-image-original-name') || `image-${imageId}.jpg`;
+          const fileSize = parseInt(response.headers.get('x-image-file-size') || '0', 10);
+          const imageFormat = response.headers.get('x-image-format') || 'unknown';
+
+          imagesFolder?.file(originalName, blob);
+
+          const formattedSize =
+            fileSize > 1024 * 1024
+              ? `${(fileSize / (1024 * 1024)).toFixed(2)} MB`
+              : `${(fileSize / 1024).toFixed(2)} KB`;
+
+          invoiceItems.push({
+            name: originalName,
+            format: imageFormat.toUpperCase(),
+            size: formattedSize,
+          });
+        } catch (error) {
+          console.error(`Error downloading image ${imageId}:`, error);
+        }
+      }
+
+      // Generate markdown invoice
+      const invoiceContent = `# Image Export Invoice
+
+**Export Date:** ${format(new Date(), 'MMMM dd, yyyy HH:mm:ss')}
+
+**Total Images:** ${invoiceItems.length}
+
+## Exported Images
+
+| # | Filename | Format | Size |
+|---|----------|--------|------|
+${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} | ${item.size} |`).join('\n')}
+
+---
+
+*Generated by Cloud Photo Gallery*
+`;
+
+      zip.file('INVOICE.md', invoiceContent);
+
+      // Generate and download ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `images-export-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Clear selection after export
+      handleClearSelection();
+    } catch (error) {
+      console.error('Export error:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Initial load and reload when sorting changes
   useEffect(() => {
     loadCloudImages();
-  }, []);
+  }, [sortBy, sortOrder]);
 
   // Set up Intersection Observer for infinite scroll
   useEffect(() => {
@@ -141,15 +291,72 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
     return (
       <div className="h-full w-full flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-          <p className="text-lg">No images found in cloud</p>
-          <p className="text-sm mt-2">Sync images to the cloud to see them here</p>
+          <p className="text-lg">{t('gallery.noImagesCloud')}</p>
+          <p className="text-sm mt-2">{t('gallery.syncToCloud')}</p>
         </div>
       </div>
     );
   }
 
+  // Sort button component
+  const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt'; label: string }) => {
+    const isActive = sortBy === column;
+    const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
+
+    return (
+      <Button
+        variant={isActive ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleSort(column)}
+        className="flex items-center gap-2"
+      >
+        {label}
+        <Icon className="h-4 w-4" />
+      </Button>
+    );
+  };
+
   return (
     <div className="h-full w-full flex flex-col">
+      {/* Controls Bar */}
+      <div className="flex items-center justify-between px-6 py-3  border-gray-200">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 mr-2">{t('gallery.sortBy')}</span>
+          <SortButton column="name" label={t('gallery.name')} />
+          <SortButton column="size" label={t('gallery.size')} />
+          <SortButton column="type" label={t('gallery.type')} />
+          <SortButton column="updatedAt" label={t('gallery.lastModified')} />
+        </div>
+
+        {/* Selection Controls */}
+        {selectionMode && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {selectedIds.size} {t('gallery.selected')}
+            </span>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleExport}
+              disabled={selectedIds.size === 0 || exporting}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {exporting ? t('gallery.exporting') : `${t('gallery.export')} (${selectedIds.size})`}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearSelection}
+              className="flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              {t('gallery.clearSelection')}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Images Grid */}
       <div
         ref={scrollContainerRef}
@@ -166,6 +373,10 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
                 <CloudPhotoCard
                   key={img.id}
                   image={img}
+                  selectionMode={selectionMode}
+                  isSelected={selectedIds.has(img.id!)}
+                  onSelect={handleSelectImage}
+                  onStartSelection={handleStartSelection}
                 />
               ))}
             </div>
@@ -177,14 +388,14 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
           {loading && (
             <div className="flex justify-center items-center">
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-              <span className="ml-2 text-gray-600">Loading more images...</span>
+              <span className="ml-2 text-gray-600">{t('gallery.loadingMore')}</span>
             </div>
           )}
         </div>
 
         {!hasMore && images.length > 0 && (
           <div className="text-center py-4 text-gray-500">
-            No more images to load
+            {t('gallery.noMoreImages')}
           </div>
         )}
       </div>

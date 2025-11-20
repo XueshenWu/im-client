@@ -13,7 +13,8 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive } from "lucide-react"
+import JSZip from 'jszip'
 import {
   Table,
   TableBody,
@@ -81,7 +82,40 @@ const Thumbnail = ({ src }: { src: string }) => {
 };
 
 
-export const columns: ColumnDef<Image>[] = [
+// Helper component for sortable column headers
+const SortableHeader = ({
+  label,
+  column,
+  sortBy,
+  sortOrder,
+  onSort
+}: {
+  label: string;
+  column: 'name' | 'size' | 'type' | 'updatedAt';
+  sortBy: 'name' | 'size' | 'type' | 'updatedAt' | null;
+  sortOrder: 'asc' | 'desc';
+  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt') => void;
+}) => {
+  const isActive = sortBy === column;
+  const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
+
+  return (
+    <Button
+      variant="ghost"
+      onClick={() => onSort(column)}
+      className="hover:bg-transparent p-0"
+    >
+      {label}
+      <Icon className={`ml-2 h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
+    </Button>
+  );
+};
+
+export const createColumns = (
+  sortBy: 'name' | 'size' | 'type' | 'updatedAt' | null,
+  sortOrder: 'asc' | 'desc',
+  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt') => void
+): ColumnDef<Image>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -121,18 +155,15 @@ export const columns: ColumnDef<Image>[] = [
   },
   {
     accessorKey: "originalName",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="hover:bg-transparent p-0"
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
+    header: () => (
+      <SortableHeader
+        label="Name"
+        column="name"
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => {
       const name = row.getValue("originalName") as string;
       return (
@@ -154,18 +185,15 @@ export const columns: ColumnDef<Image>[] = [
   },
   {
     accessorKey: "fileSize",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="hover:bg-transparent p-0"
-        >
-          Size
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
+    header: () => (
+      <SortableHeader
+        label="Size"
+        column="size"
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatBytes(row.getValue("fileSize"))}</div>,
     size: 100,
     minSize: 80,
@@ -173,7 +201,15 @@ export const columns: ColumnDef<Image>[] = [
   },
   {
     accessorKey: "format",
-    header: "Type",
+    header: () => (
+      <SortableHeader
+        label="Type"
+        column="type"
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => (
       <div className="uppercase text-sm font-medium text-muted-foreground">{row.getValue("format")}</div>
     ),
@@ -183,18 +219,15 @@ export const columns: ColumnDef<Image>[] = [
   },
   {
     accessorKey: "updatedAt",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="hover:bg-transparent p-0"
-        >
-          Last Modified
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      )
-    },
+    header: () => (
+      <SortableHeader
+        label="Last Modified"
+        column="updatedAt"
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={onSort}
+      />
+    ),
     cell: ({ row }) => {
       const dateStr = format(new Date(row.getValue("updatedAt")), "yyyy-MM-dd HH:mm");
       return <div className="text-sm text-muted-foreground">{dateStr}</div>;
@@ -208,6 +241,30 @@ export const columns: ColumnDef<Image>[] = [
     enableHiding: false,
     cell: ({ row }) => {
       const image = row.original
+
+      const handleDownload = async () => {
+        try {
+          const imageUrl = `${imageService.getImageFileUrl(image.uuid)}?info=true`;
+          const response = await fetch(imageUrl);
+
+          if (!response.ok) {
+            console.error('Download failed:', response.statusText);
+            return;
+          }
+
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = image.originalName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Download error:', error);
+        }
+      };
 
       return (
         <DropdownMenu>
@@ -229,7 +286,7 @@ export const columns: ColumnDef<Image>[] = [
               <Eye className="mr-2 h-4 w-4" />
               View details
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownload}>
               <Download className="mr-2 h-4 w-4" />
               Download
             </DropdownMenuItem>
@@ -245,7 +302,7 @@ export const columns: ColumnDef<Image>[] = [
     minSize: 60,
     maxSize: 60,
   },
-]
+];
 
 export default function DetailList() {
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -253,6 +310,10 @@ export default function DetailList() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [isLoading, setIsLoading] = React.useState(false)
+
+  // Backend sorting state
+  const [sortBy, setSortBy] = React.useState<'name' | 'size' | 'type' | 'updatedAt' | null>(null)
+  const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
 
   const [data, setData] = React.useState<Image[]>([])
   const [pagination, setPagination] = React.useState<PagePaginationMeta>({
@@ -264,10 +325,15 @@ export default function DetailList() {
     hasPrev: false,
   })
 
-  const fetchData = async (page: number, pageSize: number) => {
+  const fetchData = async (page: number, pageSize: number, sort?: 'name' | 'size' | 'type' | 'updatedAt', order?: 'asc' | 'desc') => {
     setIsLoading(true)
     try {
-      const response = await imageService.getPagePaginatedImages({ page, pageSize });
+      const params: any = { page, pageSize };
+      if (sort) {
+        params.sortBy = sort;
+        params.sortOrder = order || 'desc';
+      }
+      const response = await imageService.getPagePaginatedImages(params);
       setData(response.data);
       setPagination(response.pagination);
     } catch (error) {
@@ -278,8 +344,137 @@ export default function DetailList() {
   };
 
   React.useEffect(() => {
-    fetchData(pagination.page, pagination.pageSize);
-  }, [pagination.page, pagination.pageSize]);
+    fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
+  }, [pagination.page, pagination.pageSize, sortBy, sortOrder]);
+
+  // Handle sort column click
+  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+    if (sortBy === column) {
+      // Same column: cycle through inactive -> asc -> desc -> inactive
+      if (sortOrder === 'asc') {
+        setSortOrder('desc');
+      } else if (sortOrder === 'desc') {
+        setSortBy(null);
+        setSortOrder('desc');
+      }
+    } else {
+      // Different column: set to asc
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+    // Clear selections when sorting changes
+    setRowSelection({});
+  };
+
+  // Export selected images as zip with invoice
+  const handleExport = async () => {
+    const selectedUuids = Object.keys(rowSelection);
+    if (selectedUuids.length === 0) {
+      alert('Please select at least one image to export');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const zip = new JSZip();
+      const imagesFolder = zip.folder('images');
+
+      let totalSize = 0;
+      const invoiceItems: Array<{name: string, size: string, format: string}> = [];
+
+      // Download each image with metadata from headers
+      for (const uuid of selectedUuids) {
+        try {
+          // Use ?info=true to get metadata in response headers
+          const imageUrl = `${imageService.getImageFileUrl(uuid)}?info=true`;
+          const response = await fetch(imageUrl);
+
+          if (!response.ok) {
+            console.error(`Failed to download image ${uuid}: ${response.statusText}`);
+            continue;
+          }
+
+          const blob = await response.blob();
+
+          // Debug: Log available headers
+          console.log('Available headers for', uuid);
+          response.headers.forEach((value, key) => {
+            console.log(`  ${key}: ${value}`);
+          });
+
+          // Extract metadata from response headers (try both cases as headers might be lowercase)
+          const originalName = response.headers.get('x-image-original-name') ||
+                               response.headers.get('X-Image-Original-Name') ||
+                               `image-${uuid}.jpg`;
+          const fileSizeStr = response.headers.get('x-image-file-size') ||
+                             response.headers.get('X-Image-File-Size') ||
+                             '0';
+          const fileSize = parseInt(fileSizeStr, 10);
+          const format = response.headers.get('x-image-format') ||
+                        response.headers.get('X-Image-Format') ||
+                        'unknown';
+
+          console.log(`Extracted: name=${originalName}, size=${fileSize}, format=${format}`);
+
+          imagesFolder?.file(originalName, blob);
+          totalSize += fileSize;
+          invoiceItems.push({
+            name: originalName,
+            size: formatBytes(fileSize),
+            format: format.toUpperCase()
+          });
+        } catch (error) {
+          console.error(`Failed to download image ${uuid}:`, error);
+        }
+      }
+
+      // Generate invoice as markdown file
+      const invoiceContent = `# Image Export Invoice
+
+**Export Date:** ${format(new Date(), 'MMMM dd, yyyy HH:mm:ss')}
+**Total Items:** ${invoiceItems.length}
+**Total Size:** ${formatBytes(totalSize)}
+
+---
+
+## Items Exported
+
+| # | Filename | Format | Size |
+|---|----------|--------|------|
+${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} | ${item.size} |`).join('\n')}
+
+---
+
+*Generated by Image Management System*
+`;
+
+      zip.file('INVOICE.md', invoiceContent);
+
+      // Generate and download zip file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `images-export-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      alert(`Successfully exported ${invoiceItems.length} image(s)`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export images. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Create columns with current sort state
+  const columns = React.useMemo(
+    () => createColumns(sortBy, sortOrder, handleSort),
+    [sortBy, sortOrder]
+  );
 
   const table = useReactTable({
     data,
@@ -340,32 +535,51 @@ export default function DetailList() {
           }
           className="max-w-sm"
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
+        <div className="flex items-center gap-2">
+          {Object.keys(rowSelection).length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => setRowSelection({})}
+              className="h-8 px-2 lg:px-3"
+            >
+              Clear selection
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                )
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={Object.keys(rowSelection).length === 0 || isLoading}
+          >
+            <FileArchive className="mr-2 h-4 w-4" />
+            Export ({Object.keys(rowSelection).length})
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                Columns <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Table with Scroll Container */}

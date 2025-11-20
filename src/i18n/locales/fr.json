@@ -1,0 +1,75 @@
+{
+  "app": {
+    "title": "Gestion d'Images"
+  },
+  "navigation": {
+    "upload": "Télécharger",
+    "gallery": "Galerie",
+    "collections": "Collections",
+    "settings": "Paramètres"
+  },
+  "gallery": {
+    "title": "Galerie",
+    "cloudView": "Vue Cloud",
+    "localView": "Vue Locale",
+    "sortBy": "Trier par:",
+    "name": "Nom",
+    "size": "Taille",
+    "type": "Type",
+    "lastModified": "Dernière Modification",
+    "noImages": "Aucune image trouvée",
+    "noImagesCloud": "Aucune image trouvée dans le cloud",
+    "syncToCloud": "Synchronisez les images avec le cloud pour les voir ici",
+    "noMoreImages": "Plus d'images à charger",
+    "loadingMore": "Chargement d'autres images...",
+    "selected": "sélectionné",
+    "export": "Exporter",
+    "exporting": "Export en cours...",
+    "clearSelection": "Effacer la sélection"
+  },
+  "contextMenu": {
+    "select": "Sélectionner",
+    "copyId": "Copier l'ID de l'image",
+    "viewDetails": "Voir les détails",
+    "download": "Télécharger",
+    "delete": "Supprimer"
+  },
+  "table": {
+    "preview": "Aperçu",
+    "filename": "Nom du fichier",
+    "format": "Format",
+    "size": "Taille",
+    "lastModified": "Dernière Modification",
+    "actions": "Actions",
+    "rowsSelected": "ligne(s) sélectionnée(s)",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "page": "Page",
+    "of": "sur",
+    "rowsPerPage": "Lignes par page"
+  },
+  "upload": {
+    "title": "Télécharger des images",
+    "dragAndDrop": "Glissez et déposez les images ici",
+    "or": "ou",
+    "browse": "Parcourir",
+    "uploading": "Téléchargement...",
+    "uploadSuccess": "Téléchargement réussi",
+    "uploadFailed": "Échec du téléchargement"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "reset": "Réinitialiser",
+    "apply": "Appliquer"
+  }
+}

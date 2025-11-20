@@ -106,6 +106,13 @@ export const imageService = {
   },
 
   /**
+   * Get image file URL by UUID for download
+   */
+  getImageFileUrl(uuid: string): string {
+    return `${API_BASE_URL}/api/images/file/uuid/${uuid}`
+  },
+
+  /**
    * Fetch all collections
    */
   async getCollections(): Promise<import('@/types/api').CollectionsResponse> {
