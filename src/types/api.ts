@@ -159,3 +159,81 @@ export interface UploadImagesResponse {
   message: string
   data?: Image[]
 }
+
+// Pagination Types
+export interface PaginationMeta {
+  nextCursor: string | null
+  hasMore: boolean
+  limit: number
+}
+
+export interface PagePaginationMeta {
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface PaginatedImagesResponse {
+  success: boolean
+  count: number
+  data: Image[]
+  pagination: PaginationMeta
+}
+
+export interface GetPaginatedImagesParams {
+  limit?: number
+  cursor?: string
+  collectionId?: number
+  withExif?: boolean
+}
+
+
+export interface GetPagePaginatedImagesResponse {
+  success: boolean
+  count: number
+  data: Image[]
+  pagination: PagePaginationMeta
+}
+
+
+
+export interface GetPagePaginatedImagesParams {
+  page: number
+  pageSize: number
+  collectionId?: number
+  withExif?: boolean
+}
+
+// Collection Types
+export interface Collection {
+  id: number
+  uuid: string
+  name: string
+  description?: string
+  coverImageId?: number
+  imageCount: number
+  createdAt: string
+  updatedAt: string
+  deletedAt?: string | null
+}
+
+export interface CollectionsResponse {
+  success: boolean
+  count: number
+  data: Collection[]
+}
+
+export interface CreateCollectionRequest {
+  name: string
+  description?: string
+  coverImageId?: number
+}
+
+export interface UpdateCollectionRequest {
+  name?: string
+  description?: string
+  coverImageId?: number
+}

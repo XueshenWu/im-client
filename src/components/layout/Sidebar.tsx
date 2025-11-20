@@ -27,7 +27,7 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="w-80 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full overflow-y-auto">
+    <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full overflow-y-auto">
 
       {/* Upload Section */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">

@@ -75,9 +75,19 @@ export const deleteImage = async (id: number): Promise<DeleteImageResponse> => {
 export const uploadImages = async (files: File[]): Promise<UploadImagesResponse> => {
   const formData = new FormData()
 
-  files.forEach((file) => {
+  // Debug: Log what we're uploading
+  console.log('Uploading files:', files.length, 'files')
+
+  files.forEach((file, index) => {
+    console.log(`File ${index}:`, file.name, file.type, file.size)
     formData.append('images', file)
   })
+
+  // Debug: Log FormData contents
+  console.log('FormData entries:')
+  for (const pair of formData.entries()) {
+    console.log(pair[0], ':', pair[1])
+  }
 
   const response = await api.post<UploadImagesResponse>('/api/images/upload', formData, {
     headers: {

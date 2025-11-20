@@ -42,155 +42,155 @@ const createColumns = (
   removeFile: (fileName: string) => void,
   uploadStatuses: Map<string, UploadStatus>
 ): ColumnDef<FileWithPreview>[] => [
-  {
-    accessorKey: 'preview',
-    header: 'Preview',
-    cell: ({ row }) => {
-      const file = row.original;
-      return (
-        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-50 bg-muted flex items-center justify-center">
-          {file.type.startsWith('image/') ? (
-            <img
-              src={file.preview}
-              alt={file.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <FileText className="h-6 w-6 text-muted-foreground" />
-          )}
-        </div>
-      );
+    {
+      accessorKey: 'preview',
+      header: 'Preview',
+      cell: ({ row }) => {
+        const file = row.original;
+        return (
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-50 bg-muted flex items-center justify-center">
+            {file.type.startsWith('image/') ? (
+              <img
+                src={file.preview}
+                alt={file.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
     },
-    enableSorting: false,
-  },
-  {
-    accessorKey: 'name',
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="hover:bg-transparent p-0 cursor-pointer"
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
+    {
+      accessorKey: 'name',
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="hover:bg-transparent p-0 cursor-pointer"
+          >
+            Name
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        return (
+          <div className="font-medium truncate max-w-[200px]">
+            {row.getValue('name')}
+          </div>
+        );
+      },
+      meta: {
+        className: 'hidden sm:table-cell',
+      },
     },
-    cell: ({ row }) => {
-      return (
-        <div className="font-medium truncate max-w-[200px]">
-          {row.getValue('name')}
-        </div>
-      );
+    {
+      accessorKey: 'size',
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="hover:bg-transparent p-0 cursor-pointer"
+          >
+            Size
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const size = row.getValue('size') as number;
+        return (
+          <div className="text-sm text-muted-foreground">
+            {(size / 1024).toFixed(1)} KB
+          </div>
+        );
+      },
+      meta: {
+        className: 'hidden md:table-cell',
+      },
     },
-    meta: {
-      className: 'hidden sm:table-cell',
+    {
+      accessorKey: 'sourcePath',
+      header: 'Source Path',
+      cell: ({ row }) => {
+        const path = row.getValue('sourcePath') as string | undefined;
+        return (
+          <div className="text-sm text-muted-foreground truncate max-w-[300px]">
+            {path || 'No path'}
+          </div>
+        );
+      },
+      meta: {
+        className: 'hidden lg:table-cell',
+      },
     },
-  },
-  {
-    accessorKey: 'size',
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="hover:bg-transparent p-0 cursor-pointer"
-        >
-          Size
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => {
-      const size = row.getValue('size') as number;
-      return (
-        <div className="text-sm text-muted-foreground">
-          {(size / 1024).toFixed(1)} KB
-        </div>
-      );
-    },
-    meta: {
-      className: 'hidden md:table-cell',
-    },
-  },
-  {
-    accessorKey: 'sourcePath',
-    header: 'Source Path',
-    cell: ({ row }) => {
-      const path = row.getValue('sourcePath') as string | undefined;
-      return (
-        <div className="text-sm text-muted-foreground truncate max-w-[300px]">
-          {path || 'No path'}
-        </div>
-      );
-    },
-    meta: {
-      className: 'hidden lg:table-cell',
-    },
-  },
-  {
-    id: 'status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const file = row.original;
-      const status = uploadStatuses.get(file.name);
+    {
+      id: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const file = row.original;
+        const status = uploadStatuses.get(file.name);
 
-      if (!status) return null;
+        if (!status) return null;
 
-      return (
-        <div className="text-sm">
-          {status.status === 'staged' && (
-            <span className="text-gray-400">Staged</span>
-          )}
-          {status.status === 'pending' && (
-            <span className="text-gray-500">Pending</span>
-          )}
-          {status.status === 'uploading' && (
-            <div className="flex items-center gap-2">
-              <span className="text-blue-600">{status.progress}%</span>
-              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all"
-                  style={{ width: `${status.progress}%` }}
-                />
+        return (
+          <div className="text-sm">
+            {status.status === 'staged' && (
+              <span className="text-gray-400">Staged</span>
+            )}
+            {status.status === 'pending' && (
+              <span className="text-gray-500">Pending</span>
+            )}
+            {status.status === 'uploading' && (
+              <div className="flex items-center gap-2">
+                <span className="text-blue-600">{status.progress}%</span>
+                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 transition-all"
+                    style={{ width: `${status.progress}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          {status.status === 'completed' && (
-            <span className="text-green-600">Completed</span>
-          )}
-          {status.status === 'failed' && (
-            <span className="text-red-600" title={status.error}>Failed</span>
-          )}
-        </div>
-      );
+            )}
+            {status.status === 'completed' && (
+              <span className="text-green-600">Completed</span>
+            )}
+            {status.status === 'failed' && (
+              <span className="text-red-600" title={status.error}>Failed</span>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
     },
-    enableSorting: false,
-  },
-  {
-    id: 'actions',
-    header: 'Actions',
-    cell: ({ row }) => {
-      const file = row.original;
-      const status = uploadStatuses.get(file.name);
-      const isUploading = status?.status === 'uploading';
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const file = row.original;
+        const status = uploadStatuses.get(file.name);
+        const isUploading = status?.status === 'uploading';
 
-      return (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 text-muted-foreground hover:text-destructive cursor-pointer"
-          onClick={() => removeFile(file.name)}
-          disabled={isUploading}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      );
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground hover:text-destructive cursor-pointer"
+            onClick={() => removeFile(file.name)}
+            disabled={isUploading}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        );
+      },
+      enableSorting: false,
     },
-    enableSorting: false,
-  },
-];
+  ];
 
 
 const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
@@ -308,72 +308,34 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
     // Track results directly instead of relying on state
     let completedCount = 0;
     let failedCount = 0;
-
+    // FIXME: Need to upload to local after to cloud
     try {
-      // If not syncing to cloud, save files locally only
-      if (!syncToCloud) {
-        // Get file paths from files that have sourcePath
-        const filePaths = files
-          .filter(file => file.sourcePath)
-          .map(file => file.sourcePath!);
+      // STEP 1: Always save files with paths to local storage first
+      const filesWithPaths = files.filter(file => file.sourcePath);
+      const filesWithoutPaths = files.filter(file => !file.sourcePath);
 
-        if (filePaths.length === 0) {
-          alert('No valid file paths found. Files must be from local filesystem.');
-          return;
+      let localSavedCount = 0;
+
+      // Save files to local storage if they have paths
+      if (filesWithPaths.length > 0) {
+        try {
+          const filePaths = filesWithPaths.map(file => file.sourcePath!);
+          const result = await window.electronAPI?.saveFilesToLocal(filePaths);
+
+          if (result?.success) {
+            localSavedCount = result.savedFiles?.length || 0;
+          }
+        } catch (error) {
+          console.error('Failed to save to local storage:', error);
         }
-
-        // Initialize upload status for all files
-        const initialStatuses = new Map<string, UploadStatus>();
-        files.forEach((file) => {
-          initialStatuses.set(file.name, {
-            fileName: file.name,
-            progress: 50,
-            status: 'uploading',
-          });
-        });
-        setUploadStatuses(initialStatuses);
-
-        // Save files to local AppData
-        const result = await window.electronAPI?.saveFilesToLocal(filePaths);
-
-        if (result?.success) {
-          completedCount = filePaths.length;
-          // Mark all as completed
-          files.forEach((file) => {
-            setUploadStatuses((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(file.name, {
-                fileName: file.name,
-                progress: 100,
-                status: 'completed',
-              });
-              return newMap;
-            });
-          });
-          alert(`Successfully saved ${completedCount} file(s) locally!\nLocation: ${result.directory}`);
-        } else {
-          failedCount = files.length;
-          // Mark all as failed
-          files.forEach((file) => {
-            setUploadStatuses((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(file.name, {
-                fileName: file.name,
-                progress: 0,
-                status: 'failed',
-                error: result?.error || 'Failed to save locally',
-              });
-              return newMap;
-            });
-          });
-          alert(`Failed to save files locally: ${result?.error || 'Unknown error'}`);
-        }
-
-        setIsUploading(false);
-        return;
       }
+
+
+
+      // STEP 3: If syncing to cloud, continue with cloud upload
       // Separate files into small and large
       const smallFiles: File[] = [];
+
       const largeFiles: File[] = [];
 
       files.forEach((file) => {
@@ -508,9 +470,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                     </TableHead>
                   );
                 })}
@@ -554,7 +516,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       {/* Sticky Footer with Clear and Submit Buttons */}
       <div className="bg-white border-t border-gray-300 p-4 flex gap-3 items-center">
         <Button
-          className={"text-white cursor-pointer "+(files.length === 0 || isUploading ? "bg-red-200":"bg-red-600 hover:bg-red-500")}
+          className={"text-white cursor-pointer " + (files.length === 0 || isUploading ? "bg-red-200" : "bg-red-600 hover:bg-red-500")}
           disabled={files.length === 0 || isUploading}
           onClick={() => {
             const confirmed = window.confirm(
@@ -569,22 +531,13 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           Clear All
         </Button>
         <Button
-          className={"flex-1 cursor-pointer text-white "+(files.length === 0 || isUploading ? "bg-blue-100":"bg-blue-600 hover:bg-blue-500")}
+          className={"flex-1 cursor-pointer text-white " + (files.length === 0 || isUploading ? "bg-blue-100" : "bg-blue-600 hover:bg-blue-500")}
           disabled={files.length === 0 || isUploading}
           onClick={handleSubmit}
         >
           {isUploading ? 'Uploading...' : `Submit ${files.length > 0 ? `(${files.length} files)` : ''}`}
         </Button>
-        <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={syncToCloud}
-            onChange={(e) => setSyncToCloud(e.target.checked)}
-            className="w-4 h-4 cursor-pointer"
-            disabled={isUploading}
-          />
-          <span className={isUploading ? "text-gray-400" : ""}>Sync to Cloud</span>
-        </label>
+
       </div>
     </div>
   );

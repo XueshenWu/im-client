@@ -4,7 +4,7 @@ import HomeLink from '@/components/common/home-link'
 
 export default function () {
   return (
-    <div className='w-full flex flex-col px-6 py-6 h-full gap-6'>
+    <div className='w-full flex flex-col px-6 py-6 h-full gap-6 bg-white'>
       {/* Header Section */}
       <div className='space-y-3'>
         <HomeLink />

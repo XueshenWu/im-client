@@ -55,7 +55,7 @@ export default function Navigation() {
   return (
     <div
       ref={navRef}
-      className={`${isExpanded ? 'w-36 items-start' : 'w-16 items-center'} bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col  gap-y-4 transition-all duration-300`}
+      className={`${isExpanded ? 'w-36 items-start' : 'w-16 items-center'} bg-slate-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col  gap-y-4 transition-all duration-300`}
       style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: isExpanded ? '12px' : '12px', paddingRight: isExpanded ? '12px' : '12px' }}
     >
       {/* Logo */}

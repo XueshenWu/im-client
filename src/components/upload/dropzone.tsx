@@ -166,7 +166,7 @@ function withDropzone<P extends WithDropzoneProps>(
           {...getRootProps()}
           onClick={openNativeDialog} // Manual Click Handler
           className={cn(
-            "relative border-2 border-dashed border-slate-300 hover:border-slate-400 rounded-lg p-10 transition-all duration-100 ease-in-out cursor-pointer flex flex-col items-center justify-center gap-4  bg-white",
+            "relative border-2  border-dashed border-slate-300 hover:border-slate-400 rounded-lg p-10 transition-all duration-100 ease-in-out cursor-pointer flex flex-col items-center justify-center gap-4  bg-slate-100",
             "",
             isDragActive && "ring-2 ring-blue-300 border-0 hover:border-0",
             isProcessing && "opacity-60 pointer-events-none cursor-wait"

@@ -12,5 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('expand-path', path, recursive),
   openDialog: () => ipcRenderer.invoke('dialog:open'),
   readLocalFile: (path: string) => ipcRenderer.invoke('read-local-file', path),
+  writeTempFile: (fileName: string, buffer: ArrayBuffer) =>
+    ipcRenderer.invoke('write-temp-file', fileName, buffer),
   saveFilesToLocal: (filePaths: string[]) => ipcRenderer.invoke('save-files-to-local', filePaths),
+  getLocalImages: (options?: { limit?: number; offset?: number }) =>
+    ipcRenderer.invoke('get-local-images', options),
 })

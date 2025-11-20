@@ -78,10 +78,30 @@ export const processBatchDrop = async (
                     // Skip non-images
                     if (!relativePath.match(IMAGE_EXT_REGEX)) return;
 
-                    // FIX: Push the Promise directly, do not wrap in a function
-                    const promise = zipEntry.async('blob').then((blob) => {
-                        const ext = zipEntry.name.split('.').pop() || 'jpg';
-                        return new File([blob], zipEntry.name, { type: `image/${ext}` });
+                    // Extract and write to temp file if Electron API is available
+                    const promise = zipEntry.async('arraybuffer').then(async (arrayBuffer) => {
+                        const fileName = zipEntry.name.split('/').pop() || zipEntry.name;
+                        const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+                        const mimeType = getMimeType(ext);
+
+                        const blob = new Blob([arrayBuffer], { type: mimeType });
+                        const imageFile = new File([blob], fileName, { type: mimeType });
+
+                        // If Electron API is available, write to temp and attach path
+                        if (api?.writeTempFile) {
+                            try {
+                                const tempPath = await api.writeTempFile(fileName, arrayBuffer);
+                                if (tempPath) {
+                                    // Attach path properties
+                                    Object.defineProperty(imageFile, 'path', { value: tempPath });
+                                    (imageFile as any).sourcePath = tempPath;
+                                }
+                            } catch (error) {
+                                console.warn(`Failed to write temp file for ${fileName}:`, error);
+                            }
+                        }
+
+                        return imageFile;
                     });
 
                     zipPromises.push(promise);
@@ -121,8 +141,6 @@ export const processBatchDrop = async (
 
         // --- C. Standard Files & Folders ---
         else {
-            const filePath = api?.getFilePath(file);
-
             // ✅ CHECK 1: Basic Extension Check (Optimization)
             // If it has an extension, and that extension is NOT an image or supported format,
             // we can likely skip it immediately unless it's a folder (which usually has no ext).
@@ -137,16 +155,35 @@ export const processBatchDrop = async (
                 continue;
             }
 
-            if (filePath && api) {
-                // Ask Electron to check (Electron will now also double-check due to Fix #1)
-                const expandedPaths = await api.expandPath(filePath, recursive);
+            // Try to get file path for Electron
+            let filePath: string | undefined;
+            try {
+                filePath = api?.getFilePath(file);
+            } catch (error) {
+                console.warn(`Could not get file path for ${file.name}:`, error);
+            }
 
-                if (expandedPaths && expandedPaths.length > 0) {
-                    const diskFiles = await readFilesFromPaths(expandedPaths);
-                    extractedImages.push(...diskFiles);
+            if (filePath && api) {
+                try {
+                    // Ask Electron to check (Electron will now also double-check due to Fix #1)
+                    const expandedPaths = await api.expandPath(filePath, recursive);
+
+                    if (expandedPaths && expandedPaths.length > 0) {
+                        const diskFiles = await readFilesFromPaths(expandedPaths);
+                        extractedImages.push(...diskFiles);
+                    } else if (file.type.match(/^image\//)) {
+                        // Path expansion failed but it's an image, use the file directly
+                        extractedImages.push(file);
+                    }
+                } catch (error) {
+                    console.error(`Failed to expand path ${filePath}:`, error);
+                    // If path expansion fails, fallback to using the File object directly
+                    if (file.type.match(/^image\//)) {
+                        extractedImages.push(file);
+                    }
                 }
             } else {
-                // Fallback for non-Electron web drag
+                // Fallback for non-Electron web drag or when path is unavailable
                 if (file.type.match(/^image\//)) {
                     extractedImages.push(file);
                 }

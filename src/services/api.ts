@@ -66,4 +66,52 @@ api.interceptors.response.use(
   }
 )
 
+// API Service Functions
+export const imageService = {
+  /**
+   * Fetch cursor paginated images from the cloud server
+   */
+  async getPaginatedImages(params?: import('@/types/api').GetPaginatedImagesParams): Promise<import('@/types/api').PaginatedImagesResponse> {
+    const response = await api.get<import('@/types/api').PaginatedImagesResponse>('/api/images/paginated', {
+      params,
+    })
+    return response.data
+  },
+
+  /**
+   * Fetch page paginated images from the cloud server
+   */
+  async getPagePaginatedImages(params?:import('@/types/api').GetPagePaginatedImagesParams): Promise<import('@/types/api').GetPagePaginatedImagesResponse> {
+    const response = await api.get<import('@/types/api').GetPagePaginatedImagesResponse>('/api/images/page', {
+      params,
+    })
+    return response.data
+  },
+
+
+
+
+  /**
+   * Get thumbnail URL for cloud images
+   */
+  getThumbnailUrl(thumbnailPath: string): string {
+    return `${API_BASE_URL}${thumbnailPath}`
+  },
+
+  /**
+   * Get full image URL for cloud images
+   */
+  getImageUrl(filePath: string): string {
+    return `${API_BASE_URL}${filePath}`
+  },
+
+  /**
+   * Fetch all collections
+   */
+  async getCollections(): Promise<import('@/types/api').CollectionsResponse> {
+    const response = await api.get<import('@/types/api').CollectionsResponse>('/api/collections')
+    return response.data
+  },
+}
+
 export default api

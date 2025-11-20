@@ -61,7 +61,7 @@ function createWindow() {
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
           "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-          "img-src 'self' data: blob:; " +
+          "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https:; " +
           "font-src 'self' data: https://fonts.gstatic.com;"
         ]
       }
@@ -155,6 +155,74 @@ function createWindow() {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    }
+  });
+
+  ipcMain.handle('get-local-images', async (event, options: { limit?: number; offset?: number } = {}) => {
+    try {
+      const { limit = 20, offset = 0 } = options;
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
+
+      // Ensure the directory exists
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      // Read all files in the directory
+      const files = await fs.readdir(appDataPath);
+
+      // Filter for image files and get stats
+      const imageFiles = await Promise.all(
+        files
+          .filter(file => isImage(file))
+          .map(async (file) => {
+            const filePath = path.join(appDataPath, file);
+            const stats = await fs.stat(filePath);
+            return {
+              name: file,
+              path: filePath,
+              size: stats.size,
+              createdAt: stats.birthtime.toISOString(),
+              modifiedAt: stats.mtime.toISOString(),
+            };
+          })
+      );
+
+      // Sort by creation date (newest first)
+      imageFiles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      // Apply pagination
+      const paginatedFiles = imageFiles.slice(offset, offset + limit);
+
+      return {
+        success: true,
+        data: paginatedFiles,
+        total: imageFiles.length,
+        hasMore: offset + limit < imageFiles.length,
+      };
+    } catch (error) {
+      console.error('Failed to get local images:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        data: [],
+        total: 0,
+        hasMore: false,
+      };
+    }
+  });
+
+  ipcMain.handle('write-temp-file', async (event, fileName: string, buffer: ArrayBuffer) => {
+    try {
+      // Create temp directory for ZIP-extracted files
+      const tempDir = path.join(app.getPath('temp'), 'image-management', 'zip-extracted');
+      await fs.mkdir(tempDir, { recursive: true });
+
+      const filePath = path.join(tempDir, fileName);
+      await fs.writeFile(filePath, Buffer.from(buffer));
+
+      return filePath;
+    } catch (error) {
+      console.error('Failed to write temp file:', error);
+      return null;
     }
   });
 
