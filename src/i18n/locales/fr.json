@@ -51,7 +51,8 @@
     "saveAsNew": "Sauvegarder comme nouveau",
     "replaceOriginal": "Remplacer l'original",
     "cancel": "Annuler",
-    "processing": "Traitement en cours..."
+    "processing": "Traitement en cours...",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cette image ?"
   },
   "table": {
     "preview": "Aperçu",

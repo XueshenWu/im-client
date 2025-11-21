@@ -212,3 +212,145 @@ export const cancelChunkedUpload = async (
   )
   return response.data
 }
+
+// ===== Chunked Replace APIs =====
+
+/**
+ * Initialize a chunked replace session
+ */
+export const initChunkedReplace = async (
+  uuid: string,
+  request: InitChunkedUploadRequest
+): Promise<InitChunkedUploadResponse['data']> => {
+  const response = await api.post<InitChunkedUploadResponse>(
+    `/api/images/uuid/${uuid}/chunked-replace/init`,
+    request
+  )
+  return response.data.data
+}
+
+/**
+ * Upload a chunk for replace session
+ */
+export const uploadChunkedReplaceChunk = async (
+  uuid: string,
+  sessionId: string,
+  chunk: Blob,
+  chunkNumber: number
+): Promise<UploadChunkResponse['data']> => {
+  const formData = new FormData()
+  formData.append('chunk', chunk)
+  formData.append('chunkNumber', chunkNumber.toString())
+
+  const response = await api.post<UploadChunkResponse>(
+    `/api/images/uuid/${uuid}/chunked-replace/upload/${sessionId}`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  )
+  return response.data.data
+}
+
+/**
+ * Complete chunked replace
+ */
+export const completeChunkedReplace = async (
+  uuid: string,
+  sessionId: string
+): Promise<Image> => {
+  const response = await api.post<CompleteChunkedUploadResponse>(
+    `/api/images/uuid/${uuid}/chunked-replace/complete/${sessionId}`
+  )
+  return response.data.data
+}
+
+// ===== Helper Functions =====
+
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB threshold
+
+/**
+ * Upload a file using chunked upload if above threshold
+ */
+export const uploadImageAuto = async (file: File): Promise<Image> => {
+  if (file.size > SIZE_THRESHOLD) {
+    return uploadImageChunked(file);
+  }
+  const response = await uploadImages([file]);
+  // Handle both response formats: { data: Image[] } or { data: { uploaded: Image[] } }
+  const images = response.data as Image[] | { uploaded: Image[] };
+  if (response.success && images) {
+    const uploadedImages = Array.isArray(images) ? images : images.uploaded;
+    if (uploadedImages && uploadedImages.length > 0) {
+      return uploadedImages[0];
+    }
+  }
+  throw new Error(response.message || 'Upload failed');
+}
+
+/**
+ * Upload a large file using chunked upload
+ */
+export const uploadImageChunked = async (file: File): Promise<Image> => {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  // Initialize session
+  const session = await initChunkedUpload({
+    filename: file.name,
+    totalSize: file.size,
+    chunkSize: CHUNK_SIZE,
+    totalChunks,
+    mimeType: file.type,
+  });
+
+  // Upload each chunk
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    await uploadChunk(session.sessionId, chunk, i);
+  }
+
+  // Complete upload
+  return completeChunkedUpload(session.sessionId);
+}
+
+/**
+ * Replace an image using chunked upload if above threshold
+ */
+export const replaceImageAuto = async (uuid: string, file: File): Promise<Image> => {
+  if (file.size > SIZE_THRESHOLD) {
+    return replaceImageChunked(uuid, file);
+  }
+  return replaceImage(uuid, file);
+}
+
+/**
+ * Replace an image using chunked upload
+ */
+export const replaceImageChunked = async (uuid: string, file: File): Promise<Image> => {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  // Initialize session
+  const session = await initChunkedReplace(uuid, {
+    filename: file.name,
+    totalSize: file.size,
+    chunkSize: CHUNK_SIZE,
+    totalChunks,
+    mimeType: file.type,
+  });
+
+  // Upload each chunk
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    await uploadChunkedReplaceChunk(uuid, session.sessionId, chunk, i);
+  }
+
+  // Complete replace
+  return completeChunkedReplace(uuid, session.sessionId);
+}

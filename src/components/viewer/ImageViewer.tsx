@@ -12,16 +12,18 @@ import {
   Info,
   Crop,
   Check,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import type { Area, Point } from 'react-easy-crop';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { imageService } from '@/services/api';
-import { uploadImages, replaceImage } from '@/services/images.service';
+import { uploadImageAuto, replaceImageAuto, deleteImage } from '@/services/images.service';
 import { createCroppedImage, blobToFile } from '@/utils/cropImage';
 import { format } from 'date-fns';
 
@@ -124,11 +126,11 @@ export const ImageViewer: React.FC = () => {
       const croppedFile = blobToFile(croppedBlob, fileName);
 
       if (replaceOriginal) {
-        // Replace the original image
-        await replaceImage(currentImage.uuid, croppedFile);
+        // Replace the original image (uses chunked upload if > 50MB)
+        await replaceImageAuto(currentImage.uuid, croppedFile);
       } else {
-        // Upload as new image
-        await uploadImages([croppedFile]);
+        // Upload as new image (uses chunked upload if > 50MB)
+        await uploadImageAuto(croppedFile);
       }
 
       // Trigger gallery refresh to show updated data
@@ -223,9 +225,26 @@ export const ImageViewer: React.FC = () => {
     setRotation(0);
   };
 
+  const handleDelete = async () => {
+    if (!currentImage) return;
+
+    if (!window.confirm(t('viewer.confirmDelete'))) return;
+
+    try {
+      await deleteImage(currentImage.id);
+      triggerRefresh();
+      closeViewer();
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeViewer()}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 bg-black border-none">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 bg-black border-none" aria-describedby={undefined}>
+        <VisuallyHidden.Root>
+          <DialogTitle>{currentImage.originalName}</DialogTitle>
+        </VisuallyHidden.Root>
         {/* Top toolbar */}
         <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-4">
           <div className="flex items-center justify-between">
@@ -326,6 +345,17 @@ export const ImageViewer: React.FC = () => {
                 <Info className="h-5 w-5" />
               </Button>
 
+              {/* Delete */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                className="text-white hover:bg-red-500/80"
+                title={t('contextMenu.delete')}
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+
               {/* Close */}
               <Button
                 variant="ghost"
@@ -420,10 +450,10 @@ export const ImageViewer: React.FC = () => {
               image={imageUrl}
               crop={crop}
               zoom={cropZoom}
-              aspect={undefined}
               onCropChange={setCrop}
               onZoomChange={setCropZoom}
               onCropComplete={onCropComplete}
+              showGrid={true}
               style={{
                 containerStyle: {
                   backgroundColor: 'black',

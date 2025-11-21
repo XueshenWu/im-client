@@ -97,14 +97,18 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
     }
   }, [cursor, hasMore, sortBy, sortOrder]);
 
-  // Listen for gallery refresh trigger (e.g., after image crop/save)
+  // Track internal reload trigger
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Listen for gallery refresh trigger (e.g., after image crop/save/delete)
   useEffect(() => {
     if (refreshTrigger > 0) {
-      // Reset and reload images from the beginning
+      // Reset state and trigger reload
       setImages([]);
       setCursor(undefined);
       setHasMore(true);
       loadingRef.current = false;
+      setReloadKey(prev => prev + 1);
     }
   }, [refreshTrigger]);
 
@@ -237,10 +241,10 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     }
   };
 
-  // Initial load and reload when sorting changes
+  // Initial load, reload when sorting changes, or when reloadKey changes
   useEffect(() => {
     loadCloudImages();
-  }, [sortBy, sortOrder]);
+  }, [sortBy, sortOrder, reloadKey]);
 
   // Set up Intersection Observer for infinite scroll
   useEffect(() => {

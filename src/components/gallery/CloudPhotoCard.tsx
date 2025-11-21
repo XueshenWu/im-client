@@ -10,8 +10,10 @@ import {
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import { imageService } from '@/services/api';
+import { deleteImage } from '@/services/images.service';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 
 interface CloudPhotoCardProps {
   image: ImageItem;
@@ -30,6 +32,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
 }) => {
   const { t } = useTranslation();
   const { openViewer } = useImageViewerStore();
+  const { triggerRefresh } = useGalleryRefreshStore();
   // Ensure this is a cloud image
   if (image.source !== 'cloud') {
     console.warn('CloudPhotoCard received non-cloud image');
@@ -93,6 +96,19 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   const handleViewDetails = () => {
     if (cloudData) {
       openViewer(cloudData);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!cloudData?.id) return;
+
+    if (!window.confirm(t('viewer.confirmDelete'))) return;
+
+    try {
+      await deleteImage(cloudData.id);
+      triggerRefresh();
+    } catch (error) {
+      console.error('Delete error:', error);
     }
   };
 
@@ -168,7 +184,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           {t('contextMenu.download')}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem className="text-destructive">
+        <ContextMenuItem className="text-destructive" onClick={handleDelete}>
           <Trash2 className="mr-2 h-4 w-4" />
           {t('contextMenu.delete')}
         </ContextMenuItem>
