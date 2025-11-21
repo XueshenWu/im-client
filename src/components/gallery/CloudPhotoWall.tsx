@@ -30,7 +30,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
   // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Selection state
@@ -114,7 +114,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   }, [refreshTrigger]);
 
   // Handle sort changes - reset and reload
-  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
     if (sortBy === column) {
       // Toggle between asc -> desc -> inactive
       if (sortOrder === 'asc') {
@@ -356,7 +356,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
   }
 
   // Sort button component
-  const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt'; label: string }) => {
+  const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'; label: string }) => {
     const isActive = sortBy === column;
     const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
 
@@ -383,6 +383,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           <SortButton column="size" label={t('gallery.size')} />
           <SortButton column="type" label={t('gallery.type')} />
           <SortButton column="updatedAt" label={t('gallery.lastModified')} />
+          <SortButton column="createdAt" label={t('gallery.createdDate')} />
         </div>
 
         {/* Selection Controls */}
