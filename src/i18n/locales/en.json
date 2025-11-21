@@ -28,7 +28,10 @@
     "selected": "selected",
     "export": "Export",
     "exporting": "Exporting...",
-    "clearSelection": "Clear Selection"
+    "clearSelection": "Clear Selection",
+    "delete": "Delete",
+    "confirmDelete": "Are you sure you want to delete {{count}} image(s)?",
+    "deleteError": "Failed to delete images. Please try again."
   },
   "contextMenu": {
     "select": "Select",
@@ -78,7 +81,11 @@
     "goToFirstPage": "Go to first page",
     "goToPreviousPage": "Go to previous page",
     "goToNextPage": "Go to next page",
-    "goToLastPage": "Go to last page"
+    "goToLastPage": "Go to last page",
+    "delete": "Delete",
+    "selectAtLeastOne": "Please select at least one image",
+    "confirmDelete": "Are you sure you want to delete {{count}} image(s)?",
+    "deleteError": "Failed to delete images. Please try again."
   },
   "pages": {
     "upload": {

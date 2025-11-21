@@ -449,7 +449,11 @@ export const ImageViewer: React.FC = () => {
                 ref={imgRef}
                 src={imageUrl}
                 alt={currentImage.originalName}
-                className="max-w-full max-h-[calc(95vh-120px)] object-contain"
+                style={{
+                  width: 'min(90vw, 1200px)',
+                  maxHeight: 'calc(95vh - 120px)',
+                  objectFit: 'contain',
+                }}
                 crossOrigin="anonymous"
               />
             </ReactCrop>

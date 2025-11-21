@@ -70,6 +70,28 @@ export const deleteImage = async (id: number): Promise<DeleteImageResponse> => {
 }
 
 /**
+ * Delete multiple images by ID (batch soft delete)
+ */
+export const deleteImages = async (ids: number[]): Promise<{ success: boolean; message: string; deleted: number }> => {
+  const response = await api.post<{ success: boolean; message: string; deleted: number }>(
+    '/api/images/batch/delete/ids',
+    { ids }
+  )
+  return response.data
+}
+
+/**
+ * Delete multiple images by UUID (batch soft delete)
+ */
+export const deleteImagesByUuid = async (uuids: string[]): Promise<{ success: boolean; message: string; deleted: number }> => {
+  const response = await api.post<{ success: boolean; message: string; deleted: number }>(
+    '/api/images/batch/delete/uuids',
+    { uuids }
+  )
+  return response.data
+}
+
+/**
  * Upload images (multipart form-data)
  */
 export const uploadImages = async (files: File[]): Promise<UploadImagesResponse> => {

@@ -18,6 +18,7 @@ import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download,
 import JSZip from 'jszip'
 import { useImageViewerStore } from '@/stores/imageViewerStore'
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
+import { deleteImagesByUuid } from '@/services/images.service'
 import {
   Table,
   TableBody,
@@ -485,6 +486,34 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     }
   };
 
+  // Delete selected images
+  const handleDelete = async () => {
+    const selectedUuids = Object.keys(rowSelection);
+    if (selectedUuids.length === 0) {
+      alert(t('table.selectAtLeastOne'));
+      return;
+    }
+
+    if (!window.confirm(t('table.confirmDelete', { count: selectedUuids.length }))) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      await deleteImagesByUuid(selectedUuids);
+
+      // Clear selection and refresh data
+      setRowSelection({});
+      fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert(t('table.deleteError'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleViewImage = React.useCallback((image: Image) => {
     openViewer(image, data);
   }, [openViewer, data]);
@@ -571,6 +600,14 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           >
             <FileArchive className="mr-2 h-4 w-4" />
             {t('table.export')} ({Object.keys(rowSelection).length})
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={Object.keys(rowSelection).length === 0 || isLoading}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t('table.delete')} ({Object.keys(rowSelection).length})
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

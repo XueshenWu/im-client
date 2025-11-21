@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X } from 'lucide-react';
+import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageItem } from '@/types/gallery';
 import type { Image } from '@/types/api';
@@ -7,6 +7,7 @@ import CloudPhotoCard from './CloudPhotoCard';
 import { imageService } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
+import { deleteImagesByUuid } from '@/services/images.service';
 import JSZip from 'jszip';
 import { format } from 'date-fns';
 
@@ -241,6 +242,45 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     }
   };
 
+  // Delete handler
+  const handleDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    if (!window.confirm(t('gallery.confirmDelete', { count: selectedIds.size }))) {
+      return;
+    }
+
+    setExporting(true); // Reuse loading state
+    try {
+      // Get UUIDs from selected images
+      const uuids = Array.from(selectedIds)
+        .map(id => images.find(img => img.id === id)?.cloudData?.uuid)
+        .filter((uuid): uuid is string => uuid !== undefined);
+
+      if (uuids.length === 0) {
+        console.error('No valid UUIDs found');
+        return;
+      }
+
+      await deleteImagesByUuid(uuids);
+
+      // Reset state and trigger reload
+      setImages([]);
+      setCursor(undefined);
+      setHasMore(true);
+      loadingRef.current = false;
+      setReloadKey(prev => prev + 1);
+
+      // Clear selection
+      handleClearSelection();
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert(t('gallery.deleteError'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Initial load, reload when sorting changes, or when reloadKey changes
   useEffect(() => {
     loadCloudImages();
@@ -360,6 +400,16 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             >
               <Download className="h-4 w-4" />
               {exporting ? t('gallery.exporting') : `${t('gallery.export')} (${selectedIds.size})`}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              disabled={selectedIds.size === 0 || exporting}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('gallery.delete')} ({selectedIds.size})
             </Button>
             <Button
               variant="outline"
