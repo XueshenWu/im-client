@@ -24,6 +24,8 @@ import {
   uploadChunk,
   completeChunkedUpload,
 } from '@/services/images.service';
+import { useImageViewerStore } from '@/stores/imageViewerStore';
+import { Image } from '@/types/api';
 
 // Upload configuration
 const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
@@ -37,19 +39,48 @@ interface UploadStatus {
   error?: string;
 }
 
+
+const fileToMockImage = (file: FileWithPreview): Image => ({
+  id: 0,
+  uuid: file.preview,
+  filename: file.name,
+  originalName: file.name,
+  filePath: '',
+  thumbnailPath: '',
+  fileSize: file.size,
+  format: (file.type.split('/')[1] as 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff') || 'jpg',
+  width: 0,
+  height: 0,
+  hash: '',
+  mimeType: file.type,
+  isCorrupted: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  deletedAt: null,
+  previewUrl: file.preview,
+});
+
 // Define columns for the file list table
 const createColumns = (
   removeFile: (fileName: string) => void,
-  uploadStatuses: Map<string, UploadStatus>
+  uploadStatuses: Map<string, UploadStatus>,
+  onThumbnailClick: (file: FileWithPreview, index: number) => void,
+  files: FileWithPreview[]
 ): ColumnDef<FileWithPreview>[] => [
     {
       accessorKey: 'preview',
       header: 'Preview',
       cell: ({ row }) => {
         const file = row.original;
+        const isImage = file.type.startsWith('image/');
+        const fileIndex = files.findIndex(f => f.name === file.name);
+
         return (
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-50 bg-muted flex items-center justify-center">
-            {file.type.startsWith('image/') ? (
+          <div
+            className={`h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-50 bg-muted flex items-center justify-center ${isImage ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all' : ''}`}
+            onClick={() => isImage && onThumbnailClick(file, fileIndex)}
+          >
+            {isImage ? (
               <img
                 src={file.preview}
                 alt={file.name}
@@ -198,7 +229,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   const [uploadStatuses, setUploadStatuses] = React.useState<Map<string, UploadStatus>>(new Map());
   const [isUploading, setIsUploading] = React.useState(false);
   const [previousFileCount, setPreviousFileCount] = React.useState(0);
-
+  const { openViewer } = useImageViewerStore();
   const allFilesCompleted = React.useMemo(() => {
     if (files.length === 0) return false;
 
@@ -251,8 +282,26 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
     }
     setPreviousFileCount(files.length);
   }, [files.length, uploadStatuses, removeFile, previousFileCount]);
+  // Add this handler before the return statement
+  const handleThumbnailClick = (file: FileWithPreview, index: number) => {
+    // Only allow viewing images
+    if (!file.type.startsWith('image/')) return;
 
-  const columns = React.useMemo(() => createColumns(removeFile, uploadStatuses), [removeFile, uploadStatuses]);
+    // Convert all image files to mock image objects
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    const mockImages = imageFiles.map(fileToMockImage);
+    const imageIndex = imageFiles.findIndex(f => f.name === file.name);
+
+    // Open viewer in readonly mode (3rd parameter = true)
+    openViewer(mockImages[imageIndex], mockImages, true);
+  };
+
+  // Update the columns memo to include the handler and files:
+  const columns = React.useMemo(
+    () => createColumns(removeFile, uploadStatuses, handleThumbnailClick, files),
+    [removeFile, uploadStatuses, files]
+  );
+
 
   const table = useReactTable({
     data: files,

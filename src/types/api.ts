@@ -36,6 +36,7 @@ export interface Image {
   updatedAt: string
   deletedAt: string | null
   exifData?: ExifData
+  previewUrl?: string
 }
 
 export interface ExifData {

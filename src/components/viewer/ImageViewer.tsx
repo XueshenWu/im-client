@@ -27,6 +27,7 @@ import { uploadImageAuto, replaceImageAuto, deleteImage } from '@/services/image
 import { createCroppedImage, blobToFile } from '@/utils/cropImage';
 import { format } from 'date-fns';
 
+
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -43,6 +44,7 @@ export const ImageViewer: React.FC = () => {
     images,
     currentIndex,
     viewMode,
+    readOnly,
     closeViewer,
     nextImage,
     previousImage,
@@ -188,7 +190,7 @@ export const ImageViewer: React.FC = () => {
 
   if (!currentImage) return null;
 
-  const imageUrl = imageService.getImageFileUrl(currentImage.uuid);
+  const imageUrl = currentImage.previewUrl || imageService.getImageFileUrl(currentImage.uuid);
   const hasMultipleImages = images.length > 1;
 
   const handleDownload = async () => {
@@ -261,106 +263,112 @@ export const ImageViewer: React.FC = () => {
               {viewMode === 'view' ? (
                 // View mode controls
                 <>
-              {/* Zoom controls */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleZoomOut}
-                disabled={zoom <= 0.5}
-                className="text-white hover:bg-white/20"
-              >
-                <ZoomOut className="h-5 w-5" />
-              </Button>
-              <span className="text-white text-sm min-w-[60px] text-center">
-                {Math.round(zoom * 100)}%
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleZoomIn}
-                disabled={zoom >= 3}
-                className="text-white hover:bg-white/20"
-              >
-                <ZoomIn className="h-5 w-5" />
-              </Button>
+                  {/* Zoom controls */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleZoomOut}
+                    disabled={zoom <= 0.5}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <ZoomOut className="h-5 w-5" />
+                  </Button>
+                  <span className="text-white text-sm min-w-[60px] text-center">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleZoomIn}
+                    disabled={zoom >= 3}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <ZoomIn className="h-5 w-5" />
+                  </Button>
 
-              {/* Rotate */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRotate}
-                className="text-white hover:bg-white/20"
-              >
-                <RotateCw className="h-5 w-5" />
-              </Button>
+                  {/* Rotate */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRotate}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <RotateCw className="h-5 w-5" />
+                  </Button>
 
-              {/* Reset view */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleResetView}
-                className="text-white hover:bg-white/20"
-                title={t('viewer.resetView')}
-              >
-                <Maximize2 className="h-5 w-5" />
-              </Button>
+                  {/* Reset view */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleResetView}
+                    className="text-white hover:bg-white/20"
+                    title={t('viewer.resetView')}
+                  >
+                    <Maximize2 className="h-5 w-5" />
+                  </Button>
 
-              {/* Crop */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleEnterCropMode}
-                className="text-white hover:bg-white/20"
-                title={t('viewer.crop')}
-              >
-                <CropIcon className="h-5 w-5" />
-              </Button>
+                  {/* Crop - Hide in readonly mode */}
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleEnterCropMode}
+                      className="text-white hover:bg-white/20"
+                      title={t('viewer.crop')}
+                    >
+                      <CropIcon className="h-5 w-5" />
+                    </Button>
+                  )}
 
-              {/* Download */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDownload}
-                className="text-white hover:bg-white/20"
-                title={t('contextMenu.download')}
-              >
-                <Download className="h-5 w-5" />
-              </Button>
+                  {/* Download - Hide in readonly mode */}
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDownload}
+                      className="text-white hover:bg-white/20"
+                      title={t('contextMenu.download')}
+                    >
+                      <Download className="h-5 w-5" />
+                    </Button>
+                  )}
 
-              {/* Info toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowInfo(!showInfo)}
-                className="text-white hover:bg-white/20"
-                title={t('viewer.toggleInfo')}
-              >
-                <Info className="h-5 w-5" />
-              </Button>
+                  {/* Info toggle */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowInfo(!showInfo)}
+                    className="text-white hover:bg-white/20"
+                    title={t('viewer.toggleInfo')}
+                  >
+                    <Info className="h-5 w-5" />
+                  </Button>
 
-              {/* Delete */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDelete}
-                className="text-white hover:bg-red-500/80"
-                title={t('contextMenu.delete')}
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
+                  {/* Delete - Hide in readonly mode */}
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleDelete}
+                      className="text-white hover:bg-red-500/80"
+                      title={t('contextMenu.delete')}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
+                  )}
 
-              {/* Close */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={closeViewer}
-                className="text-white hover:bg-white/20"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-              </>
+                  {/* Close */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={closeViewer}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </>
               ) : (
-                // Crop mode controls
+                // Crop mode controls (unchanged)
                 <>
                   <Button
                     variant="ghost"
@@ -418,7 +426,7 @@ export const ImageViewer: React.FC = () => {
         )}
 
         {/* Main image container */}
-        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-full flex items-center justify-center overflow-hidden p-16">
           {viewMode === 'view' ? (
             // View mode - normal image with zoom/rotation
             <>
@@ -433,30 +441,34 @@ export const ImageViewer: React.FC = () => {
                 className="max-w-full max-h-full object-contain transition-transform duration-200"
                 style={{
                   transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                  maxWidth: '100%',
+                  maxHeight: '100%',
                 }}
                 onLoad={() => setImageLoaded(true)}
               />
             </>
           ) : (
             // Crop mode - react-image-crop component
-            <ReactCrop
-              crop={crop}
-              onChange={(c) => setCrop(c)}
-              onComplete={(c) => setCompletedCrop(c)}
-              className="max-h-full"
-            >
-              <img
-                ref={imgRef}
-                src={imageUrl}
-                alt={currentImage.originalName}
-                style={{
-                  width: 'min(90vw, 1200px)',
-                  maxHeight: 'calc(95vh - 120px)',
-                  objectFit: 'contain',
-                }}
-                crossOrigin="anonymous"
-              />
-            </ReactCrop>
+            <div className="flex items-center justify-center w-full h-full">
+              <ReactCrop
+                crop={crop}
+                onChange={(c) => setCrop(c)}
+                onComplete={(c) => setCompletedCrop(c)}
+                className="max-h-full max-w-full"
+              >
+                <img
+                  ref={imgRef}
+                  src={imageUrl}
+                  alt={currentImage.originalName}
+                  style={{
+                    maxWidth: 'calc(95vw - 8rem)',
+                    maxHeight: 'calc(95vh - 8rem)',
+                    objectFit: 'contain',
+                  }}
+                  crossOrigin="anonymous"
+                />
+              </ReactCrop>
+            </div>
           )}
         </div>
 
