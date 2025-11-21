@@ -106,6 +106,26 @@ export const batchUpload = async (config: Record<string, any>): Promise<any> => 
   return response.data
 }
 
+/**
+ * Replace an existing image with a new file
+ */
+export const replaceImage = async (uuid: string, file: File): Promise<Image> => {
+  const formData = new FormData()
+  formData.append('image', file)
+
+  const response = await api.put<ApiResponse<Image>>(
+    `/api/images/uuid/${uuid}/replace`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  )
+
+  return response.data.data
+}
+
 // ===== Chunked Upload APIs =====
 
 /**

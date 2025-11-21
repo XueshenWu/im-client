@@ -45,7 +45,13 @@
     "format": "Format",
     "dimensions": "Dimensions",
     "uploaded": "Uploaded",
-    "modified": "Modified"
+    "modified": "Modified",
+    "crop": "Crop",
+    "cropMode": "Crop Mode",
+    "saveAsNew": "Save as New",
+    "replaceOriginal": "Replace Original",
+    "cancel": "Cancel",
+    "processing": "Processing..."
   },
   "table": {
     "preview": "Preview",

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   X,
@@ -9,12 +9,20 @@ import {
   Download,
   RotateCw,
   Maximize2,
-  Info
+  Info,
+  Crop,
+  Check,
+  Save
 } from 'lucide-react';
+import Cropper from 'react-easy-crop';
+import type { Area, Point } from 'react-easy-crop';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { imageService } from '@/services/api';
+import { uploadImages, replaceImage } from '@/services/images.service';
+import { createCroppedImage, blobToFile } from '@/utils/cropImage';
 import { format } from 'date-fns';
 
 const formatBytes = (bytes: number) => {
@@ -32,9 +40,12 @@ export const ImageViewer: React.FC = () => {
     currentImage,
     images,
     currentIndex,
+    viewMode,
     closeViewer,
     nextImage,
     previousImage,
+    enterCropMode,
+    exitCropMode,
   } = useImageViewerStore();
 
   const [zoom, setZoom] = useState(1);
@@ -42,20 +53,111 @@ export const ImageViewer: React.FC = () => {
   const [showInfo, setShowInfo] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
+  // Crop mode states
+  const [cropZoom, setCropZoom] = useState(1);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
+
+  const { triggerRefresh } = useGalleryRefreshStore();
+
   // Reset zoom and rotation when image changes
   useEffect(() => {
     if (currentImage) {
       setZoom(1);
       setRotation(0);
       setImageLoaded(false);
+      setCropZoom(1);
+      setCrop({ x: 0, y: 0 });
     }
   }, [currentImage]);
+
+  // Reset crop mode when closing viewer
+  useEffect(() => {
+    if (!isOpen) {
+      exitCropMode();
+    }
+  }, [isOpen, exitCropMode]);
+
+  // Crop complete callback
+  const onCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  // Handle entering crop mode
+  const handleEnterCropMode = () => {
+    enterCropMode();
+    setCropZoom(1);
+    setCrop({ x: 0, y: 0 });
+  };
+
+  // Handle canceling crop
+  const handleCancelCrop = () => {
+    exitCropMode();
+    setCropZoom(1);
+    setCrop({ x: 0, y: 0 });
+  };
+
+  // Handle saving cropped image
+  const handleSaveCrop = async (replaceOriginal: boolean) => {
+    if (!currentImage || !croppedAreaPixels) return;
+
+    setIsCropping(true);
+    try {
+      const imageUrl = imageService.getImageFileUrl(currentImage.uuid);
+
+      // Determine format based on original image
+      const format = currentImage.format === 'png' ? 'png' : 'jpeg';
+
+      // Create cropped image blob
+      const croppedBlob = await createCroppedImage(
+        imageUrl,
+        croppedAreaPixels,
+        format,
+        0.95
+      );
+
+      // Convert blob to file
+      const fileName = replaceOriginal
+        ? currentImage.originalName
+        : `cropped_${currentImage.originalName}`;
+      const croppedFile = blobToFile(croppedBlob, fileName);
+
+      if (replaceOriginal) {
+        // Replace the original image
+        await replaceImage(currentImage.uuid, croppedFile);
+      } else {
+        // Upload as new image
+        await uploadImages([croppedFile]);
+      }
+
+      // Trigger gallery refresh to show updated data
+      triggerRefresh();
+
+      // Exit crop mode and close viewer
+      exitCropMode();
+      closeViewer();
+    } catch (error) {
+      console.error('Error saving cropped image:', error);
+    } finally {
+      setIsCropping(false);
+    }
+  };
 
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // In crop mode, only allow Escape to cancel
+      if (viewMode === 'crop') {
+        if (e.key === 'Escape') {
+          handleCancelCrop();
+        }
+        return;
+      }
+
+      // Normal view mode keyboard shortcuts
       switch (e.key) {
         case 'Escape':
           closeViewer();
@@ -87,7 +189,7 @@ export const ImageViewer: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, images.length, closeViewer, nextImage, previousImage]);
+  }, [isOpen, images.length, viewMode, closeViewer, nextImage, previousImage, handleCancelCrop]);
 
   if (!currentImage) return null;
 
@@ -131,14 +233,22 @@ export const ImageViewer: React.FC = () => {
               <h2 className="text-lg font-semibold truncate max-w-[400px]">
                 {currentImage.originalName}
               </h2>
-              {hasMultipleImages && (
+              {hasMultipleImages && viewMode === 'view' && (
                 <span className="text-sm text-gray-300">
                   {currentIndex + 1} / {images.length}
+                </span>
+              )}
+              {viewMode === 'crop' && (
+                <span className="text-sm text-yellow-400">
+                  {t('viewer.cropMode')}
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-2">
+              {viewMode === 'view' ? (
+                // View mode controls
+                <>
               {/* Zoom controls */}
               <Button
                 variant="ghost"
@@ -183,6 +293,17 @@ export const ImageViewer: React.FC = () => {
                 <Maximize2 className="h-5 w-5" />
               </Button>
 
+              {/* Crop */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleEnterCropMode}
+                className="text-white hover:bg-white/20"
+                title={t('viewer.crop')}
+              >
+                <Crop className="h-5 w-5" />
+              </Button>
+
               {/* Download */}
               <Button
                 variant="ghost"
@@ -214,12 +335,45 @@ export const ImageViewer: React.FC = () => {
               >
                 <X className="h-5 w-5" />
               </Button>
+              </>
+              ) : (
+                // Crop mode controls
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCancelCrop}
+                    className="text-white hover:bg-white/20"
+                    title={t('viewer.cancel')}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSaveCrop(false)}
+                    disabled={isCropping || !croppedAreaPixels}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <Save className="h-5 w-5 mr-2" />
+                    {isCropping ? t('viewer.processing') : t('viewer.saveAsNew')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSaveCrop(true)}
+                    disabled={isCropping || !croppedAreaPixels}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <Check className="h-5 w-5 mr-2" />
+                    {isCropping ? t('viewer.processing') : t('viewer.replaceOriginal')}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Navigation arrows */}
-        {hasMultipleImages && (
+        {/* Navigation arrows - only in view mode */}
+        {hasMultipleImages && viewMode === 'view' && (
           <>
             <Button
               variant="ghost"
@@ -242,24 +396,45 @@ export const ImageViewer: React.FC = () => {
 
         {/* Main image container */}
         <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
-            </div>
+          {viewMode === 'view' ? (
+            // View mode - normal image with zoom/rotation
+            <>
+              {!imageLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
+                </div>
+              )}
+              <img
+                src={imageUrl}
+                alt={currentImage.originalName}
+                className="max-w-full max-h-full object-contain transition-transform duration-200"
+                style={{
+                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                }}
+                onLoad={() => setImageLoaded(true)}
+              />
+            </>
+          ) : (
+            // Crop mode - react-easy-crop component
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={cropZoom}
+              aspect={undefined}
+              onCropChange={setCrop}
+              onZoomChange={setCropZoom}
+              onCropComplete={onCropComplete}
+              style={{
+                containerStyle: {
+                  backgroundColor: 'black',
+                },
+              }}
+            />
           )}
-          <img
-            src={imageUrl}
-            alt={currentImage.originalName}
-            className="max-w-full max-h-full object-contain transition-transform duration-200"
-            style={{
-              transform: `scale(${zoom}) rotate(${rotation}deg)`,
-            }}
-            onLoad={() => setImageLoaded(true)}
-          />
         </div>
 
-        {/* Info panel */}
-        {showInfo && (
+        {/* Info panel - only in view mode */}
+        {showInfo && viewMode === 'view' && (
           <div className="absolute bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-black/90 to-transparent p-6">
             <div className="grid grid-cols-2 gap-4 text-white text-sm max-w-2xl">
               <div>

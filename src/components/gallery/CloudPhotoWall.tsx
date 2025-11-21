@@ -6,6 +6,7 @@ import type { Image } from '@/types/api';
 import CloudPhotoCard from './CloudPhotoCard';
 import { imageService } from '@/services/api';
 import { Button } from '@/components/ui/button';
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import JSZip from 'jszip';
 import { format } from 'date-fns';
 
@@ -21,6 +22,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   gap = 12
 }) => {
   const { t } = useTranslation();
+  const { refreshTrigger } = useGalleryRefreshStore();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -94,6 +96,17 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
       loadingRef.current = false;
     }
   }, [cursor, hasMore, sortBy, sortOrder]);
+
+  // Listen for gallery refresh trigger (e.g., after image crop/save)
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      // Reset and reload images from the beginning
+      setImages([]);
+      setCursor(undefined);
+      setHasMore(true);
+      loadingRef.current = false;
+    }
+  }, [refreshTrigger]);
 
   // Handle sort changes - reset and reload
   const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {

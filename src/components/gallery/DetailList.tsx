@@ -17,6 +17,7 @@ import {
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive } from "lucide-react"
 import JSZip from 'jszip'
 import { useImageViewerStore } from '@/stores/imageViewerStore'
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
 import {
   Table,
   TableBody,
@@ -311,6 +312,7 @@ export const createColumns = (
 export default function DetailList() {
   const { t } = useTranslation()
   const { openViewer } = useImageViewerStore()
+  const { refreshTrigger } = useGalleryRefreshStore()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -352,6 +354,13 @@ export default function DetailList() {
   React.useEffect(() => {
     fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
   }, [pagination.page, pagination.pageSize, sortBy, sortOrder]);
+
+  // Listen for gallery refresh trigger (e.g., after image crop/save)
+  React.useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
+    }
+  }, [refreshTrigger]);
 
   // Handle sort column click
   const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {

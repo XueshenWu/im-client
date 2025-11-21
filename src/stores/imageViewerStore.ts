@@ -1,16 +1,21 @@
 import { create } from 'zustand';
 import type { Image } from '@/types/api';
 
+type ViewMode = 'view' | 'crop';
+
 interface ImageViewerStore {
   isOpen: boolean;
   currentImage: Image | null;
   images: Image[];
   currentIndex: number;
+  viewMode: ViewMode;
   openViewer: (image: Image, allImages?: Image[]) => void;
   closeViewer: () => void;
   nextImage: () => void;
   previousImage: () => void;
   setCurrentIndex: (index: number) => void;
+  enterCropMode: () => void;
+  exitCropMode: () => void;
 }
 
 export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
@@ -18,6 +23,7 @@ export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
   currentImage: null,
   images: [],
   currentIndex: 0,
+  viewMode: 'view',
 
   openViewer: (image: Image, allImages?: Image[]) => {
     const images = allImages || [image];
@@ -39,6 +45,7 @@ export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
       currentImage: null,
       images: [],
       currentIndex: 0,
+      viewMode: 'view',
     });
   },
 
@@ -72,5 +79,13 @@ export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
         currentImage: images[index],
       });
     }
+  },
+
+  enterCropMode: () => {
+    set({ viewMode: 'crop' });
+  },
+
+  exitCropMode: () => {
+    set({ viewMode: 'view' });
   },
 }));

@@ -45,7 +45,13 @@
     "format": "Format",
     "dimensions": "Dimensions",
     "uploaded": "Téléchargé",
-    "modified": "Modifié"
+    "modified": "Modifié",
+    "crop": "Recadrer",
+    "cropMode": "Mode Recadrage",
+    "saveAsNew": "Sauvegarder comme nouveau",
+    "replaceOriginal": "Remplacer l'original",
+    "cancel": "Annuler",
+    "processing": "Traitement en cours..."
   },
   "table": {
     "preview": "Aperçu",
