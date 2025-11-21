@@ -95,10 +95,10 @@ const SortableHeader = ({
   onSort
 }: {
   label: string;
-  column: 'name' | 'size' | 'type' | 'updatedAt';
-  sortBy: 'name' | 'size' | 'type' | 'updatedAt' | null;
+  column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt';
+  sortBy: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null;
   sortOrder: 'asc' | 'desc';
-  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt') => void;
+  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => void;
 }) => {
   const isActive = sortBy === column;
   const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
@@ -116,9 +116,9 @@ const SortableHeader = ({
 };
 
 export const createColumns = (
-  sortBy: 'name' | 'size' | 'type' | 'updatedAt' | null,
+  sortBy: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null,
   sortOrder: 'asc' | 'desc',
-  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt') => void,
+  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => void,
   t: (key: string) => string,
   onViewImage: (image: Image) => void
 ): ColumnDef<Image>[] => [
@@ -243,6 +243,25 @@ export const createColumns = (
     maxSize: 170,
   },
   {
+    accessorKey: "createdAt",
+    header: () => (
+      <SortableHeader
+        label={t('table.createdDate')}
+        column="createdAt"
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={onSort}
+      />
+    ),
+    cell: ({ row }) => {
+      const dateStr = format(new Date(row.getValue("createdAt")), "yyyy-MM-dd HH:mm");
+      return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+    },
+    size: 150,
+    minSize: 130,
+    maxSize: 170,
+  },
+  {
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
@@ -321,7 +340,7 @@ export default function DetailList() {
   const [isLoading, setIsLoading] = React.useState(false)
 
   // Backend sorting state
-  const [sortBy, setSortBy] = React.useState<'name' | 'size' | 'type' | 'updatedAt' | null>(null)
+  const [sortBy, setSortBy] = React.useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('createdAt')
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
 
   const [data, setData] = React.useState<Image[]>([])
