@@ -450,6 +450,7 @@ export const ImageViewer: React.FC = () => {
               image={imageUrl}
               crop={crop}
               zoom={cropZoom}
+              aspect={undefined}
               onCropChange={setCrop}
               onZoomChange={setCropZoom}
               onCropComplete={onCropComplete}
