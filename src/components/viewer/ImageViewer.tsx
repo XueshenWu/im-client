@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   X,
@@ -10,13 +10,13 @@ import {
   RotateCw,
   Maximize2,
   Info,
-  Crop,
+  Crop as CropIcon,
   Check,
   Save,
   Trash2
 } from 'lucide-react';
-import Cropper from 'react-easy-crop';
-import type { Area, Point } from 'react-easy-crop';
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
@@ -56,10 +56,10 @@ export const ImageViewer: React.FC = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Crop mode states
-  const [cropZoom, setCropZoom] = useState(1);
-  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [isCropping, setIsCropping] = useState(false);
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
   const { triggerRefresh } = useGalleryRefreshStore();
 
@@ -69,8 +69,8 @@ export const ImageViewer: React.FC = () => {
       setZoom(1);
       setRotation(0);
       setImageLoaded(false);
-      setCropZoom(1);
-      setCrop({ x: 0, y: 0 });
+      setCrop(undefined);
+      setCompletedCrop(undefined);
     }
   }, [currentImage]);
 
@@ -81,40 +81,33 @@ export const ImageViewer: React.FC = () => {
     }
   }, [isOpen, exitCropMode]);
 
-  // Crop complete callback
-  const onCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
   // Handle entering crop mode
   const handleEnterCropMode = () => {
     enterCropMode();
-    setCropZoom(1);
-    setCrop({ x: 0, y: 0 });
+    setCrop(undefined);
+    setCompletedCrop(undefined);
   };
 
   // Handle canceling crop
   const handleCancelCrop = () => {
     exitCropMode();
-    setCropZoom(1);
-    setCrop({ x: 0, y: 0 });
+    setCrop(undefined);
+    setCompletedCrop(undefined);
   };
 
   // Handle saving cropped image
   const handleSaveCrop = async (replaceOriginal: boolean) => {
-    if (!currentImage || !croppedAreaPixels) return;
+    if (!currentImage || !completedCrop || !imgRef.current) return;
 
     setIsCropping(true);
     try {
-      const imageUrl = imageService.getImageFileUrl(currentImage.uuid);
-
       // Determine format based on original image
       const format = currentImage.format === 'png' ? 'png' : 'jpeg';
 
-      // Create cropped image blob
+      // Create cropped image blob using the actual image element
       const croppedBlob = await createCroppedImage(
-        imageUrl,
-        croppedAreaPixels,
+        imgRef.current,
+        completedCrop,
         format,
         0.95
       );
@@ -320,7 +313,7 @@ export const ImageViewer: React.FC = () => {
                 className="text-white hover:bg-white/20"
                 title={t('viewer.crop')}
               >
-                <Crop className="h-5 w-5" />
+                <CropIcon className="h-5 w-5" />
               </Button>
 
               {/* Download */}
@@ -381,7 +374,7 @@ export const ImageViewer: React.FC = () => {
                   <Button
                     variant="ghost"
                     onClick={() => handleSaveCrop(false)}
-                    disabled={isCropping || !croppedAreaPixels}
+                    disabled={isCropping || !completedCrop}
                     className="text-white hover:bg-white/20"
                   >
                     <Save className="h-5 w-5 mr-2" />
@@ -390,7 +383,7 @@ export const ImageViewer: React.FC = () => {
                   <Button
                     variant="ghost"
                     onClick={() => handleSaveCrop(true)}
-                    disabled={isCropping || !croppedAreaPixels}
+                    disabled={isCropping || !completedCrop}
                     className="text-white hover:bg-white/20"
                   >
                     <Check className="h-5 w-5 mr-2" />
@@ -445,22 +438,21 @@ export const ImageViewer: React.FC = () => {
               />
             </>
           ) : (
-            // Crop mode - react-easy-crop component
-            <Cropper
-              image={imageUrl}
+            // Crop mode - react-image-crop component
+            <ReactCrop
               crop={crop}
-              zoom={cropZoom}
-              aspect={undefined}
-              onCropChange={setCrop}
-              onZoomChange={setCropZoom}
-              onCropComplete={onCropComplete}
-              showGrid={true}
-              style={{
-                containerStyle: {
-                  backgroundColor: 'black',
-                },
-              }}
-            />
+              onChange={(c) => setCrop(c)}
+              onComplete={(c) => setCompletedCrop(c)}
+              className="max-h-full"
+            >
+              <img
+                ref={imgRef}
+                src={imageUrl}
+                alt={currentImage.originalName}
+                className="max-w-full max-h-[calc(95vh-120px)] object-contain"
+                crossOrigin="anonymous"
+              />
+            </ReactCrop>
           )}
         </div>
 

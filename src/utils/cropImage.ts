@@ -1,30 +1,24 @@
 /**
  * Crop image utility using Canvas API
- * Based on react-easy-crop's documentation
+ * For use with react-image-crop
  */
 
-export interface CropArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+import type { PixelCrop } from 'react-image-crop';
 
 /**
- * Creates a cropped image from the source image
- * @param imageSrc - Source image URL
- * @param pixelCrop - Crop area in pixels
+ * Creates a cropped image from an HTMLImageElement
+ * @param image - Source image element
+ * @param crop - Crop area in pixels from react-image-crop
  * @param format - Output format (jpeg, png)
  * @param quality - JPEG quality (0-1)
  * @returns Promise that resolves to a Blob of the cropped image
  */
 export const createCroppedImage = async (
-  imageSrc: string,
-  pixelCrop: CropArea,
+  image: HTMLImageElement,
+  crop: PixelCrop,
   format: 'jpeg' | 'png' = 'jpeg',
   quality: number = 0.95
 ): Promise<Blob> => {
-  const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -32,21 +26,25 @@ export const createCroppedImage = async (
     throw new Error('Failed to get canvas context');
   }
 
-  // Set canvas size to match crop area
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  // Calculate scale between displayed image and natural size
+  const scaleX = image.naturalWidth / image.width;
+  const scaleY = image.naturalHeight / image.height;
+
+  // Set canvas size to match crop area at natural resolution
+  canvas.width = crop.width * scaleX;
+  canvas.height = crop.height * scaleY;
 
   // Draw the cropped portion of the image
   ctx.drawImage(
     image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
+    crop.x * scaleX,
+    crop.y * scaleY,
+    crop.width * scaleX,
+    crop.height * scaleY,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    canvas.width,
+    canvas.height
   );
 
   // Convert canvas to blob
@@ -62,21 +60,6 @@ export const createCroppedImage = async (
       `image/${format}`,
       quality
     );
-  });
-};
-
-/**
- * Helper function to create an Image element from a URL
- * @param url - Image URL
- * @returns Promise that resolves to an HTMLImageElement
- */
-const createImage = (url: string): Promise<HTMLImageElement> => {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.addEventListener('load', () => resolve(image));
-    image.addEventListener('error', (error) => reject(error));
-    image.setAttribute('crossOrigin', 'anonymous'); // Needed to avoid CORS issues
-    image.src = url;
   });
 };
 
