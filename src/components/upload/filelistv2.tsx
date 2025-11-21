@@ -198,7 +198,15 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   const [uploadStatuses, setUploadStatuses] = React.useState<Map<string, UploadStatus>>(new Map());
   const [isUploading, setIsUploading] = React.useState(false);
   const [previousFileCount, setPreviousFileCount] = React.useState(0);
-  const [syncToCloud, setSyncToCloud] = React.useState(true);
+
+  const allFilesCompleted = React.useMemo(() => {
+    if (files.length === 0) return false;
+
+    return files.every(file => {
+      const status = uploadStatuses.get(file.name);
+      return status?.status === 'completed';
+    });
+  }, [files, uploadStatuses]);
 
   // Set staged status for new files that don't have a status yet
   React.useEffect(() => {
@@ -519,20 +527,23 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           className={"text-white cursor-pointer " + (files.length === 0 || isUploading ? "bg-red-200" : "bg-red-600 hover:bg-red-500")}
           disabled={files.length === 0 || isUploading}
           onClick={() => {
-            const confirmed = window.confirm(
-              `Are you sure you want to clear all ${files.length} file${files.length !== 1 ? 's' : ''}?`
-            );
-            if (confirmed) {
-              files.forEach(file => removeFile(file.name));
-              setUploadStatuses(new Map());
+            // Skip confirmation if all files are completed
+            if (!allFilesCompleted) {
+              const confirmed = window.confirm(
+                `Are you sure you want to clear all ${files.length} file${files.length !== 1 ? 's' : ''}?`
+              );
+              if (!confirmed) return;
             }
+
+            files.forEach(file => removeFile(file.name));
+            setUploadStatuses(new Map());
           }}
         >
           Clear All
         </Button>
         <Button
           className={"flex-1 cursor-pointer text-white " + (files.length === 0 || isUploading ? "bg-blue-100" : "bg-blue-600 hover:bg-blue-500")}
-          disabled={files.length === 0 || isUploading}
+          disabled={files.length === 0 || isUploading || allFilesCompleted}
           onClick={handleSubmit}
         >
           {isUploading ? 'Uploading...' : `Submit ${files.length > 0 ? `(${files.length} files)` : ''}`}
