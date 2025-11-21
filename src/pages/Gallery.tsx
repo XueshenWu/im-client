@@ -1,13 +1,13 @@
+import { useState } from "react";
+import { useTranslation } from 'react-i18next'
 import CloudPhotoWall from "@/components/gallery/CloudPhotoWall";
 import HomeLink from '@/components/common/home-link'
 import { ViewSwitch, type View } from "@/components/gallery/ViewSwitch";
-import { useState } from "react";
 import DetailList from "@/components/gallery/DetailList";
 
 
 export default function Gallery() {
-
-
+  const { t } = useTranslation()
   const [view, setView] = useState<View>("photowall");
 
 
@@ -20,7 +20,7 @@ export default function Gallery() {
               <div className='flex items-center justify-between gap-3'>
 
                 <h1 className='text-4xl font-bold font-sans text-gray-900'>
-                  Gallery
+                  {t('navigation.gallery')}
                 </h1>
 
                 <ViewSwitch onViewChange={setView} />

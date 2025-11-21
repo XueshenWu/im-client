@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2, Download, Eye, Trash2, Copy, CheckSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ImageItem } from '@/types/gallery';
 import {
   ContextMenu,
@@ -10,6 +11,7 @@ import {
 } from '@/components/ui/context-menu';
 import { imageService } from '@/services/api';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useImageViewerStore } from '@/stores/imageViewerStore';
 
 interface CloudPhotoCardProps {
   image: ImageItem;
@@ -26,6 +28,8 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   onSelect,
   onStartSelection
 }) => {
+  const { t } = useTranslation();
+  const { openViewer } = useImageViewerStore();
   // Ensure this is a cloud image
   if (image.source !== 'cloud') {
     console.warn('CloudPhotoCard received non-cloud image');
@@ -80,6 +84,15 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
     if (selectionMode && onSelect && image.id) {
       e.preventDefault();
       onSelect(image.id);
+    } else if (!selectionMode && cloudData) {
+      // Open viewer when clicking the card (not in selection mode)
+      openViewer(cloudData);
+    }
+  };
+
+  const handleViewDetails = () => {
+    if (cloudData) {
+      openViewer(cloudData);
     }
   };
 
@@ -136,28 +149,28 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           <>
             <ContextMenuItem onClick={handleSelect}>
               <CheckSquare className="mr-2 h-4 w-4" />
-              Select
+              {t('contextMenu.select')}
             </ContextMenuItem>
             <ContextMenuSeparator />
           </>
         )}
         <ContextMenuItem onClick={handleCopyId}>
           <Copy className="mr-2 h-4 w-4" />
-          Copy Image ID
+          {t('contextMenu.copyId')}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem>
+        <ContextMenuItem onClick={handleViewDetails}>
           <Eye className="mr-2 h-4 w-4" />
-          View Details
+          {t('contextMenu.viewDetails')}
         </ContextMenuItem>
         <ContextMenuItem onClick={handleDownload}>
           <Download className="mr-2 h-4 w-4" />
-          Download
+          {t('contextMenu.download')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem className="text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
-          Delete
+          {t('contextMenu.delete')}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

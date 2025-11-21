@@ -3,8 +3,11 @@
     "title": "Image Management"
   },
   "navigation": {
+    "dashboard": "Dashboard",
     "upload": "Upload",
     "gallery": "Gallery",
+    "sync": "Sync",
+    "activity": "Activity",
     "collections": "Collections",
     "settings": "Settings"
   },
@@ -34,19 +37,46 @@
     "download": "Download",
     "delete": "Delete"
   },
+  "viewer": {
+    "resetView": "Reset View",
+    "toggleInfo": "Toggle Info",
+    "filename": "Filename",
+    "fileSize": "File Size",
+    "format": "Format",
+    "dimensions": "Dimensions",
+    "uploaded": "Uploaded",
+    "modified": "Modified"
+  },
   "table": {
     "preview": "Preview",
+    "name": "Name",
     "filename": "Filename",
     "format": "Format",
     "size": "Size",
+    "type": "Type",
     "lastModified": "Last Modified",
     "actions": "Actions",
-    "rowsSelected": "row(s) selected",
+    "rowsSelected": "{{count}} row(s) selected",
     "previous": "Previous",
     "next": "Next",
     "page": "Page",
+    "pageInfo": "Page {{current}} of {{total}}",
     "of": "of",
-    "rowsPerPage": "Rows per page"
+    "rowsPerPage": "Rows per page",
+    "filterByName": "Filter by name...",
+    "clearSelection": "Clear selection",
+    "export": "Export",
+    "columns": "Columns",
+    "noImages": "No images found.",
+    "goToFirstPage": "Go to first page",
+    "goToPreviousPage": "Go to previous page",
+    "goToNextPage": "Go to next page",
+    "goToLastPage": "Go to last page"
+  },
+  "pages": {
+    "upload": {
+      "title": "File Upload"
+    }
   },
   "upload": {
     "title": "Upload Images",

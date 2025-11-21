@@ -3,8 +3,11 @@
     "title": "Gestion d'Images"
   },
   "navigation": {
+    "dashboard": "Tableau de bord",
     "upload": "Télécharger",
     "gallery": "Galerie",
+    "sync": "Synchroniser",
+    "activity": "Activité",
     "collections": "Collections",
     "settings": "Paramètres"
   },
@@ -34,19 +37,46 @@
     "download": "Télécharger",
     "delete": "Supprimer"
   },
+  "viewer": {
+    "resetView": "Réinitialiser la vue",
+    "toggleInfo": "Afficher/Masquer les infos",
+    "filename": "Nom du fichier",
+    "fileSize": "Taille du fichier",
+    "format": "Format",
+    "dimensions": "Dimensions",
+    "uploaded": "Téléchargé",
+    "modified": "Modifié"
+  },
   "table": {
     "preview": "Aperçu",
+    "name": "Nom",
     "filename": "Nom du fichier",
     "format": "Format",
     "size": "Taille",
+    "type": "Type",
     "lastModified": "Dernière Modification",
     "actions": "Actions",
-    "rowsSelected": "ligne(s) sélectionnée(s)",
+    "rowsSelected": "{{count}} ligne(s) sélectionnée(s)",
     "previous": "Précédent",
     "next": "Suivant",
     "page": "Page",
+    "pageInfo": "Page {{current}} sur {{total}}",
     "of": "sur",
-    "rowsPerPage": "Lignes par page"
+    "rowsPerPage": "Lignes par page",
+    "filterByName": "Filtrer par nom...",
+    "clearSelection": "Effacer la sélection",
+    "export": "Exporter",
+    "columns": "Colonnes",
+    "noImages": "Aucune image trouvée.",
+    "goToFirstPage": "Aller à la première page",
+    "goToPreviousPage": "Aller à la page précédente",
+    "goToNextPage": "Aller à la page suivante",
+    "goToLastPage": "Aller à la dernière page"
+  },
+  "pages": {
+    "upload": {
+      "title": "Téléchargement de fichiers"
+    }
   },
   "upload": {
     "title": "Télécharger des images",

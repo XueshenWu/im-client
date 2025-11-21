@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from 'react-i18next'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -15,6 +16,7 @@ import {
 } from "@tanstack/react-table"
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive } from "lucide-react"
 import JSZip from 'jszip'
+import { useImageViewerStore } from '@/stores/imageViewerStore'
 import {
   Table,
   TableBody,
@@ -114,7 +116,9 @@ const SortableHeader = ({
 export const createColumns = (
   sortBy: 'name' | 'size' | 'type' | 'updatedAt' | null,
   sortOrder: 'asc' | 'desc',
-  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt') => void
+  onSort: (column: 'name' | 'size' | 'type' | 'updatedAt') => void,
+  t: (key: string) => string,
+  onViewImage: (image: Image) => void
 ): ColumnDef<Image>[] => [
   {
     id: "select",
@@ -143,7 +147,7 @@ export const createColumns = (
   },
   {
     accessorKey: "thumbnailPath",
-    header: "Preview",
+    header: () => t('table.preview'),
     cell: ({ row }) => {
       const thumbnailUrl = imageService.getThumbnailUrl(row.original.thumbnailPath);
       return <Thumbnail src={thumbnailUrl} />;
@@ -157,7 +161,7 @@ export const createColumns = (
     accessorKey: "originalName",
     header: () => (
       <SortableHeader
-        label="Name"
+        label={t('table.name')}
         column="name"
         sortBy={sortBy}
         sortOrder={sortOrder}
@@ -187,7 +191,7 @@ export const createColumns = (
     accessorKey: "fileSize",
     header: () => (
       <SortableHeader
-        label="Size"
+        label={t('table.size')}
         column="size"
         sortBy={sortBy}
         sortOrder={sortOrder}
@@ -203,7 +207,7 @@ export const createColumns = (
     accessorKey: "format",
     header: () => (
       <SortableHeader
-        label="Type"
+        label={t('table.type')}
         column="type"
         sortBy={sortBy}
         sortOrder={sortOrder}
@@ -221,7 +225,7 @@ export const createColumns = (
     accessorKey: "updatedAt",
     header: () => (
       <SortableHeader
-        label="Last Modified"
+        label={t('table.lastModified')}
         column="updatedAt"
         sortBy={sortBy}
         sortOrder={sortOrder}
@@ -275,24 +279,24 @@ export const createColumns = (
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(image.uuid)}
             >
-              Copy image ID
+              {t('contextMenu.copyId')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onViewImage(image)}>
               <Eye className="mr-2 h-4 w-4" />
-              View details
+              {t('contextMenu.viewDetails')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleDownload}>
               <Download className="mr-2 h-4 w-4" />
-              Download
+              {t('contextMenu.download')}
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('contextMenu.delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -305,6 +309,8 @@ export const createColumns = (
 ];
 
 export default function DetailList() {
+  const { t } = useTranslation()
+  const { openViewer } = useImageViewerStore()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -470,10 +476,14 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     }
   };
 
+  const handleViewImage = React.useCallback((image: Image) => {
+    openViewer(image, data);
+  }, [openViewer, data]);
+
   // Create columns with current sort state
   const columns = React.useMemo(
-    () => createColumns(sortBy, sortOrder, handleSort),
-    [sortBy, sortOrder]
+    () => createColumns(sortBy, sortOrder, handleSort, t, handleViewImage),
+    [sortBy, sortOrder, t, handleSort, handleViewImage]
   );
 
   const table = useReactTable({
@@ -528,7 +538,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
       {/* Filter and Column Visibility Controls */}
       <div className="flex items-center justify-between shrink-0">
         <Input
-          placeholder="Filter by name..."
+          placeholder={t('table.filterByName')}
           value={(table.getColumn("originalName")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn("originalName")?.setFilterValue(event.target.value)
@@ -542,7 +552,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               onClick={() => setRowSelection({})}
               className="h-8 px-2 lg:px-3"
             >
-              Clear selection
+              {t('table.clearSelection')}
             </Button>
           )}
           <Button
@@ -551,12 +561,12 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             disabled={Object.keys(rowSelection).length === 0 || isLoading}
           >
             <FileArchive className="mr-2 h-4 w-4" />
-            Export ({Object.keys(rowSelection).length})
+            {t('table.export')} ({Object.keys(rowSelection).length})
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
-                Columns <ChevronDown className="ml-2 h-4 w-4" />
+                {t('table.columns')} <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -616,7 +626,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
                 >
                   <div className="flex items-center justify-center">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                    <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+                    <span className="ml-2 text-sm text-muted-foreground">{t('common.loading')}</span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -646,7 +656,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  <div className="text-muted-foreground">No images found.</div>
+                  <div className="text-muted-foreground">{t('table.noImages')}</div>
                 </TableCell>
               </TableRow>
             )}
@@ -658,13 +668,13 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
       <div className="flex items-center justify-between shrink-0">
         <div className="flex-1 text-sm text-muted-foreground">
           {Object.keys(rowSelection).length > 0 && (
-            <span>{Object.keys(rowSelection).length} row(s) selected</span>
+            <span>{t('table.rowsSelected', { count: Object.keys(rowSelection).length })}</span>
           )}
         </div>
         <div className="flex items-center space-x-6 lg:space-x-8">
           {/* Page Size Selector */}
           <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
+            <p className="text-sm font-medium">{t('table.rowsPerPage')}</p>
             <Select
               value={`${pagination.pageSize}`}
               onValueChange={(value) => handlePageSizeChange(Number(value))}
@@ -684,7 +694,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
 
           {/* Page Info */}
           <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-            Page {pagination.page} of {pagination.totalPages}
+            {t('table.pageInfo', { current: pagination.page, total: pagination.totalPages })}
           </div>
 
           {/* Navigation Buttons */}
@@ -695,7 +705,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               onClick={goToFirstPage}
               disabled={!pagination.hasPrev}
             >
-              <span className="sr-only">Go to first page</span>
+              <span className="sr-only">{t('table.goToFirstPage')}</span>
               <ChevronsLeft className="h-4 w-4" />
             </Button>
             <Button
@@ -704,7 +714,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               onClick={goToPreviousPage}
               disabled={!pagination.hasPrev}
             >
-              <span className="sr-only">Go to previous page</span>
+              <span className="sr-only">{t('table.goToPreviousPage')}</span>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
@@ -713,7 +723,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               onClick={goToNextPage}
               disabled={!pagination.hasNext}
             >
-              <span className="sr-only">Go to next page</span>
+              <span className="sr-only">{t('table.goToNextPage')}</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button
@@ -722,7 +732,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               onClick={goToLastPage}
               disabled={!pagination.hasNext}
             >
-              <span className="sr-only">Go to last page</span>
+              <span className="sr-only">{t('table.goToLastPage')}</span>
               <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>

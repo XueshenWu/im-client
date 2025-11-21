@@ -1,8 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import FileList from '@/components/upload/filelistv2'
 import HomeLink from '@/components/common/home-link'
 
 
-export default function () {
+export default function Upload() {
+  const { t } = useTranslation()
+
   return (
     <div className='w-full flex flex-col px-6 py-6 h-full gap-6 bg-white'>
       {/* Header Section */}
@@ -11,7 +14,7 @@ export default function () {
         <div className='flex items-center gap-3'>
 
           <h1 className='text-4xl font-bold font-sans text-gray-900'>
-            File Upload
+            {t('pages.upload.title')}
           </h1>
         </div>
 

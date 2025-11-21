@@ -1,5 +1,4 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   Select,
   SelectContent,
@@ -8,9 +7,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Languages } from 'lucide-react';
+import { useLanguageStore } from '@/stores/languageStore';
 
 const LanguageSwitcher: React.FC = () => {
-  const { i18n } = useTranslation();
+  const { language, changeLanguage } = useLanguageStore();
 
   const languages = [
     { code: 'en', name: 'English' },
@@ -18,13 +18,13 @@ const LanguageSwitcher: React.FC = () => {
   ];
 
   const handleLanguageChange = (languageCode: string) => {
-    i18n.changeLanguage(languageCode);
+    changeLanguage(languageCode);
   };
 
   return (
     <div className="flex items-center gap-2">
       <Languages className="h-4 w-4 text-gray-600" />
-      <Select value={i18n.language} onValueChange={handleLanguageChange}>
+      <Select value={language} onValueChange={handleLanguageChange}>
         <SelectTrigger className="w-[140px]">
           <SelectValue />
         </SelectTrigger>

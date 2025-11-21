@@ -16,13 +16,18 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'en', // default language
     fallbackLng: 'en',
+    debug: true,
     interpolation: {
       escapeValue: false // react already safes from xss
     },
     react: {
-      useSuspense: false
+      useSuspense: false,
+      bindI18n: 'languageChanged loaded',
+      bindI18nStore: 'added removed',
+      transEmptyNodeValue: '',
+      transSupportBasicHtmlNodes: true,
+      transKeepBasicHtmlNodesFor: ['br', 'strong', 'i'],
     }
   });
 

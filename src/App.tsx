@@ -6,6 +6,7 @@ import Gallery from './pages/Gallery'
 import Sync from './pages/Sync'
 import Activity from './pages/Activity'
 import Settings from './pages/Settings'
+import { ImageViewer } from './components/viewer/ImageViewer'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
+      <ImageViewer />
     </BrowserRouter>
   )
 }

@@ -1,12 +1,14 @@
 import { Home, Upload, Grid3x3, Settings, RefreshCw, Activity } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 type NavItem = 'dashboard' | 'upload' | 'gallery' | 'sync' | 'activity' | 'settings'
 
 export default function Navigation() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const [active, setActive] = useState<NavItem>('gallery')
@@ -45,11 +47,11 @@ export default function Navigation() {
   }
 
   const navItems = [
-    { id: 'dashboard' as NavItem, icon: Home, label: 'Dashboard' },
-    { id: 'upload' as NavItem, icon: Upload, label: 'Upload' },
-    { id: 'gallery' as NavItem, icon: Grid3x3, label: 'Gallery' },
-    { id: 'sync' as NavItem, icon: RefreshCw, label: 'Sync' },
-    { id: 'activity' as NavItem, icon: Activity, label: 'Activity' },
+    { id: 'dashboard' as NavItem, icon: Home, labelKey: 'navigation.dashboard' },
+    { id: 'upload' as NavItem, icon: Upload, labelKey: 'navigation.upload' },
+    { id: 'gallery' as NavItem, icon: Grid3x3, labelKey: 'navigation.gallery' },
+    { id: 'sync' as NavItem, icon: RefreshCw, labelKey: 'navigation.sync' },
+    { id: 'activity' as NavItem, icon: Activity, labelKey: 'navigation.activity' },
   ]
 
   return (
@@ -91,7 +93,7 @@ export default function Navigation() {
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               )}
               style={{ paddingLeft: isExpanded ? '12px' : '12px', paddingRight: isExpanded ? '12px' : '12px' }}
-              title={!isExpanded ? item.label : undefined}
+              title={!isExpanded ? t(item.labelKey) : undefined}
             >
 
 
@@ -99,14 +101,14 @@ export default function Navigation() {
 
               {isExpanded && (
                 <span className={cn('text-xs font-medium whitespace-nowrap', isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300')}>
-                  {item.label}
+                  {t(item.labelKey)}
                 </span>
               )}
 
               {/* Tooltip - only show when collapsed */}
               {!isExpanded && (
                 <div className="absolute left-full ml-6 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-lg">
-                  {item.label}
+                  {t(item.labelKey)}
                 </div>
               )}
 
@@ -126,20 +128,20 @@ export default function Navigation() {
           isExpanded ? 'w-full justify-start' : 'w-12'
         )}
         style={{ paddingLeft: isExpanded ? '12px' : '12px', paddingRight: isExpanded ? '12px' : '12px' }}
-        title={!isExpanded ? 'Settings' : undefined}
+        title={!isExpanded ? t('navigation.settings') : undefined}
       >
         <Settings className={cn('flex-shrink-0', 'text-gray-600 dark:text-gray-400')} />
 
         {isExpanded && (
           <span className={cn('text-xs font-medium whitespace-nowrap', 'text-gray-700 dark:text-gray-300')}>
-            Settings
+            {t('navigation.settings')}
           </span>
         )}
 
         {/* Tooltip - only show when collapsed */}
         {!isExpanded && (
           <div className="absolute left-full ml-6 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-lg">
-            Settings
+            {t('navigation.settings')}
           </div>
         )}
       </Button>
