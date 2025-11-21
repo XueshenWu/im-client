@@ -353,7 +353,7 @@ export default function DetailList() {
     hasPrev: false,
   })
 
-  const fetchData = async (page: number, pageSize: number, sort?: 'name' | 'size' | 'type' | 'updatedAt', order?: 'asc' | 'desc') => {
+  const fetchData = async (page: number, pageSize: number, sort?: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt', order?: 'asc' | 'desc') => {
     setIsLoading(true)
     try {
       const params: any = { page, pageSize };
@@ -383,7 +383,7 @@ export default function DetailList() {
   }, [refreshTrigger]);
 
   // Handle sort column click
-  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
     if (sortBy === column) {
       // Same column: cycle through inactive -> asc -> desc -> inactive
       if (sortOrder === 'asc') {
