@@ -31,7 +31,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
   // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | null>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Selection state
