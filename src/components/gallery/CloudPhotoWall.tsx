@@ -507,20 +507,22 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             <DrawerTitle>{t('gallery.sortBy')}</DrawerTitle>
             <DrawerClose onClick={() => setDrawerOpen(false)} />
           </DrawerHeader>
-          <DrawerBody className="p-0">
-            <div className="flex flex-col">
-              <SortOption column="name" label="Name: A-Z" order="asc" />
-              <SortOption column="name" label="Name: Z-A" order="desc" />
-              <SortOption column="size" label="Size: Smallest" order="asc" />
-              <SortOption column="size" label="Size: Largest" order="desc" />
-              <SortOption column="type" label="Type: A-Z" order="asc" />
-              <SortOption column="type" label="Type: Z-A" order="desc" />
-              <SortOption column="createdAt" label="Created: Newest" order="desc" />
-              <SortOption column="createdAt" label="Created: Oldest" order="asc" />
-              <SortOption column="updatedAt" label="Modified: Newest" order="desc" />
-              <SortOption column="updatedAt" label="Modified: Oldest" order="asc" />
+          <DrawerBody className="p-0 flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-col">
+                <SortOption column="name" label="Name: A-Z" order="asc" />
+                <SortOption column="name" label="Name: Z-A" order="desc" />
+                <SortOption column="size" label="Size: Smallest" order="asc" />
+                <SortOption column="size" label="Size: Largest" order="desc" />
+                <SortOption column="type" label="Type: A-Z" order="asc" />
+                <SortOption column="type" label="Type: Z-A" order="desc" />
+                <SortOption column="createdAt" label="Created: Newest" order="desc" />
+                <SortOption column="createdAt" label="Created: Oldest" order="asc" />
+                <SortOption column="updatedAt" label="Modified: Newest" order="desc" />
+                <SortOption column="updatedAt" label="Modified: Oldest" order="asc" />
+              </div>
             </div>
-            <div className="flex gap-3 p-4 border-t mt-2">
+            <div className="sticky bottom-0 flex gap-3 p-4 border-t bg-white">
               <Button
                 variant="outline"
                 className="flex-1 h-11"
