@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2 } from 'lucide-react';
+import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2, ListFilter } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageItem } from '@/types/gallery';
 import type { Image } from '@/types/api';
@@ -10,6 +10,7 @@ import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { deleteImagesByUuid } from '@/services/images.service';
 import JSZip from 'jszip';
 import { format } from 'date-fns';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose, DrawerBody } from '@/components/ui/drawer';
 
 interface CloudPhotoWallProps {
   columnWidth?: number;
@@ -37,6 +38,9 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Drawer state for mobile
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -132,6 +136,9 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
     setImages([]);
     setCursor(undefined);
     setHasMore(true);
+
+    // Close drawer on mobile after selection
+    setDrawerOpen(false);
   };
 
   // Selection handlers
@@ -365,7 +372,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
         variant={isActive ? 'default' : 'outline'}
         size="sm"
         onClick={() => handleSort(column)}
-        className="flex items-center gap-2"
+        className="flex items-center justify-between gap-2 lg:justify-center w-full lg:w-auto"
       >
         {label}
         <Icon className="h-4 w-4" />
@@ -376,13 +383,32 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
   return (
     <div className="h-full w-full flex flex-col">
       {/* Controls Bar */}
-      <div className="flex items-center justify-between px-6 py-3  border-gray-200">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-6 py-3 border-gray-200">
+        {/* Desktop Sort Controls (visible on lg and up) */}
+        <div className="hidden lg:flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700 mr-2">{t('gallery.sortBy')}</span>
           <SortButton column="name" label={t('gallery.name')} />
           <SortButton column="size" label={t('gallery.size')} />
           <SortButton column="type" label={t('gallery.type')} />
           <SortButton column="updatedAt" label={t('gallery.lastModified')} />
+        </div>
+
+        {/* Mobile Sort Button (visible below lg) */}
+        <div className="lg:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <ListFilter className="h-4 w-4" />
+            {t('gallery.sortBy')}
+            {sortBy && (
+              <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
+                {t(`gallery.${sortBy}`)}
+              </span>
+            )}
+          </Button>
         </div>
 
         {/* Selection Controls */}
@@ -423,6 +449,24 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           </div>
         )}
       </div>
+
+      {/* Mobile Sort Drawer */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>{t('gallery.sortBy')}</DrawerTitle>
+            <DrawerClose onClick={() => setDrawerOpen(false)} />
+          </DrawerHeader>
+          <DrawerBody>
+            <div className="flex flex-col gap-2">
+              <SortButton column="name" label={t('gallery.name')} />
+              <SortButton column="size" label={t('gallery.size')} />
+              <SortButton column="type" label={t('gallery.type')} />
+              <SortButton column="updatedAt" label={t('gallery.lastModified')} />
+            </div>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
 
       {/* Images Grid */}
       <div
