@@ -138,10 +138,10 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
     setHasMore(true);
   };
 
-  // Handle sort from drawer (simplified - just sets to asc)
-  const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+  // Handle sort from drawer with explicit order
+  const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt', order: 'asc' | 'desc') => {
     setSortBy(column);
-    setSortOrder('asc');
+    setSortOrder(order);
 
     // Reset images and cursor to reload from beginning
     setImages([]);
@@ -400,12 +400,20 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
   };
 
   // Sort option component (for mobile drawer)
-  const SortOption = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt'; label: string }) => {
-    const isActive = sortBy === column;
+  const SortOption = ({
+    column,
+    label,
+    order
+  }: {
+    column: 'name' | 'size' | 'type' | 'updatedAt';
+    label: string;
+    order: 'asc' | 'desc';
+  }) => {
+    const isActive = sortBy === column && sortOrder === order;
 
     return (
       <button
-        onClick={() => handleDrawerSort(column)}
+        onClick={() => handleDrawerSort(column, order)}
         className="flex items-center justify-between py-4 px-6 hover:bg-gray-50 transition-colors text-left w-full border-b border-gray-100 last:border-b-0"
       >
         <span className={`text-base ${isActive ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
@@ -438,11 +446,15 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             className="flex items-center gap-2"
           >
             <ListFilter className="h-4 w-4" />
-            {t('gallery.sortBy')}
-            {sortBy && (
-              <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
-                {t(`gallery.${sortBy}`)}
+            {sortBy ? (
+              <span className="text-sm">
+                {sortBy === 'name' && (sortOrder === 'asc' ? 'Name: A-Z' : 'Name: Z-A')}
+                {sortBy === 'size' && (sortOrder === 'asc' ? 'Size: Smallest' : 'Size: Largest')}
+                {sortBy === 'type' && (sortOrder === 'asc' ? 'Type: A-Z' : 'Type: Z-A')}
+                {sortBy === 'updatedAt' && (sortOrder === 'desc' ? 'Newest First' : 'Oldest First')}
               </span>
+            ) : (
+              t('gallery.sortBy')
             )}
           </Button>
         </div>
@@ -495,10 +507,14 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           </DrawerHeader>
           <DrawerBody className="p-0">
             <div className="flex flex-col">
-              <SortOption column="name" label={t('gallery.name')} />
-              <SortOption column="size" label={t('gallery.size')} />
-              <SortOption column="type" label={t('gallery.type')} />
-              <SortOption column="updatedAt" label={t('gallery.lastModified')} />
+              <SortOption column="name" label="Name: A-Z" order="asc" />
+              <SortOption column="name" label="Name: Z-A" order="desc" />
+              <SortOption column="size" label="Size: Smallest First" order="asc" />
+              <SortOption column="size" label="Size: Largest First" order="desc" />
+              <SortOption column="type" label="Type: A-Z" order="asc" />
+              <SortOption column="type" label="Type: Z-A" order="desc" />
+              <SortOption column="updatedAt" label="Last Modified: Newest First" order="desc" />
+              <SortOption column="updatedAt" label="Last Modified: Oldest First" order="asc" />
             </div>
             <div className="flex gap-3 p-4 border-t mt-2">
               <Button
