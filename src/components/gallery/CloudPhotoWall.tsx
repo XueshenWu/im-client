@@ -389,16 +389,16 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
 
     return (
       <Button
-        variant={isActive ? 'default' : 'outline'}
-        size="default"
+        variant={isActive ? 'secondary' : 'ghost'}
+        size="sm"
         onClick={() => handleSort(column)}
         className={cn(
-          "gap-2 min-w-[120px] font-medium",
-          isActive && "shadow-md"
+          "gap-1.5 px-3 font-medium transition-all",
+          isActive && "bg-gray-900 text-white hover:bg-gray-800"
         )}
       >
         <span>{label}</span>
-        <Icon className="h-4 w-4 ml-auto" />
+        <Icon className="h-3.5 w-3.5" />
       </Button>
     );
   };
