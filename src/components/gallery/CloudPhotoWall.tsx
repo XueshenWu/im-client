@@ -31,7 +31,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
   // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | null>('updatedAt');
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Selection state
@@ -118,7 +118,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   }, [refreshTrigger]);
 
   // Handle sort changes - reset and reload
-  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
     if (sortBy === column) {
       // Toggle between asc -> desc -> inactive
       if (sortOrder === 'asc') {
@@ -139,7 +139,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   };
 
   // Handle sort from drawer with explicit order
-  const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt', order: 'asc' | 'desc') => {
+  const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt', order: 'asc' | 'desc') => {
     setSortBy(column);
     setSortOrder(order);
 
@@ -382,7 +382,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
   }
 
   // Sort button component (for desktop)
-  const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt'; label: string }) => {
+  const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'; label: string }) => {
     const isActive = sortBy === column;
     const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
 
@@ -405,7 +405,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     label,
     order
   }: {
-    column: 'name' | 'size' | 'type' | 'updatedAt';
+    column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt';
     label: string;
     order: 'asc' | 'desc';
   }) => {
@@ -434,7 +434,8 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           <SortButton column="name" label={t('gallery.name')} />
           <SortButton column="size" label={t('gallery.size')} />
           <SortButton column="type" label={t('gallery.type')} />
-          <SortButton column="updatedAt" label={t('gallery.lastModified')} />
+          <SortButton column="createdAt" label="Created" />
+          <SortButton column="updatedAt" label="Modified" />
         </div>
 
         {/* Mobile Sort Button (visible below lg) */}
@@ -449,9 +450,10 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             {sortBy ? (
               <span className="text-sm">
                 {sortBy === 'name' && (sortOrder === 'asc' ? 'Name: A-Z' : 'Name: Z-A')}
-                {sortBy === 'size' && (sortOrder === 'asc' ? 'Size: Smallest' : 'Size: Largest')}
+                {sortBy === 'size' && (sortOrder === 'asc' ? 'Smallest' : 'Largest')}
                 {sortBy === 'type' && (sortOrder === 'asc' ? 'Type: A-Z' : 'Type: Z-A')}
-                {sortBy === 'updatedAt' && (sortOrder === 'desc' ? 'Newest First' : 'Oldest First')}
+                {sortBy === 'createdAt' && (sortOrder === 'desc' ? 'Created: Newest' : 'Created: Oldest')}
+                {sortBy === 'updatedAt' && (sortOrder === 'desc' ? 'Modified: Newest' : 'Modified: Oldest')}
               </span>
             ) : (
               t('gallery.sortBy')
@@ -509,12 +511,14 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             <div className="flex flex-col">
               <SortOption column="name" label="Name: A-Z" order="asc" />
               <SortOption column="name" label="Name: Z-A" order="desc" />
-              <SortOption column="size" label="Size: Smallest First" order="asc" />
-              <SortOption column="size" label="Size: Largest First" order="desc" />
+              <SortOption column="size" label="Size: Smallest" order="asc" />
+              <SortOption column="size" label="Size: Largest" order="desc" />
               <SortOption column="type" label="Type: A-Z" order="asc" />
               <SortOption column="type" label="Type: Z-A" order="desc" />
-              <SortOption column="updatedAt" label="Last Modified: Newest First" order="desc" />
-              <SortOption column="updatedAt" label="Last Modified: Oldest First" order="asc" />
+              <SortOption column="createdAt" label="Created: Newest" order="desc" />
+              <SortOption column="createdAt" label="Created: Oldest" order="asc" />
+              <SortOption column="updatedAt" label="Modified: Newest" order="desc" />
+              <SortOption column="updatedAt" label="Modified: Oldest" order="asc" />
             </div>
             <div className="flex gap-3 p-4 border-t mt-2">
               <Button
