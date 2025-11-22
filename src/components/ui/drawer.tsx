@@ -52,6 +52,10 @@ export function DrawerContent({
       )}
       {...props}
     >
+      {/* Drag handle */}
+      <div className="flex justify-center py-2">
+        <div className="w-12 h-1 bg-gray-300 rounded-full" />
+      </div>
       {children}
     </div>
   )
@@ -65,7 +69,7 @@ export function DrawerHeader({
   return (
     <div
       className={cn(
-        "sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between",
+        "sticky top-0 bg-white border-b px-6 py-3 flex items-center justify-between",
         className
       )}
       {...props}

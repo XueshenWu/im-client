@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2, ListFilter } from 'lucide-react';
+import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2, ListFilter, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageItem } from '@/types/gallery';
 import type { Image } from '@/types/api';
@@ -136,9 +136,28 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
     setImages([]);
     setCursor(undefined);
     setHasMore(true);
+  };
 
-    // Close drawer on mobile after selection
-    setDrawerOpen(false);
+  // Handle sort from drawer (simplified - just sets to asc)
+  const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt') => {
+    setSortBy(column);
+    setSortOrder('asc');
+
+    // Reset images and cursor to reload from beginning
+    setImages([]);
+    setCursor(undefined);
+    setHasMore(true);
+  };
+
+  // Reset sort
+  const handleResetSort = () => {
+    setSortBy(null);
+    setSortOrder('desc');
+
+    // Reset images and cursor to reload from beginning
+    setImages([]);
+    setCursor(undefined);
+    setHasMore(true);
   };
 
   // Selection handlers
@@ -362,7 +381,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     );
   }
 
-  // Sort button component
+  // Sort button component (for desktop)
   const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt'; label: string }) => {
     const isActive = sortBy === column;
     const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
@@ -372,11 +391,28 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
         variant={isActive ? 'default' : 'outline'}
         size="sm"
         onClick={() => handleSort(column)}
-        className="flex items-center justify-between gap-2 lg:justify-center w-full lg:w-auto"
+        className="flex items-center gap-2"
       >
         {label}
         <Icon className="h-4 w-4" />
       </Button>
+    );
+  };
+
+  // Sort option component (for mobile drawer)
+  const SortOption = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt'; label: string }) => {
+    const isActive = sortBy === column;
+
+    return (
+      <button
+        onClick={() => handleDrawerSort(column)}
+        className="flex items-center justify-between py-4 px-6 hover:bg-gray-50 transition-colors text-left w-full border-b border-gray-100 last:border-b-0"
+      >
+        <span className={`text-base ${isActive ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+          {label}
+        </span>
+        {isActive && <Check className="h-5 w-5 text-green-600" />}
+      </button>
     );
   };
 
@@ -457,12 +493,27 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             <DrawerTitle>{t('gallery.sortBy')}</DrawerTitle>
             <DrawerClose onClick={() => setDrawerOpen(false)} />
           </DrawerHeader>
-          <DrawerBody>
-            <div className="flex flex-col gap-2">
-              <SortButton column="name" label={t('gallery.name')} />
-              <SortButton column="size" label={t('gallery.size')} />
-              <SortButton column="type" label={t('gallery.type')} />
-              <SortButton column="updatedAt" label={t('gallery.lastModified')} />
+          <DrawerBody className="p-0">
+            <div className="flex flex-col">
+              <SortOption column="name" label={t('gallery.name')} />
+              <SortOption column="size" label={t('gallery.size')} />
+              <SortOption column="type" label={t('gallery.type')} />
+              <SortOption column="updatedAt" label={t('gallery.lastModified')} />
+            </div>
+            <div className="flex gap-3 p-4 border-t mt-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={handleResetSort}
+              >
+                {t('common.reset')}
+              </Button>
+              <Button
+                className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => setDrawerOpen(false)}
+              >
+                Done
+              </Button>
             </div>
           </DrawerBody>
         </DrawerContent>
