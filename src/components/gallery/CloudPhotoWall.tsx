@@ -11,6 +11,7 @@ import { deleteImagesByUuid } from '@/services/images.service';
 import JSZip from 'jszip';
 import { format } from 'date-fns';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose, DrawerBody } from '@/components/ui/drawer';
+import { cn } from '@/lib/utils';
 
 interface CloudPhotoWallProps {
   columnWidth?: number;
@@ -389,12 +390,15 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     return (
       <Button
         variant={isActive ? 'default' : 'outline'}
-        size="sm"
+        size="default"
         onClick={() => handleSort(column)}
-        className="flex items-center gap-2"
+        className={cn(
+          "gap-2 min-w-[120px] font-medium",
+          isActive && "shadow-md"
+        )}
       >
-        {label}
-        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+        <Icon className="h-4 w-4 ml-auto" />
       </Button>
     );
   };
