@@ -189,6 +189,8 @@ export interface GetPaginatedImagesParams {
   cursor?: string
   collectionId?: number
   withExif?: boolean
+  sortBy?: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
 }
 
 
@@ -206,6 +208,8 @@ export interface GetPagePaginatedImagesParams {
   pageSize: number
   collectionId?: number
   withExif?: boolean
+  sortBy?: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
 }
 
 // Collection Types

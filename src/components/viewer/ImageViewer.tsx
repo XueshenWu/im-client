@@ -461,8 +461,12 @@ export const ImageViewer: React.FC = () => {
                   src={imageUrl}
                   alt={currentImage.originalName}
                   style={{
+                    width: 'auto',
+                    height: 'auto',
                     maxWidth: 'calc(95vw - 8rem)',
                     maxHeight: 'calc(95vh - 8rem)',
+                    minWidth: '400px',
+                    minHeight: '400px',
                     objectFit: 'contain',
                   }}
                   crossOrigin="anonymous"

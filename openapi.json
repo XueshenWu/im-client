@@ -1,0 +1,2297 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Image Management API",
+    "version": "1.0.0",
+    "description": "API for managing images with EXIF data, thumbnails, and synchronization",
+    "contact": {
+      "name": "API Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Images",
+      "description": "Image management endpoints"
+    },
+    {
+      "name": "Sync",
+      "description": "Synchronization endpoints"
+    },
+    {
+      "name": "Health",
+      "description": "Health check endpoints"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Image": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string",
+            "example": "photo.jpg"
+          },
+          "originalName": {
+            "type": "string",
+            "example": "vacation-photo.jpg"
+          },
+          "filePath": {
+            "type": "string",
+            "example": "/storage/images/photo.jpg"
+          },
+          "thumbnailPath": {
+            "type": "string",
+            "example": "/storage/thumbnails/photo.jpg"
+          },
+          "fileSize": {
+            "type": "integer",
+            "example": 2048000
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpg",
+              "jpeg",
+              "png",
+              "tif",
+              "tiff"
+            ]
+          },
+          "width": {
+            "type": "integer",
+            "example": 1920
+          },
+          "height": {
+            "type": "integer",
+            "example": 1080
+          },
+          "hash": {
+            "type": "string",
+            "example": "abc123def456..."
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "isCorrupted": {
+            "type": "boolean",
+            "default": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ExifData": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "imageId": {
+            "type": "integer"
+          },
+          "cameraMake": {
+            "type": "string",
+            "example": "Canon"
+          },
+          "cameraModel": {
+            "type": "string",
+            "example": "EOS 5D Mark IV"
+          },
+          "lensModel": {
+            "type": "string",
+            "example": "EF 24-70mm f/2.8L II USM"
+          },
+          "iso": {
+            "type": "integer",
+            "example": 400
+          },
+          "shutterSpeed": {
+            "type": "string",
+            "example": "1/250"
+          },
+          "aperture": {
+            "type": "string",
+            "example": "f/5.6"
+          },
+          "focalLength": {
+            "type": "string",
+            "example": "70mm"
+          },
+          "dateTaken": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gpsLatitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "gpsLongitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "gpsAltitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "orientation": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "ImageStats": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "example": 100
+          },
+          "totalSize": {
+            "type": "integer",
+            "example": 52428800
+          },
+          "corruptedCount": {
+            "type": "integer",
+            "example": 2
+          },
+          "jpgCount": {
+            "type": "integer",
+            "example": 50
+          },
+          "pngCount": {
+            "type": "integer",
+            "example": 30
+          },
+          "tifCount": {
+            "type": "integer",
+            "example": 20
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "message": {
+            "type": "string",
+            "example": "Detailed error description"
+          },
+          "statusCode": {
+            "type": "integer",
+            "example": 400
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/collections": {
+      "get": {
+        "summary": "Get all collections",
+        "tags": [
+          "Collections"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of collections with image counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Collection"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new collection",
+        "tags": [
+          "Collections"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Vacation Photos"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Photos from summer vacation 2024"
+                  },
+                  "coverImageId": {
+                    "type": "integer",
+                    "example": 42
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Collection created successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/api/collections/{id}": {
+      "get": {
+        "summary": "Get collection by ID",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Collection ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection details"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update collection",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Collection ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "coverImageId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Collection updated successfully"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete collection (soft delete)",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Collection ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection deleted successfully"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      }
+    },
+    "/api/collections/uuid/{uuid}": {
+      "get": {
+        "summary": "Get collection by UUID",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Collection UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection details"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      }
+    },
+    "/api/collections/{id}/images": {
+      "get": {
+        "summary": "Get images in collection",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Collection ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of images in collection"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add image to collection",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Collection ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "imageId"
+                ],
+                "properties": {
+                  "imageId": {
+                    "type": "integer",
+                    "example": 123
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Image added to collection"
+          },
+          "404": {
+            "description": "Collection or image not found"
+          }
+        }
+      }
+    },
+    "/api/collections/{id}/images/{imageId}": {
+      "delete": {
+        "summary": "Remove image from collection",
+        "tags": [
+          "Collections"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Collection ID"
+          },
+          {
+            "in": "path",
+            "name": "imageId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Image ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image removed from collection"
+          },
+          "404": {
+            "description": "Image not found in collection"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "database": {
+                      "type": "string",
+                      "example": "connected"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images": {
+      "get": {
+        "summary": "Get all images",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "withExif",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include EXIF data"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Image"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/paginated": {
+      "get": {
+        "summary": "Get paginated images with cursor-based pagination (infinite scroll)",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Cursor for pagination (base64 encoded ID from previous response)"
+          },
+          {
+            "in": "query",
+            "name": "collectionId",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter images by collection ID"
+          },
+          {
+            "in": "query",
+            "name": "withExif",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include EXIF data"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "size",
+                "type",
+                "updatedAt"
+              ]
+            },
+            "description": "Field to sort by (name=originalName, size=fileSize, type=format, updatedAt=updatedAt)"
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort order (ascending or descending)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Image"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "nextCursor": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Cursor for next page (null if no more data)"
+                        },
+                        "hasMore": {
+                          "type": "boolean",
+                          "description": "Whether there are more items to load"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Items per page"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters"
+          }
+        }
+      }
+    },
+    "/api/images/page": {
+      "get": {
+        "summary": "Get paginated images with page-based pagination (traditional pagination)",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number (starts from 1)"
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "in": "query",
+            "name": "collectionId",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter images by collection ID"
+          },
+          {
+            "in": "query",
+            "name": "withExif",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include EXIF data"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "size",
+                "type",
+                "updatedAt"
+              ]
+            },
+            "description": "Field to sort by (name=originalName, size=fileSize, type=format, updatedAt=updatedAt)"
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort order (ascending or descending)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Number of items in current page"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Image"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "pageSize": {
+                          "type": "integer",
+                          "description": "Items per page"
+                        },
+                        "totalItems": {
+                          "type": "integer",
+                          "description": "Total number of items"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total number of pages"
+                        },
+                        "hasNext": {
+                          "type": "boolean",
+                          "description": "Whether there is a next page"
+                        },
+                        "hasPrev": {
+                          "type": "boolean",
+                          "description": "Whether there is a previous page"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters"
+          }
+        }
+      }
+    },
+    "/api/images/stats": {
+      "get": {
+        "summary": "Get image statistics",
+        "tags": [
+          "Images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Image statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ImageStats"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/file/{id}": {
+      "get": {
+        "summary": "Get image file by ID with optional metadata",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Image ID"
+          },
+          {
+            "in": "query",
+            "name": "info",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include image metadata in response headers (X-Image-*)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image file",
+            "headers": {
+              "X-Image-Id": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Image ID (when info=true)"
+              },
+              "X-Image-UUID": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Image UUID (when info=true)"
+              },
+              "X-Image-Filename": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Image filename (when info=true)"
+              },
+              "X-Image-Original-Name": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Original filename (when info=true)"
+              },
+              "X-Image-Format": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Image format (when info=true)"
+              },
+              "X-Image-File-Size": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "File size in bytes (when info=true)"
+              },
+              "X-Image-Width": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Image width (when info=true)"
+              },
+              "X-Image-Height": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Image height (when info=true)"
+              },
+              "X-Image-Hash": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "SHA-256 hash (when info=true)"
+              },
+              "X-Image-Created-At": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Creation timestamp (when info=true)"
+              },
+              "X-Image-Updated-At": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Update timestamp (when info=true)"
+              }
+            },
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    },
+    "/api/images/file/uuid/{uuid}": {
+      "get": {
+        "summary": "Get image file by UUID with optional metadata",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Image UUID"
+          },
+          {
+            "in": "query",
+            "name": "info",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include image metadata in response headers (X-Image-*)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image file",
+            "headers": {
+              "X-Image-Id": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Image ID (when info=true)"
+              },
+              "X-Image-UUID": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Image UUID (when info=true)"
+              },
+              "X-Image-Filename": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Image filename (when info=true)"
+              },
+              "X-Image-Original-Name": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Original filename (when info=true)"
+              },
+              "X-Image-Format": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Image format (when info=true)"
+              },
+              "X-Image-File-Size": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "File size in bytes (when info=true)"
+              },
+              "X-Image-Width": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Image width (when info=true)"
+              },
+              "X-Image-Height": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Image height (when info=true)"
+              },
+              "X-Image-Hash": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "SHA-256 hash (when info=true)"
+              },
+              "X-Image-Created-At": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Creation timestamp (when info=true)"
+              },
+              "X-Image-Updated-At": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Update timestamp (when info=true)"
+              }
+            },
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    },
+    "/api/images/{id}": {
+      "get": {
+        "summary": "Get image by ID",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Image ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update image metadata",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filename": {
+                    "type": "string"
+                  },
+                  "originalName": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete image (soft delete)",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/uuid/{uuid}": {
+      "get": {
+        "summary": "Get image by UUID",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Image UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    },
+    "/api/images/uuid/{uuid}/replace": {
+      "put": {
+        "summary": "Replace image file by UUID",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Image UUID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image replaced successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    },
+    "/api/images/uuid/{uuid}/replace/chunked/init": {
+      "post": {
+        "summary": "Initialize chunked image replacement session",
+        "tags": [
+          "Image Replacement"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Image UUID to replace"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "filename",
+                  "totalSize",
+                  "chunkSize",
+                  "totalChunks"
+                ],
+                "properties": {
+                  "filename": {
+                    "type": "string",
+                    "description": "Original filename"
+                  },
+                  "totalSize": {
+                    "type": "integer",
+                    "description": "Total file size in bytes"
+                  },
+                  "chunkSize": {
+                    "type": "integer",
+                    "description": "Size of each chunk in bytes"
+                  },
+                  "totalChunks": {
+                    "type": "integer",
+                    "description": "Total number of chunks"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the file"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Replacement session created"
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    },
+    "/api/images/uuid/{uuid}/replace/chunked/upload/{sessionId}": {
+      "post": {
+        "summary": "Upload chunk for image replacement",
+        "tags": [
+          "Image Replacement"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "chunk",
+                  "chunkNumber"
+                ],
+                "properties": {
+                  "chunk": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "chunkNumber": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chunk uploaded successfully"
+          }
+        }
+      }
+    },
+    "/api/images/uuid/{uuid}/replace/chunked/complete/{sessionId}": {
+      "post": {
+        "summary": "Complete chunked image replacement",
+        "tags": [
+          "Image Replacement"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uuid",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image replaced successfully"
+          },
+          "404": {
+            "description": "Image or session not found"
+          }
+        }
+      }
+    },
+    "/api/images/batch/delete/ids": {
+      "post": {
+        "summary": "Batch soft delete images by IDs",
+        "tags": [
+          "Images"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Array of image IDs to soft delete",
+                    "example": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Images soft deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Image"
+                          }
+                        },
+                        "stats": {
+                          "type": "object",
+                          "properties": {
+                            "requested": {
+                              "type": "integer",
+                              "description": "Number of IDs requested"
+                            },
+                            "successful": {
+                              "type": "integer",
+                              "description": "Number of images successfully deleted"
+                            },
+                            "failed": {
+                              "type": "integer",
+                              "description": "Number of images that failed to delete"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body"
+          }
+        }
+      }
+    },
+    "/api/images/batch/delete/uuids": {
+      "post": {
+        "summary": "Batch soft delete images by UUIDs",
+        "tags": [
+          "Images"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "uuids"
+                ],
+                "properties": {
+                  "uuids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "description": "Array of image UUIDs to soft delete",
+                    "example": [
+                      "867130af-dbc1-40cd-99f2-fb75baf9b8e1",
+                      "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Images soft deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Image"
+                          }
+                        },
+                        "stats": {
+                          "type": "object",
+                          "properties": {
+                            "requested": {
+                              "type": "integer",
+                              "description": "Number of UUIDs requested"
+                            },
+                            "successful": {
+                              "type": "integer",
+                              "description": "Number of images successfully deleted"
+                            },
+                            "failed": {
+                              "type": "integer",
+                              "description": "Number of images that failed to delete"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body"
+          }
+        }
+      }
+    },
+    "/api/images/upload": {
+      "post": {
+        "summary": "Upload images",
+        "tags": [
+          "Images"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Images uploaded successfully"
+          },
+          "400": {
+            "description": "No files uploaded or invalid format"
+          }
+        }
+      }
+    },
+    "/api/images/batch": {
+      "post": {
+        "summary": "Batch upload from folder config",
+        "tags": [
+          "Images"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Batch upload completed"
+          },
+          "501": {
+            "description": "Not yet implemented"
+          }
+        }
+      }
+    },
+    "/api/images/chunked/init": {
+      "post": {
+        "summary": "Initialize a chunked upload session",
+        "tags": [
+          "Chunked Upload"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "filename",
+                  "totalSize",
+                  "chunkSize",
+                  "totalChunks"
+                ],
+                "properties": {
+                  "filename": {
+                    "type": "string",
+                    "description": "Original filename",
+                    "example": "large-image.jpg"
+                  },
+                  "totalSize": {
+                    "type": "integer",
+                    "description": "Total file size in bytes",
+                    "example": 52428800
+                  },
+                  "chunkSize": {
+                    "type": "integer",
+                    "description": "Size of each chunk in bytes",
+                    "example": 5242880
+                  },
+                  "totalChunks": {
+                    "type": "integer",
+                    "description": "Total number of chunks",
+                    "example": 10
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the file",
+                    "example": "image/jpeg"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sessionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "filename": {
+                          "type": "string"
+                        },
+                        "totalChunks": {
+                          "type": "integer"
+                        },
+                        "chunkSize": {
+                          "type": "integer"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/api/images/chunked/upload/{sessionId}": {
+      "post": {
+        "summary": "Upload a single chunk",
+        "tags": [
+          "Chunked Upload"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Upload session ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "chunk",
+                  "chunkNumber"
+                ],
+                "properties": {
+                  "chunk": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Chunk data"
+                  },
+                  "chunkNumber": {
+                    "type": "integer",
+                    "description": "Zero-based chunk index"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chunk uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "chunkNumber": {
+                          "type": "integer"
+                        },
+                        "uploadedChunks": {
+                          "type": "integer"
+                        },
+                        "totalChunks": {
+                          "type": "integer"
+                        },
+                        "isComplete": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid chunk or session"
+          },
+          "404": {
+            "description": "Session not found"
+          },
+          "410": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/api/images/chunked/complete/{sessionId}": {
+      "post": {
+        "summary": "Complete chunked upload and assemble file",
+        "tags": [
+          "Chunked Upload"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Upload session ID"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Upload completed and image created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Image"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Upload incomplete"
+          },
+          "404": {
+            "description": "Session not found"
+          },
+          "409": {
+            "description": "Duplicate image"
+          },
+          "410": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/api/images/chunked/status/{sessionId}": {
+      "get": {
+        "summary": "Get upload session status",
+        "tags": [
+          "Chunked Upload"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Upload session ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "filename": {
+                          "type": "string"
+                        },
+                        "originalName": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "in_progress",
+                            "completed",
+                            "failed",
+                            "expired"
+                          ]
+                        },
+                        "uploadedChunks": {
+                          "type": "integer"
+                        },
+                        "totalChunks": {
+                          "type": "integer"
+                        },
+                        "uploadedChunksList": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        },
+                        "progress": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    },
+    "/api/images/chunked/{sessionId}": {
+      "delete": {
+        "summary": "Cancel and cleanup upload session",
+        "tags": [
+          "Chunked Upload"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Upload session ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    },
+    "/api/images/dev/purge": {
+      "delete": {
+        "summary": "Purge all data (files + database + Redis) - DEV ONLY",
+        "tags": [
+          "Development"
+        ],
+        "description": "WARNING - Deletes ALL images, thumbnails, chunks, database records, and Redis sessions. Only available in development mode.",
+        "responses": {
+          "200": {
+            "description": "Data purged successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "deletedFiles": {
+                              "type": "integer"
+                            },
+                            "deletedThumbnails": {
+                              "type": "integer"
+                            },
+                            "deletedChunkDirectories": {
+                              "type": "integer"
+                            },
+                            "deletedDatabaseRecords": {
+                              "type": "integer"
+                            },
+                            "deletedRedisSessions": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden in production mode"
+          }
+        }
+      }
+    },
+    "/api/images/dev/purge/files": {
+      "delete": {
+        "summary": "Purge only files (keep database) - DEV ONLY",
+        "tags": [
+          "Development"
+        ],
+        "description": "Deletes images, thumbnails, and chunks. Preserves database records.",
+        "responses": {
+          "200": {
+            "description": "Files purged successfully"
+          },
+          "403": {
+            "description": "Forbidden in production mode"
+          }
+        }
+      }
+    },
+    "/api/images/dev/purge/database": {
+      "delete": {
+        "summary": "Purge only database records (keep files) - DEV ONLY",
+        "tags": [
+          "Development"
+        ],
+        "description": "Deletes all database records. Preserves files on disk.",
+        "responses": {
+          "200": {
+            "description": "Database purged successfully"
+          },
+          "403": {
+            "description": "Forbidden in production mode"
+          }
+        }
+      }
+    },
+    "/api/images/dev/purge/redis": {
+      "delete": {
+        "summary": "Purge only Redis sessions - DEV ONLY",
+        "tags": [
+          "Development"
+        ],
+        "description": "Deletes all upload sessions from Redis.",
+        "responses": {
+          "200": {
+            "description": "Redis sessions purged successfully"
+          },
+          "403": {
+            "description": "Forbidden in production mode"
+          }
+        }
+      }
+    },
+    "/api/images/dev/purge/chunks": {
+      "delete": {
+        "summary": "Purge only chunk directories - DEV ONLY",
+        "tags": [
+          "Development"
+        ],
+        "description": "Deletes temporary chunk upload directories.",
+        "responses": {
+          "200": {
+            "description": "Chunks purged successfully"
+          },
+          "403": {
+            "description": "Forbidden in production mode"
+          }
+        }
+      }
+    },
+    "/api/images/{imageId}/collections": {
+      "get": {
+        "summary": "Get collections containing a specific image",
+        "tags": [
+          "Images"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "imageId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Image ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of collections containing the image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Collection"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          }
+        }
+      }
+    }
+  }
+}
