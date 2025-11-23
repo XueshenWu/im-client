@@ -80,6 +80,12 @@ export class ImageSyncClient {
     this.emitEvent({ type: 'client_id_ready', data: { clientId: this.clientId } })
   }
 
+  private updateSequence(seq: number){
+    this.lastSyncSequence = seq
+    localStorage.setItem(STORAGE_KEY_SEQUENCE, seq.toString())
+    console.log(`[SyncClient] Updated lastSyncSequence to ${seq}`)
+  }
+
   async waitForClientId(): Promise<string> {
     if (this.clientId) return this.clientId
     await this.initPromise
@@ -98,7 +104,7 @@ export class ImageSyncClient {
   private async aGenerateClientId(): Promise<string> {
     const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined
     const platform = isElectron ? 'desktop' : 'web'
-    
+    console.log('platform: ', platform)
     let uniqueId: string
 
     if (isElectron) {

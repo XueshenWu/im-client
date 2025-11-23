@@ -49,13 +49,18 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+
+
+
     // Update sync sequence from response headers
     const currentSequence = response.headers['x-current-sequence']
     if (currentSequence) {
       const sequence = parseInt(currentSequence, 10)
       if (!isNaN(sequence)) {
-        localStorage.setItem('lastSyncSequence', sequence.toString())
-        console.log(`[API] Updated lastSyncSequence to ${sequence}`)
+        console.log('server resp: seq = ', sequence)
+        syncClient.updateLastSyncSequence(sequence)
+        // localStorage.setItem('lastSyncSequence', sequence.toString())
+
       }
     }
     return response
