@@ -31,7 +31,8 @@ interface ElectronAPI {
     total: number
     hasMore: boolean
     error?: string
-  }>
+  }>,
+  getDeviceId: () => Promise<string>;
 }
 
 // Vite environment variables

@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
 import { ApiError } from '@/types/api'
+import { syncClient } from './syncClient'
 
 // Get API URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -15,13 +16,13 @@ const api: AxiosInstance = axios.create({
 
 // Request interceptor
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     // Add sync headers for write operations
-    if (config.method && ['post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
+    if (config.method && ['get', 'post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
       // Import syncClient lazily to avoid circular dependencies
       try {
         // We'll add sync headers dynamically
-        const clientId = localStorage.getItem('clientId')
+        const clientId = await syncClient.waitForClientId()
         const lastSyncSequence = localStorage.getItem('lastSyncSequence')
 
         if (clientId && lastSyncSequence) {

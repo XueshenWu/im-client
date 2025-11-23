@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFilesToLocal: (filePaths: string[]) => ipcRenderer.invoke('save-files-to-local', filePaths),
   getLocalImages: (options?: { limit?: number; offset?: number }) =>
     ipcRenderer.invoke('get-local-images', options),
+  getDeviceId: () => ipcRenderer.invoke('get-device-id')
 })

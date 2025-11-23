@@ -19,7 +19,7 @@ function generateUUID(): string {
 const STORAGE_KEY_SEQUENCE = 'lastSyncSequence'
 const STORAGE_KEY_CLIENT_ID = 'clientId'
 
-export type SyncEventType = 'sync_started' | 'sync_completed' | 'sync_error' | 'operation_applied' | 'conflict_detected'
+export type SyncEventType = 'sync_started' | 'sync_completed' | 'sync_error' | 'operation_applied' | 'conflict_detected'| 'client_id_ready'
 
 export interface SyncEvent {
   type: SyncEventType
@@ -40,26 +40,50 @@ export type SyncEventListener = (event: SyncEvent) => void
  */
 export class ImageSyncClient {
   private lastSyncSequence: number
-  private clientId: string
+  private clientId: string | null = null
   private autoSyncInterval: NodeJS.Timeout | null = null
   private eventListeners: SyncEventListener[] = []
   private isSyncing: boolean = false
 
+  private initPromise: Promise<void>;
+
   constructor() {
     // Load or generate client ID
-    const storedClientId = localStorage.getItem(STORAGE_KEY_CLIENT_ID)
-    if (storedClientId) {
-      this.clientId = storedClientId
-    } else {
-      this.clientId = this.generateClientId()
-      localStorage.setItem(STORAGE_KEY_CLIENT_ID, this.clientId)
-    }
+    // const storedClientId = localStorage.getItem(STORAGE_KEY_CLIENT_ID)
+    // if (storedClientId) {
+    //   this.clientId = storedClientId
+    // } else {
+    //   this.clientId = this.generateClientId()
+    //   localStorage.setItem(STORAGE_KEY_CLIENT_ID, this.clientId)
+    // }
 
     // Load last sync sequence
     const storedSequence = localStorage.getItem(STORAGE_KEY_SEQUENCE)
     this.lastSyncSequence = storedSequence ? parseInt(storedSequence, 10) : 0
+    this.initPromise = this.internalInit()
+    console.log(`[SyncClient] Initialized with lastSequence: ${this.lastSyncSequence} and promised clientId`)
+  }
 
-    console.log(`[SyncClient] Initialized with clientId: ${this.clientId}, lastSequence: ${this.lastSyncSequence}`)
+  private async internalInit(): Promise<void> {
+    const storedClientId = localStorage.getItem(STORAGE_KEY_CLIENT_ID)
+
+    if (storedClientId) {
+      // 1. Fast path: We have it in storage
+      this.clientId = storedClientId
+    } else {
+      // 2. Slow path: Generate via Electron/Hardware
+      this.clientId = await this.aGenerateClientId()
+      localStorage.setItem(STORAGE_KEY_CLIENT_ID, this.clientId)
+    }
+
+    console.log(`[SyncClient] Ready. ClientId: ${this.clientId}`)
+    this.emitEvent({ type: 'client_id_ready', data: { clientId: this.clientId } })
+  }
+
+  async waitForClientId(): Promise<string> {
+    if (this.clientId) return this.clientId
+    await this.initPromise
+    return this.clientId!
   }
 
   /**
@@ -71,11 +95,33 @@ export class ImageSyncClient {
     return `${platform}-app-v1.0-${uuid}`
   }
 
+  private async aGenerateClientId(): Promise<string> {
+    const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined
+    const platform = isElectron ? 'desktop' : 'web'
+    
+    let uniqueId: string
+
+    if (isElectron) {
+      try {
+        // Await the hardware ID from the main process
+        uniqueId = await window.electronAPI!.getDeviceId()
+      } catch (e) {
+        console.warn('Failed to get hardware ID, falling back to random')
+        uniqueId = generateUUID()
+      }
+    } else {
+      uniqueId = generateUUID()
+    }
+
+    return `${platform}-app-v1.0-${uniqueId}`
+  }
+
   /**
    * Get the current client ID
    */
   getClientId(): string {
-    return this.clientId
+    // FIXME: Need to asynchify this
+    return this.clientId || ""
   }
 
   /**
@@ -97,9 +143,10 @@ export class ImageSyncClient {
   /**
    * Get sync headers to include in requests
    */
+ // FIXME: Need to asynchify this
   getSyncHeaders(): Record<string, string> {
     return {
-      'X-Client-ID': this.clientId,
+      'X-Client-ID': this.clientId || "",
       'X-Last-Sync-Sequence': this.lastSyncSequence.toString(),
     }
   }

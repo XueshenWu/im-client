@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import si from 'systeminformation'
+import crypto from 'crypto'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -207,6 +209,20 @@ function createWindow() {
         total: 0,
         hasMore: false,
       };
+    }
+  });
+    ipcMain.handle('get-device-id', async () => {
+    try {
+      // 1. Get Hardware UUID (Motherboard/System UUID)
+      const systemData = await si.uuid();
+      const rawId = systemData.os || systemData.hardware;
+
+      // 2. Hash it for privacy and format consistency
+      // Result looks like a UUID: "a1b2c3d4..."
+      return crypto.createHash('sha256').update(rawId + 'my-salt').digest('hex');
+    } catch (error) {
+      console.error('Hardware ID failed, falling back to random UUID', error);
+      return crypto.randomUUID();
     }
   });
 
