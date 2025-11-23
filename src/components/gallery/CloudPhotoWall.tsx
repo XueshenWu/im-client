@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2 } from 'lucide-react';
+import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2, ListFilter, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageItem } from '@/types/gallery';
 import type { Image } from '@/types/api';
@@ -10,6 +10,8 @@ import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { deleteImagesByUuid } from '@/services/images.service';
 import JSZip from 'jszip';
 import { format } from 'date-fns';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose, DrawerBody } from '@/components/ui/drawer';
+import { cn } from '@/lib/utils';
 
 interface CloudPhotoWallProps {
   columnWidth?: number;
@@ -30,13 +32,16 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
   // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('createdAt');
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Drawer state for mobile
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -127,6 +132,28 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
       setSortBy(column);
       setSortOrder('asc');
     }
+
+    // Reset images and cursor to reload from beginning
+    setImages([]);
+    setCursor(undefined);
+    setHasMore(true);
+  };
+
+  // Handle sort from drawer with explicit order
+  const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt', order: 'asc' | 'desc') => {
+    setSortBy(column);
+    setSortOrder(order);
+
+    // Reset images and cursor to reload from beginning
+    setImages([]);
+    setCursor(undefined);
+    setHasMore(true);
+  };
+
+  // Reset sort
+  const handleResetSort = () => {
+    setSortBy(null);
+    setSortOrder('desc');
 
     // Reset images and cursor to reload from beginning
     setImages([]);
@@ -355,35 +382,87 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     );
   }
 
-  // Sort button component
+  // Sort button component (for desktop)
   const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'; label: string }) => {
     const isActive = sortBy === column;
     const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
 
     return (
       <Button
-        variant={isActive ? 'default' : 'outline'}
+        variant={isActive ? 'secondary' : 'ghost'}
         size="sm"
         onClick={() => handleSort(column)}
-        className="flex items-center gap-2"
+        className={cn(
+          "gap-1.5 px-3 font-medium transition-all",
+          isActive && "bg-gray-900 text-white hover:bg-gray-800"
+        )}
       >
-        {label}
-        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+        <Icon className="h-3.5 w-3.5" />
       </Button>
+    );
+  };
+
+  // Sort option component (for mobile drawer)
+  const SortOption = ({
+    column,
+    label,
+    order
+  }: {
+    column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt';
+    label: string;
+    order: 'asc' | 'desc';
+  }) => {
+    const isActive = sortBy === column && sortOrder === order;
+
+    return (
+      <button
+        onClick={() => handleDrawerSort(column, order)}
+        className="flex items-center justify-between py-4 px-6 hover:bg-gray-50 transition-colors text-left w-full border-b border-gray-100 last:border-b-0"
+      >
+        <span className={`text-base ${isActive ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+          {label}
+        </span>
+        {isActive && <Check className="h-5 w-5 text-green-600" />}
+      </button>
     );
   };
 
   return (
     <div className="h-full w-full flex flex-col">
       {/* Controls Bar */}
-      <div className="flex items-center justify-between px-6 py-3  border-gray-200">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-6 py-3 border-gray-200">
+        {/* Desktop Sort Controls (visible on lg and up) */}
+        <div className="hidden lg:flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700 mr-2">{t('gallery.sortBy')}</span>
           <SortButton column="name" label={t('gallery.name')} />
           <SortButton column="size" label={t('gallery.size')} />
           <SortButton column="type" label={t('gallery.type')} />
-          <SortButton column="updatedAt" label={t('gallery.lastModified')} />
-          <SortButton column="createdAt" label={t('gallery.createdDate')} />
+          <SortButton column="createdAt" label="Created" />
+          <SortButton column="updatedAt" label="Modified" />
+        </div>
+
+        {/* Mobile Sort Button (visible below lg) */}
+        <div className="lg:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <ListFilter className="h-4 w-4" />
+            {sortBy ? (
+              <span className="text-sm">
+                {sortBy === 'name' && (sortOrder === 'asc' ? 'Name: A-Z' : 'Name: Z-A')}
+                {sortBy === 'size' && (sortOrder === 'asc' ? 'Smallest' : 'Largest')}
+                {sortBy === 'type' && (sortOrder === 'asc' ? 'Type: A-Z' : 'Type: Z-A')}
+                {sortBy === 'createdAt' && (sortOrder === 'desc' ? 'Created: Newest' : 'Created: Oldest')}
+                {sortBy === 'updatedAt' && (sortOrder === 'desc' ? 'Modified: Newest' : 'Modified: Oldest')}
+              </span>
+            ) : (
+              t('gallery.sortBy')
+            )}
+          </Button>
         </div>
 
         {/* Selection Controls */}
@@ -424,6 +503,47 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           </div>
         )}
       </div>
+
+      {/* Mobile Sort Drawer */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>{t('gallery.sortBy')}</DrawerTitle>
+            <DrawerClose onClick={() => setDrawerOpen(false)} />
+          </DrawerHeader>
+          <DrawerBody className="p-0 flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-col">
+                <SortOption column="name" label="Name: A-Z" order="asc" />
+                <SortOption column="name" label="Name: Z-A" order="desc" />
+                <SortOption column="size" label="Size: Smallest" order="asc" />
+                <SortOption column="size" label="Size: Largest" order="desc" />
+                <SortOption column="type" label="Type: A-Z" order="asc" />
+                <SortOption column="type" label="Type: Z-A" order="desc" />
+                <SortOption column="createdAt" label="Created: Newest" order="desc" />
+                <SortOption column="createdAt" label="Created: Oldest" order="asc" />
+                <SortOption column="updatedAt" label="Modified: Newest" order="desc" />
+                <SortOption column="updatedAt" label="Modified: Oldest" order="asc" />
+              </div>
+            </div>
+            <div className="sticky bottom-0 flex gap-3 p-4 border-t bg-white">
+              <Button
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={handleResetSort}
+              >
+                {t('common.reset')}
+              </Button>
+              <Button
+                className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => setDrawerOpen(false)}
+              >
+                Done
+              </Button>
+            </div>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
 
       {/* Images Grid */}
       <div

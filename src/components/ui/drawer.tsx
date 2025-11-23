@@ -1,116 +1,123 @@
 import * as React from "react"
-import { Drawer as DrawerPrimitive } from "vaul"
-
 import { cn } from "@/lib/utils"
+import { X } from "lucide-react"
 
-const Drawer = ({
-  shouldScaleBackground = true,
+interface DrawerProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: React.ReactNode
+}
+
+export function Drawer({ open, onOpenChange, children }: DrawerProps) {
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+        onClick={() => onOpenChange(false)}
+      />
+      {/* Drawer */}
+      <div className="fixed inset-x-0 bottom-0 z-50">
+        {children}
+      </div>
+    </>
+  )
+}
+
+export function DrawerContent({
+  className,
+  children,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-)
-Drawer.displayName = "Drawer"
-
-const DrawerTrigger = DrawerPrimitive.Trigger
-
-const DrawerPortal = DrawerPrimitive.Portal
-
-const DrawerClose = DrawerPrimitive.Close
-
-const DrawerOverlay = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay
-    ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/80", className)}
-    {...props}
-  />
-))
-DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName
-
-const DrawerContent = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
-    <DrawerPrimitive.Content
-      ref={ref}
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        "bg-white rounded-t-[10px] shadow-lg",
+        "max-h-[85vh] overflow-auto",
+        "animate-in slide-in-from-bottom duration-300",
         className
       )}
       {...props}
     >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      {/* Drag handle */}
+      <div className="flex justify-center py-2">
+        <div className="w-12 h-1 bg-gray-300 rounded-full" />
+      </div>
       {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-))
-DrawerContent.displayName = "DrawerContent"
+    </div>
+  )
+}
 
-const DrawerHeader = ({
+export function DrawerHeader({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn(
+        "sticky top-0 bg-white border-b px-6 py-3 flex items-center justify-between",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+export function DrawerTitle({
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("grid gap-1.5 p-4 text-center sm:text-left", className)}
-    {...props}
-  />
-)
-DrawerHeader.displayName = "DrawerHeader"
+}: React.HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h2
+      className={cn("text-lg font-semibold", className)}
+      {...props}
+    />
+  )
+}
 
-const DrawerFooter = ({
+export function DrawerClose({
+  className,
+  onClick,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      className={cn(
+        "rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100",
+        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "disabled:pointer-events-none",
+        className
+      )}
+      onClick={onClick}
+      {...props}
+    >
+      <X className="h-4 w-4" />
+      <span className="sr-only">Close</span>
+    </button>
+  )
+}
+
+export function DrawerBody({
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-    {...props}
-  />
-)
-DrawerFooter.displayName = "DrawerFooter"
-
-const DrawerTitle = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Title
-    ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className
-    )}
-    {...props}
-  />
-))
-DrawerTitle.displayName = DrawerPrimitive.Title.displayName
-
-const DrawerDescription = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-DrawerDescription.displayName = DrawerPrimitive.Description.displayName
-
-export {
-  Drawer,
-  DrawerPortal,
-  DrawerOverlay,
-  DrawerTrigger,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("p-4", className)} {...props} />
+  )
 }
