@@ -16,6 +16,23 @@ const api: AxiosInstance = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    // Add sync headers for write operations
+    if (config.method && ['post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
+      // Import syncClient lazily to avoid circular dependencies
+      try {
+        // We'll add sync headers dynamically
+        const clientId = localStorage.getItem('clientId')
+        const lastSyncSequence = localStorage.getItem('lastSyncSequence')
+
+        if (clientId && lastSyncSequence) {
+          config.headers['X-Client-ID'] = clientId
+          config.headers['X-Last-Sync-Sequence'] = lastSyncSequence
+        }
+      } catch (error) {
+        console.warn('[API] Failed to add sync headers:', error)
+      }
+    }
+
     // You can add authentication headers here if needed
     // const token = localStorage.getItem('token')
     // if (token) {
@@ -31,9 +48,40 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    // Update sync sequence from response headers
+    const currentSequence = response.headers['x-current-sequence']
+    if (currentSequence) {
+      const sequence = parseInt(currentSequence, 10)
+      if (!isNaN(sequence)) {
+        localStorage.setItem('lastSyncSequence', sequence.toString())
+        console.log(`[API] Updated lastSyncSequence to ${sequence}`)
+      }
+    }
     return response
   },
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
+    // Handle 409 Conflict - Sync conflict detected
+    if (error.response?.status === 409) {
+      console.warn('[API] Sync conflict detected (409). Client needs to sync.')
+
+      // Get operations behind from header
+      const operationsBehind = error.response.headers['x-operations-behind']
+      const parsedBehind = operationsBehind ? parseInt(operationsBehind, 10) : undefined
+
+      // Store conflict info for the application to handle
+      const conflictError: ApiError = {
+        error: 'Sync Conflict',
+        message: error.response.data?.message || 'Your client is out of sync. Please sync and retry.',
+        statusCode: 409,
+      }
+
+      // Attach extra info
+      ;(conflictError as any).operationsBehind = parsedBehind
+      ;(conflictError as any).requiresSync = true
+
+      return Promise.reject(conflictError)
+    }
+
     // Handle different error scenarios
     if (error.response) {
       // Server responded with error status

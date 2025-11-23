@@ -238,3 +238,50 @@ export interface UpdateCollectionRequest {
   description?: string
   coverImageId?: number
 }
+
+// Sync System Types
+export interface SyncOperation {
+  id: number
+  sequenceNumber: number
+  operation: 'upload' | 'delete' | 'update' | 'replace' | 'batch_upload' | 'batch_delete'
+  imageId: number | null
+  imageUuid: string | null
+  clientId: string
+  groupOperationId: string | null
+  metadata: Record<string, any>
+  createdAt: string
+}
+
+export interface SyncOperationsResponse {
+  success: boolean
+  data: SyncOperation[]
+  sync: {
+    currentSequence: number
+    requestedSince: number
+    returnedCount: number
+    hasMore: boolean
+  }
+}
+
+export interface SyncStatusResponse {
+  success: boolean
+  data: {
+    currentSequence: number
+    clientLastSequence: number
+    isInSync: boolean
+    operationsBehind: number
+  }
+}
+
+export interface SyncCurrentResponse {
+  success: boolean
+  data: {
+    currentSequence: number
+  }
+}
+
+export interface MyOperationsResponse {
+  success: boolean
+  data: SyncOperation[]
+  count: number
+}
