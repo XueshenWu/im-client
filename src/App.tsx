@@ -18,7 +18,7 @@ function App() {
           <Route path="upload" element={<Upload />} />
           <Route path="gallery" element={<Gallery />} />
           <Route path="sync" element={<Sync />} />
-          <Route path="activity" element={<Activity />} />
+          {/* <Route path="activity" element={<Activity />} /> */}
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

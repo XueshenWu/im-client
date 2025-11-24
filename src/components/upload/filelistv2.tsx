@@ -522,7 +522,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className={(header.column.columnDef.meta as any)?.className}
+                      className={(header.column.columnDef.meta as any)?.className }
                     >
                       {header.isPlaceholder
                         ? null

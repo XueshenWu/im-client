@@ -18,7 +18,7 @@ export function ViewSwitch({ onViewChange }: ViewSwitchProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 bg-gray-100 rounded-xl p-1">
+    <div className="flex items-center gap-2 bg-gray-100 rounded-xl p-1 *:cursor-pointer">
       <Button
         variant={activeView === "photowall" ? "secondary" : "ghost"}
         className={activeView==='photowall'?'bg-white text-blue-600': ""}

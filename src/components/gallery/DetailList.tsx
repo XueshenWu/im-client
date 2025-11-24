@@ -82,7 +82,7 @@ const Thumbnail = ({ src }: { src: string }) => {
     return <div className="h-8 w-8 animate-pulse rounded bg-gray-200" />;
   }
 
-  return <img src={imgSrc} alt="thumbnail" className="h-8 w-8 rounded object-cover" />;
+  return <img src={imgSrc} alt="thumbnail" className="h-14 w-14 rounded object-cover" />;
 };
 
 
@@ -122,212 +122,214 @@ export const createColumns = (
   t: (key: string) => string,
   onViewImage: (image: Image) => void
 ): ColumnDef<Image>[] => [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-    size: 40,
-    minSize: 40,
-    maxSize: 40,
-  },
-  {
-    accessorKey: "thumbnailPath",
-    header: () => t('table.preview'),
-    cell: ({ row }) => {
-      const thumbnailUrl = imageService.getThumbnailUrl(row.original.thumbnailPath);
-      return <Thumbnail src={thumbnailUrl} />;
-    },
-    enableSorting: false,
-    size: 60,
-    minSize: 60,
-    maxSize: 60,
-  },
-  {
-    accessorKey: "originalName",
-    header: () => (
-      <SortableHeader
-        label={t('table.name')}
-        column="name"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const name = row.getValue("originalName") as string;
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="font-medium truncate max-w-[300px]">{name}</div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{name}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    },
-    size: 300,
-    minSize: 200,
-    maxSize: 400,
-  },
-  {
-    accessorKey: "fileSize",
-    header: () => (
-      <SortableHeader
-        label={t('table.size')}
-        column="size"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatBytes(row.getValue("fileSize"))}</div>,
-    size: 100,
-    minSize: 80,
-    maxSize: 120,
-  },
-  {
-    accessorKey: "format",
-    header: () => (
-      <SortableHeader
-        label={t('table.type')}
-        column="type"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => (
-      <div className="uppercase text-sm font-medium text-muted-foreground">{row.getValue("format")}</div>
-    ),
-    size: 80,
-    minSize: 60,
-    maxSize: 100,
-  },
-  {
-    accessorKey: "updatedAt",
-    header: () => (
-      <SortableHeader
-        label={t('table.lastModified')}
-        column="updatedAt"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const dateStr = format(new Date(row.getValue("updatedAt")), "yyyy-MM-dd HH:mm");
-      return <div className="text-sm text-muted-foreground">{dateStr}</div>;
-    },
-    size: 150,
-    minSize: 130,
-    maxSize: 170,
-  },
-  {
-    accessorKey: "createdAt",
-    header: () => (
-      <SortableHeader
-        label={t('table.createdDate')}
-        column="createdAt"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const dateStr = format(new Date(row.getValue("createdAt")), "yyyy-MM-dd HH:mm");
-      return <div className="text-sm text-muted-foreground">{dateStr}</div>;
-    },
-    size: 150,
-    minSize: 130,
-    maxSize: 170,
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    cell: ({ row }) => {
-      const image = row.original
-
-      const handleDownload = async () => {
-        try {
-          const imageUrl = `${imageService.getImageFileUrl(image.uuid)}?info=true`;
-          const response = await fetch(imageUrl);
-
-          if (!response.ok) {
-            console.error('Download failed:', response.statusText);
-            return;
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
           }
-
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = image.originalName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        } catch (error) {
-          console.error('Download error:', error);
-        }
-      };
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(image.uuid)}
-            >
-              {t('contextMenu.copyId')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onViewImage(image)}>
-              <Eye className="mr-2 h-4 w-4" />
-              {t('contextMenu.viewDetails')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownload}>
-              <Download className="mr-2 h-4 w-4" />
-              {t('contextMenu.download')}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              {t('contextMenu.delete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="border-gray-300 bg-white rounded-md  hover:border-blue-300 duration-100 "
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="border-gray-300 rounded-md hover:border-blue-300 duration-100 "
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 60,
+      minSize: 60,
+      maxSize: 60,
     },
-    size: 60,
-    minSize: 60,
-    maxSize: 60,
-  },
-];
+    {
+      accessorKey: "thumbnailPath",
+      header: () => t('table.preview'),
+      cell: ({ row }) => {
+        const thumbnailUrl = imageService.getThumbnailUrl(row.original.thumbnailPath);
+        return <Thumbnail src={thumbnailUrl} />;
+      },
+      enableSorting: false,
+      size: 100,
+      minSize: 60,
+      maxSize: 100,
+    },
+    {
+      accessorKey: "originalName",
+      header: () => (
+        <SortableHeader
+          label={t('table.name')}
+          column="name"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const name = row.getValue("originalName") as string;
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="font-medium truncate max-w-[300px]">{name}</div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{name}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+      size: 250,
+      minSize: 200,
+      maxSize: 300,
+    },
+    {
+      accessorKey: "fileSize",
+      header: () => (
+        <SortableHeader
+          label={t('table.size')}
+          column="size"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatBytes(row.getValue("fileSize"))}</div>,
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+    {
+      accessorKey: "format",
+      header: () => (
+        <SortableHeader
+          label={t('table.type')}
+          column="type"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="uppercase text-sm font-medium text-muted-foreground">{row.getValue("format")}</div>
+      ),
+      size: 80,
+      minSize: 60,
+      maxSize: 100,
+    },
+    {
+      accessorKey: "updatedAt",
+      header: () => (
+        <SortableHeader
+          label={t('table.lastModified')}
+          column="updatedAt"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const dateStr = format(new Date(row.getValue("updatedAt")), "yyyy-MM-dd HH:mm");
+        return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+      },
+      size: 150,
+      minSize: 130,
+      maxSize: 170,
+    },
+    {
+      accessorKey: "createdAt",
+      header: () => (
+        <SortableHeader
+          label={t('table.createdDate')}
+          column="createdAt"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const dateStr = format(new Date(row.getValue("createdAt")), "yyyy-MM-dd HH:mm");
+        return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+      },
+      size: 150,
+      minSize: 130,
+      maxSize: 170,
+    },
+    {
+      id: "actions",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const image = row.original
+
+        const handleDownload = async () => {
+          try {
+            const imageUrl = `${imageService.getImageFileUrl(image.uuid)}?info=true`;
+            const response = await fetch(imageUrl);
+
+            if (!response.ok) {
+              console.error('Download failed:', response.statusText);
+              return;
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = image.originalName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('Download error:', error);
+          }
+        };
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => navigator.clipboard.writeText(image.uuid)}
+              >
+                {t('contextMenu.copyId')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onViewImage(image)}>
+                <Eye className="mr-2 h-4 w-4" />
+                {t('contextMenu.viewDetails')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownload}>
+                <Download className="mr-2 h-4 w-4" />
+                {t('contextMenu.download')}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                {t('contextMenu.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      },
+      size: 60,
+      minSize: 60,
+      maxSize: 60,
+    },
+  ];
 
 export default function DetailList() {
   const { t } = useTranslation()
@@ -415,7 +417,7 @@ export default function DetailList() {
       const imagesFolder = zip.folder('images');
 
       let totalSize = 0;
-      const invoiceItems: Array<{name: string, size: string, format: string}> = [];
+      const invoiceItems: Array<{ name: string, size: string, format: string }> = [];
 
       // Download each image with metadata from headers
       for (const uuid of selectedUuids) {
@@ -439,15 +441,15 @@ export default function DetailList() {
 
           // Extract metadata from response headers (try both cases as headers might be lowercase)
           const originalName = response.headers.get('x-image-original-name') ||
-                               response.headers.get('X-Image-Original-Name') ||
-                               `image-${uuid}.jpg`;
+            response.headers.get('X-Image-Original-Name') ||
+            `image-${uuid}.jpg`;
           const fileSizeStr = response.headers.get('x-image-file-size') ||
-                             response.headers.get('X-Image-File-Size') ||
-                             '0';
+            response.headers.get('X-Image-File-Size') ||
+            '0';
           const fileSize = parseInt(fileSizeStr, 10);
           const format = response.headers.get('x-image-format') ||
-                        response.headers.get('X-Image-Format') ||
-                        'unknown';
+            response.headers.get('X-Image-Format') ||
+            'unknown';
 
           console.log(`Extracted: name=${originalName}, size=${fileSize}, format=${format}`);
 
@@ -573,7 +575,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
 
   const handlePageChange = (newPage: number) => {
     if (newPage > 0 && newPage <= pagination.totalPages) {
-      setPagination(prev => ({...prev, page: newPage}));
+      setPagination(prev => ({ ...prev, page: newPage }));
     }
   }
 
@@ -600,20 +602,20 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           onChange={(event) =>
             table.getColumn("originalName")?.setFilterValue(event.target.value)
           }
-          className="max-w-sm"
+          className="max-w-sm border-gray-300 ring-gray-400"
         />
         <div className="flex items-center gap-2">
           {Object.keys(rowSelection).length > 0 && (
             <Button
               variant="ghost"
               onClick={() => setRowSelection({})}
-              className="h-8 px-2 lg:px-3"
+              className="h-8 px-2 lg:px-3 hover:text-blue-500 hover:underline duration-75"
             >
               {t('table.clearSelection')}
             </Button>
           )}
           <Button
-            variant="outline"
+            className=" border-gray-200 border bg-blue-600 text-white hover:bg-blue-500"
             onClick={handleExport}
             disabled={Object.keys(rowSelection).length === 0 || isLoading}
           >
@@ -621,7 +623,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             {t('table.export')} ({Object.keys(rowSelection).length})
           </Button>
           <Button
-            variant="destructive"
+              className=" border-gray-200 border hover:bg-gray-100 "
             onClick={handleDelete}
             disabled={Object.keys(rowSelection).length === 0 || isLoading}
           >
@@ -630,7 +632,9 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline"
+              className="border-gray-200"
+              >
                 {t('table.columns')} <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -642,7 +646,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
-                      className="capitalize"
+                      className="capitalize cursor-pointer hover:bg-gray-100 duration-75"
                       checked={column.getIsVisible()}
                       onCheckedChange={(value) =>
                         column.toggleVisibility(!!value)
@@ -658,31 +662,35 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
       </div>
 
       {/* Table with Scroll Container */}
-      <div className="flex-1 min-h-0 rounded-md border overflow-auto">
+      <div className="flex-1 min-h-0 rounded-md  overflow-auto">
         <Table style={{ tableLayout: 'fixed', width: '100%' }}>
-          <TableHeader>
+          <TableHeader
+            className="bg-slate-100 [&_tr]:border-b-0! **:font-semibold"
+          >
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className="h-10 px-2"
+                      className="h-10 px-2 "
                       style={{ width: `${header.getSize()}px` }}
                     >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                     </TableHead>
                   )
                 })}
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody
+            className="border-0"
+          >
             {isLoading ? (
               <TableRow>
                 <TableCell
@@ -700,6 +708,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="border-gray-300 h-18 hover:bg-slate-50"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -736,20 +745,23 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             <span>{t('table.rowsSelected', { count: Object.keys(rowSelection).length })}</span>
           )}
         </div>
-        <div className="flex items-center space-x-6 lg:space-x-8">
+        <div className="flex items-center space-x-6 lg:space-x-8 **:ring-0!">
           {/* Page Size Selector */}
           <div className="flex items-center space-x-2">
             <p className="text-sm font-medium">{t('table.rowsPerPage')}</p>
             <Select
+            
               value={`${pagination.pageSize}`}
               onValueChange={(value) => handlePageSizeChange(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[70px]">
+              <SelectTrigger className="h-8 w-[70px] border-gray-200 cursor-pointer ">
                 <SelectValue placeholder={pagination.pageSize} />
               </SelectTrigger>
               <SelectContent side="top">
                 {[5, 10, 20, 30, 40, 50].map((pageSize) => (
-                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                  <SelectItem
+                  className="cursor-pointer"
+                  key={pageSize} value={`${pageSize}`}>
                     {pageSize}
                   </SelectItem>
                 ))}
@@ -763,7 +775,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 *:border-gray-200">
             <Button
               variant="outline"
               className="hidden h-8 w-8 p-0 lg:flex"

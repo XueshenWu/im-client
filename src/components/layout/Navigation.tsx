@@ -51,13 +51,13 @@ export default function Navigation() {
     { id: 'upload' as NavItem, icon: Upload, labelKey: 'navigation.upload' },
     { id: 'gallery' as NavItem, icon: Grid3x3, labelKey: 'navigation.gallery' },
     { id: 'sync' as NavItem, icon: RefreshCw, labelKey: 'navigation.sync' },
-    { id: 'activity' as NavItem, icon: Activity, labelKey: 'navigation.activity' },
+    // { id: 'activity' as NavItem, icon: Activity, labelKey: 'navigation.activity' },
   ]
 
   return (
     <div
       ref={navRef}
-      className={`${isExpanded ? 'w-36 items-start' : 'w-16 items-center'} bg-slate-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col  gap-y-4 transition-all duration-300`}
+      className={`${isExpanded ? 'min-w-36 max-w-44 items-start' : 'w-16 items-center'} bg-slate-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col  gap-y-4 transition-all duration-300`}
       style={{ paddingTop: '24px', paddingBottom: '24px', paddingLeft: isExpanded ? '12px' : '12px', paddingRight: isExpanded ? '12px' : '12px' }}
     >
       {/* Logo */}
@@ -83,16 +83,17 @@ export default function Navigation() {
               key={item.id}
               onClick={() => handleNavigate(item.id)}
               variant="ghost"
+              
               // size={isExpanded ? "default" : "icon"}
 
               className={cn(
                 'relative h-12 rounded-2xl transition-all duration-200 cursor-pointer ',
-                isExpanded ? 'w-full justify-start' : 'w-12',
+                isExpanded ? 'w-full justify-start ' : 'w-12',
                 isActive
-                  ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30 hover:from-blue-700 hover:to-purple-700'
+                  ? 'bg-linear-to-br from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30 hover:from-blue-700 hover:to-purple-700'
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               )}
-              style={{ paddingLeft: isExpanded ? '12px' : '12px', paddingRight: isExpanded ? '12px' : '12px' }}
+              style={{ paddingLeft: isExpanded ? '12px' : '12px'}}
               title={!isExpanded ? t(item.labelKey) : undefined}
             >
 
@@ -100,7 +101,7 @@ export default function Navigation() {
               <Icon className={cn('flex-shrink-0', isActive ? 'text-white' : 'text-gray-600 dark:text-gray-400')} />
 
               {isExpanded && (
-                <span className={cn('text-xs font-medium whitespace-nowrap', isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300')}>
+                <span className={cn(' text-xs whitespace-nowrap', isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300')}>
                   {t(item.labelKey)}
                 </span>
               )}

@@ -125,7 +125,13 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
       if (sortOrder === 'asc') {
         setSortOrder('desc');
       } else if (sortOrder === 'desc') {
-        setSortBy(null);
+
+        if(column === 'updatedAt'){
+          setSortOrder('asc');
+          return;
+        }
+
+        setSortBy('updatedAt');
         setSortOrder('desc');
       }
     } else {
@@ -152,7 +158,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
 
   // Reset sort
   const handleResetSort = () => {
-    setSortBy(null);
+    setSortBy('updatedAt');
     setSortOrder('desc');
 
     // Reset images and cursor to reload from beginning
@@ -394,7 +400,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
         onClick={() => handleSort(column)}
         className={cn(
           "gap-1.5 px-3 font-medium transition-all",
-          isActive && "bg-gray-900 text-white hover:bg-gray-800"
+          isActive ? "bg-blue-600 text-white hover:bg-blue-500":"hover:bg-blue-600 hover:text-white bg-gray-100 border-gray-700"
         )}
       >
         <span>{label}</span>
@@ -445,10 +451,10 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
         {/* Mobile Sort Button (visible below lg) */}
         <div className="lg:hidden">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500"
           >
             <ListFilter className="h-4 w-4" />
             {sortBy ? (
@@ -526,10 +532,9 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
                 <SortOption column="updatedAt" label="Modified: Oldest" order="asc" />
               </div>
             </div>
-            <div className="sticky bottom-0 flex gap-3 p-4 border-t bg-white">
+            <div className="sticky bottom-0 flex gap-3 p-4 border-t bg-white ">
               <Button
-                variant="outline"
-                className="flex-1 h-11"
+                className="flex-1 h-11 bg-gray-200 hover:bg-gray-300"
                 onClick={handleResetSort}
               >
                 {t('common.reset')}
