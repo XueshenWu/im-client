@@ -14,6 +14,7 @@ interface ElectronAPI {
   minimizeWindow: () => void
   maximizeWindow: () => void
   closeWindow: () => void
+  setWindowTitle: (title: string) => void
   getFilePath: (file: File) => string
   expandPath: (path: string, recursive?: boolean) => Promise<string[]>
   readLocalFile: (path: string) => Promise<ArrayBuffer | null>

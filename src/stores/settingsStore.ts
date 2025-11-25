@@ -25,6 +25,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setSourceMode: (mode: SourceMode) => {
         console.log('[Settings] Source mode changed to:', mode);
         set({ sourceMode: mode });
+     
       },
       setSyncPolicy: (policy: Partial<SyncPolicy>) =>
         set((state) => ({

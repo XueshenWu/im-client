@@ -17,25 +17,27 @@ import { localSyncService } from '@/services/localSync.service'
 import { localImageService } from '@/services/localImage.service'
 import ExportDialog from '@/components/sync/ExportDialog'
 import { LocalImage } from '@/types/local'
-import { Upload, Download, AlertTriangle } from 'lucide-react'
+import { Upload, Download, AlertTriangle, Cloud, HardDrive } from 'lucide-react'
 
 export default function Sync() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const { t } = useTranslation()
+  const { sourceMode } = useSettingsStore()
+
+  // Cloud mode state
   const [syncStatus, setSyncStatus] = useState<{
     currentSequence: number
     clientLastSequence: number
     isInSync: boolean
     operationsBehind: number
   } | null>(null)
-  const { t } = useTranslation()
   const [myOperations, setMyOperations] = useState<SyncOperation[]>([])
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [syncEvents, setSyncEvents] = useState<string[]>([])
 
   // Local mode state
-  const { sourceMode } = useSettingsStore()
   const [localSyncStatus, setLocalSyncStatus] = useState<{
     localSeq: number
     serverSeq: number
@@ -45,8 +47,10 @@ export default function Sync() {
   const [affectedImages, setAffectedImages] = useState<LocalImage[]>([])
   const [pendingPullContinue, setPendingPullContinue] = useState(false)
 
-  // Load sync status on mount
+  // Cloud mode: Load sync status and operations
   useEffect(() => {
+    if (sourceMode !== 'cloud') return
+
     loadSyncStatus()
     loadMyOperations()
 
@@ -72,7 +76,14 @@ export default function Sync() {
     return () => {
       syncClient.removeEventListener(eventListener)
     }
-  }, [])
+  }, [sourceMode])
+
+  // Local mode: Load sync status
+  useEffect(() => {
+    if (sourceMode === 'local') {
+      loadLocalSyncStatus()
+    }
+  }, [sourceMode])
 
   const loadSyncStatus = async () => {
     try {
@@ -266,43 +277,51 @@ export default function Sync() {
     await handleLocalPush(true)
   }
 
-  // Load local sync status on mount and when source mode changes
-  useEffect(() => {
-    if (sourceMode === 'local') {
-      loadLocalSyncStatus()
-    }
-  }, [sourceMode])
-
   return (
     <div className="w-full flex flex-col px-6 py-6 h-full gap-6 bg-white">
       <div className="space-y-3 shrink-0">
         <HomeLink />
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-4xl font-bold font-sans text-gray-900">Sync</h1>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
+            {sourceMode === 'cloud' ? (
+              <>
+                <Cloud className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-gray-700">Cloud Mode</span>
+              </>
+            ) : (
+              <>
+                <HardDrive className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-gray-700">Local Mode</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
       <div className="border-t border-gray-300 shrink-0" />
 
       <ScrollArea className="h-full w-full rounded-md">
-        <Accordion
-          type="multiple"
-          defaultValue={['status', 'controls', 'events', 'operations']}
-          className="w-full space-y-6 p-1"
-        >
-          {/* Sync Status Card */}
-          <AccordionItem
-            value="status"
-            className="bg-white rounded-lg shadow-md border-none"
+        {sourceMode === 'cloud' ? (
+          // CLOUD MODE SYNC
+          <Accordion
+            type="multiple"
+            defaultValue={['status', 'controls', 'events', 'operations']}
+            className="w-full space-y-6 p-1"
           >
-            <AccordionTrigger className="px-6 py-4 hover:no-underline">
-              <h2 className="text-xl font-semibold">Sync Status</h2>
-            </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4">
-              <div className="flex justify-end mb-4">
-                <Button onClick={loadSyncStatus} variant="outline" size="sm">
-                  Refresh Status
-                </Button>
-              </div>
+            {/* Sync Status Card */}
+            <AccordionItem
+              value="status"
+              className="bg-white rounded-lg shadow-md border-none"
+            >
+              <AccordionTrigger className="px-6 py-4 hover:no-underline">
+                <h2 className="text-xl font-semibold">Sync Status</h2>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4">
+                <div className="flex justify-end mb-4">
+                  <Button onClick={loadSyncStatus} variant="outline" size="sm">
+                    Refresh Status
+                  </Button>
+                </div>
 
               {syncStatus ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -497,9 +516,14 @@ export default function Sync() {
               )}
             </AccordionContent>
           </AccordionItem>
-
-          {/* Local Mode Sync Controls - Only shown in local mode */}
-          {sourceMode === 'local' && (
+        </Accordion>
+        ) : (
+          // LOCAL MODE SYNC
+          <Accordion
+            type="multiple"
+            defaultValue={['local-sync']}
+            className="w-full space-y-6 p-1"
+          >
             <AccordionItem
               value="local-sync"
               className="bg-white rounded-lg shadow-md border-none"
@@ -591,8 +615,8 @@ export default function Sync() {
                 </div>
               </AccordionContent>
             </AccordionItem>
-          )}
-        </Accordion>
+          </Accordion>
+        )}
       </ScrollArea>
 
       {/* Export Dialog */}

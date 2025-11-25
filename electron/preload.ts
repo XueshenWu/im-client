@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.send('minimize-window'),
   maximizeWindow: () => ipcRenderer.send('maximize-window'),
   closeWindow: () => ipcRenderer.send('close-window'),
+  setWindowTitle: (title: string) => ipcRenderer.send('set-window-title', title),
   getFilePath: (file:File) => webUtils.getPathForFile(file),
   expandPath: (path: string, recursive: boolean) =>
     ipcRenderer.invoke('expand-path', path, recursive),

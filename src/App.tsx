@@ -8,8 +8,11 @@ import Sync from './pages/Sync'
 import Activity from './pages/Activity'
 import Settings from './pages/Settings'
 import { ImageViewer } from './components/viewer/ImageViewer'
+import { useSettingsStore } from './stores/settingsStore'
 
 function App() {
+  const { sourceMode } = useSettingsStore()
+
   // Initialize database on app startup
   useEffect(() => {
     const initializeDatabase = async () => {
@@ -27,6 +30,14 @@ function App() {
 
     initializeDatabase();
   }, []);
+
+  // Set window title based on current source mode
+  useEffect(() => {
+    const title = sourceMode === 'local' ? 'Image Manager (Local)' : 'Image Manager (Cloud)';
+    if (window.electronAPI) {
+      window.electronAPI.setWindowTitle(title);
+    }
+  }, [sourceMode]);
 
   return (
     <BrowserRouter>

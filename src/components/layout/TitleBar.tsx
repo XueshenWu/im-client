@@ -1,4 +1,6 @@
 import { Minus, Square, X } from 'lucide-react'
+import {useSettingsStore} from '@/stores/settingsStore'
+
 
 export default function TitleBar() {
   const handleMinimize = () => {
@@ -12,6 +14,10 @@ export default function TitleBar() {
   const handleClose = () => {
     window.electronAPI?.closeWindow()
   }
+
+  const { sourceMode } = useSettingsStore()
+
+
 
   return (
     <div
@@ -27,7 +33,7 @@ export default function TitleBar() {
         <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
           <span className="text-blue-700 font-bold text-sm">V</span>
         </div>
-        <span className="text-white font-semibold text-sm">Voyis Image Editor</span>
+        <span className="text-white font-semibold text-sm">Voyis Image Editor {`(${sourceMode})`}</span>
       </div>
 
       {/* Right side - Window Controls */}

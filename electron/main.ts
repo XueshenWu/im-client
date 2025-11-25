@@ -89,6 +89,11 @@ function createWindow() {
     mainWindow.close()
   })
 
+  // Set window title
+  ipcMain.on('set-window-title', (_event, title: string) => {
+    mainWindow.setTitle(title)
+  })
+
   // Updated Handler
   ipcMain.handle('expand-path', async (event, targetPath, recursive = false) => {
     try {
