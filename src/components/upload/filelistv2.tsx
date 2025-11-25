@@ -26,6 +26,10 @@ import {
 } from '@/services/images.service';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { Image } from '@/types/api';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { localImageService } from '@/services/localImage.service';
+import { LocalImage } from '@/types/local';
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 
 // Upload configuration
 const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
@@ -230,6 +234,8 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   const [isUploading, setIsUploading] = React.useState(false);
   const [previousFileCount, setPreviousFileCount] = React.useState(0);
   const { openViewer } = useImageViewerStore();
+  const { sourceMode } = useSettingsStore();
+  const { triggerRefresh } = useGalleryRefreshStore();
   const allFilesCompleted = React.useMemo(() => {
     if (files.length === 0) return false;
 
@@ -365,11 +371,124 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
     // Track results directly instead of relying on state
     let completedCount = 0;
     let failedCount = 0;
-    // FIXME: Need to upload to local after to cloud
+
     try {
-      // STEP 1: Always save files with paths to local storage first
+      // Check source mode
+      if (sourceMode === 'local') {
+        // LOCAL MODE: Save to local database only
+        console.log('[Upload] Local mode: saving to local database');
+
+        // Initialize upload status for all files
+        const initialStatuses = new Map<string, UploadStatus>();
+        files.forEach((file) => {
+          initialStatuses.set(file.name, {
+            fileName: file.name,
+            progress: 0,
+            status: 'pending',
+          });
+        });
+        setUploadStatuses(initialStatuses);
+
+        // Process each file
+        for (const file of files) {
+          try {
+            // Update status to uploading
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(file.name, {
+                fileName: file.name,
+                progress: 30,
+                status: 'uploading',
+              });
+              return newMap;
+            });
+
+            // Save file to AppData (if has source path)
+            let localFilePath = '';
+            if (file.sourcePath) {
+              const result = await window.electronAPI?.saveFilesToLocal([file.sourcePath]);
+              if (result?.success && result.savedFiles && result.savedFiles.length > 0) {
+                localFilePath = result.savedFiles[0];
+              }
+            } else {
+              // File doesn't have source path (e.g., from drag-drop of blob)
+              console.warn(`File ${file.name} has no source path, skipping local save`);
+            }
+
+            // Update progress
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(file.name, {
+                fileName: file.name,
+                progress: 70,
+                status: 'uploading',
+              });
+              return newMap;
+            });
+
+            // Create LocalImage record
+            const localImage: LocalImage = {
+              uuid: crypto.randomUUID(),
+              filename: file.name,
+              originalName: file.name,
+              filePath: localFilePath,
+              thumbnailPath: '', // TODO: Generate thumbnail
+              fileSize: file.size,
+              format: (file.type.split('/')[1] as any) || 'jpg',
+              width: 0,
+              height: 0,
+              hash: '',
+              mimeType: file.type,
+              isCorrupted: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              deletedAt: null,
+              exifData: undefined,
+            };
+
+            // Save to local database
+            await localImageService.addImage(localImage);
+
+            // Mark as completed
+            completedCount++;
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(file.name, {
+                fileName: file.name,
+                progress: 100,
+                status: 'completed',
+              });
+              return newMap;
+            });
+          } catch (error) {
+            console.error(`Failed to save ${file.name} to local:`, error);
+            failedCount++;
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(file.name, {
+                fileName: file.name,
+                progress: 0,
+                status: 'failed',
+                error: error instanceof Error ? error.message : 'Upload failed',
+              });
+              return newMap;
+            });
+          }
+        }
+
+        // Show summary
+        alert(`Local upload complete!\n✓ ${completedCount} files saved\n${failedCount > 0 ? `✗ ${failedCount} files failed` : ''}`);
+
+        // Trigger gallery refresh
+        triggerRefresh();
+
+        setIsUploading(false);
+        return;
+      }
+
+      // CLOUD MODE: Original logic
+      // STEP 1: Always save files with paths to local storage first (for backup)
       const filesWithPaths = files.filter(file => file.sourcePath);
-      const filesWithoutPaths = files.filter(file => !file.sourcePath);
 
       let localSavedCount = 0;
 
@@ -387,12 +506,8 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         }
       }
 
-
-
-      // STEP 3: If syncing to cloud, continue with cloud upload
-      // Separate files into small and large
+      // STEP 2: Upload to cloud - Separate files into small and large
       const smallFiles: File[] = [];
-
       const largeFiles: File[] = [];
 
       files.forEach((file) => {

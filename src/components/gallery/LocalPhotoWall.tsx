@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { ImageItem, ImageSource } from '@/types/gallery';
 import LocalPhotoCard from './LocalPhotoCard';
+import { localDatabase } from '@/services/localDatabase.service';
 
 interface LocalPhotoWallProps {
   columnWidth?: number;
@@ -17,71 +18,80 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
 
-  // Load images from local storage
+  // Load images from local database
   const loadLocalImages = useCallback(async () => {
     if (loadingRef.current || !hasMore) return;
 
     loadingRef.current = true;
     setLoading(true);
     try {
-      const result = await window.electronAPI?.getLocalImages({
-        limit: LIMIT,
-        offset: offset,
-      });
+      const result = await localDatabase.getPaginatedImages(page, LIMIT);
 
-      if (result?.success && result.data) {
-        if (result.data.length > 0) {
-          // Process images to add preview and aspect ratio
-          const imagesWithPreview = await Promise.all(
-            result.data.map(async (img) => {
-              const buffer = await window.electronAPI?.readLocalFile(img.path);
-              if (!buffer) {
-                return {
-                  ...img,
-                  aspectRatio: 1,
-                  source: 'local' as ImageSource,
-                  id: img.path,
-                };
-              }
-
-              const blob = new Blob([buffer]);
-              const preview = URL.createObjectURL(blob);
-
-              const aspectRatio = await new Promise<number>((resolve) => {
-                const image = new Image();
-                image.onload = () => resolve(image.width / image.height);
-                image.onerror = () => resolve(1);
-                image.src = preview;
-              });
-
+      if (result && result.images.length > 0) {
+        // Process images to add preview and aspect ratio
+        const imagesWithPreview = await Promise.all(
+          result.images.map(async (img: any) => {
+            const buffer = await window.electronAPI?.readLocalFile(img.filePath);
+            if (!buffer) {
               return {
-                ...img,
-                preview,
-                aspectRatio,
+                name: img.filename,
+                path: img.filePath,
+                size: img.fileSize,
+                aspectRatio: img.width && img.height ? img.width / img.height : 1,
                 source: 'local' as ImageSource,
-                id: img.path,
+                id: img.uuid,
+                createdAt: img.createdAt,
+                modifiedAt: img.updatedAt,
               };
-            })
-          );
+            }
 
-          // Filter out duplicates
-          setImages((prevImages) => {
-            const existingPaths = new Set(prevImages.map((i) => i.path));
-            const newUniqueImages = imagesWithPreview.filter(
-              (img) => !existingPaths.has(img.path)
-            );
-            return [...prevImages, ...newUniqueImages];
-          });
-          setOffset((prev) => prev + result.data.length);
-        }
-        setHasMore(result.hasMore);
+            const blob = new Blob([buffer]);
+            const preview = URL.createObjectURL(blob);
+
+            const aspectRatio = img.width && img.height
+              ? img.width / img.height
+              : await new Promise<number>((resolve) => {
+                  const image = new Image();
+                  image.onload = () => resolve(image.width / image.height);
+                  image.onerror = () => resolve(1);
+                  image.src = preview;
+                });
+
+            return {
+              name: img.filename,
+              path: img.filePath,
+              size: img.fileSize,
+              preview,
+              aspectRatio,
+              source: 'local' as ImageSource,
+              id: img.uuid,
+              createdAt: img.createdAt,
+              modifiedAt: img.updatedAt,
+            };
+          })
+        );
+
+        // Filter out duplicates
+        setImages((prevImages) => {
+          const existingIds = new Set(prevImages.map((i) => i.id));
+          const newUniqueImages = imagesWithPreview.filter(
+            (img) => !existingIds.has(img.id)
+          );
+          return [...prevImages, ...newUniqueImages];
+        });
+
+        setPage((prev) => prev + 1);
+
+        // Check if there are more images
+        const totalPages = Math.ceil(result.total / LIMIT);
+        setHasMore(page < totalPages);
       } else {
         setHasMore(false);
       }
@@ -91,7 +101,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [offset, hasMore]);
+  }, [page, hasMore]);
 
   // Initial load
   useEffect(() => {

@@ -12,6 +12,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { localSyncService } from '@/services/localSync.service'
+import { localImageService } from '@/services/localImage.service'
+import ExportDialog from '@/components/sync/ExportDialog'
+import { LocalImage } from '@/types/local'
+import { Upload, Download, AlertTriangle } from 'lucide-react'
 
 export default function Sync() {
   const [isLoading, setIsLoading] = useState(false)
@@ -27,6 +33,17 @@ export default function Sync() {
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [syncEvents, setSyncEvents] = useState<string[]>([])
+
+  // Local mode state
+  const { sourceMode } = useSettingsStore()
+  const [localSyncStatus, setLocalSyncStatus] = useState<{
+    localSeq: number
+    serverSeq: number
+    inSync: boolean
+  } | null>(null)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [affectedImages, setAffectedImages] = useState<LocalImage[]>([])
+  const [pendingPullContinue, setPendingPullContinue] = useState(false)
 
   // Load sync status on mount
   useEffect(() => {
@@ -145,6 +162,116 @@ export default function Sync() {
         return '❓'
     }
   }
+
+  // Local mode functions
+  const loadLocalSyncStatus = async () => {
+    if (sourceMode !== 'local') return
+    try {
+      const status = await localSyncService.checkSyncStatus()
+      setLocalSyncStatus(status)
+    } catch (error) {
+      console.error('Failed to load local sync status:', error)
+    }
+  }
+
+  const handleLocalPush = async (forcePush: boolean = false) => {
+    if (sourceMode !== 'local') return
+    setIsSyncing(true)
+    try {
+      const result = await localSyncService.push(forcePush)
+      if (result.success) {
+        alert(`Push successful! ${result.message}`)
+        await loadLocalSyncStatus()
+      } else {
+        alert(`Push failed: ${result.message}`)
+      }
+    } catch (error) {
+      console.error('Push failed:', error)
+      alert('Push failed. Check console for details.')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  const handleLocalPull = async () => {
+    if (sourceMode !== 'local') return
+    setIsSyncing(true)
+    try {
+      const result = await localSyncService.pull()
+      if (result.success) {
+        // Check if there are affected images
+        if (result.affectedImages && result.affectedImages.length > 0) {
+          setAffectedImages(result.affectedImages)
+          setExportDialogOpen(true)
+          setPendingPullContinue(true)
+        } else {
+          alert(`Pull successful! ${result.message}`)
+          await loadLocalSyncStatus()
+        }
+      } else {
+        alert(`Pull failed: ${result.message}`)
+      }
+    } catch (error) {
+      console.error('Pull failed:', error)
+      alert('Pull failed. Check console for details.')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  const handleExportAndContinuePull = async (imagesToExport: LocalImage[], destination: string) => {
+    try {
+      // Export images
+      const result = await localImageService.exportImages(
+        imagesToExport.map(img => img.uuid),
+        destination
+      )
+
+      if (result.success) {
+        alert(`Exported ${imagesToExport.length} images successfully!`)
+        // Continue with pull
+        await loadLocalSyncStatus()
+      } else {
+        alert('Failed to export some images. Check console.')
+      }
+    } catch (error) {
+      console.error('Export failed:', error)
+      alert('Export failed. Check console for details.')
+    }
+    setPendingPullContinue(false)
+  }
+
+  const handleSkipExportAndContinue = async () => {
+    await loadLocalSyncStatus()
+    setPendingPullContinue(false)
+  }
+
+  const handleCancelPull = () => {
+    setPendingPullContinue(false)
+    setAffectedImages([])
+  }
+
+  const handleForcePush = async () => {
+    if (!confirm('⚠️ FORCE PUSH will overwrite the server with your local state. This is dangerous and may cause data loss for other clients. Are you sure?')) {
+      return
+    }
+    if (!confirm('Type CONFIRM in the next dialog to proceed with force push.')) {
+      return
+    }
+    const confirmation = prompt('Type CONFIRM to proceed with force push:')
+    if (confirmation !== 'CONFIRM') {
+      alert('Force push cancelled.')
+      return
+    }
+    await handleLocalPush(true)
+  }
+
+  // Load local sync status on mount and when source mode changes
+  useEffect(() => {
+    if (sourceMode === 'local') {
+      loadLocalSyncStatus()
+    }
+  }, [sourceMode])
 
   return (
     <div className="w-full flex flex-col px-6 py-6 h-full gap-6 bg-white">
@@ -370,8 +497,113 @@ export default function Sync() {
               )}
             </AccordionContent>
           </AccordionItem>
+
+          {/* Local Mode Sync Controls - Only shown in local mode */}
+          {sourceMode === 'local' && (
+            <AccordionItem
+              value="local-sync"
+              className="bg-white rounded-lg shadow-md border-none"
+            >
+              <AccordionTrigger className="px-6 py-4 hover:no-underline">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Local Mode Sync
+                </h2>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4">
+                {/* Local Sync Status */}
+                <div className="mb-6">
+                  <div className="flex justify-end mb-4">
+                    <Button onClick={loadLocalSyncStatus} variant="outline" size="sm">
+                      Refresh Status
+                    </Button>
+                  </div>
+
+                  {localSyncStatus ? (
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="text-sm text-gray-600 mb-1">Local Sequence</div>
+                        <div className="text-2xl font-bold">{localSyncStatus.localSeq}</div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="text-sm text-gray-600 mb-1">Server Sequence</div>
+                        <div className="text-2xl font-bold">{localSyncStatus.serverSeq}</div>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="text-sm text-gray-600 mb-1">Sync Status</div>
+                        <div className="flex items-center gap-2">
+                          {localSyncStatus.inSync ? (
+                            <span className="text-green-600 font-semibold">✓ In Sync</span>
+                          ) : (
+                            <span className="text-orange-600 font-semibold flex items-center gap-1">
+                              <AlertTriangle className="h-4 w-4" />
+                              Out of Sync
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 mb-6">Loading local sync status...</div>
+                  )}
+                </div>
+
+                {/* Push/Pull Controls */}
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => handleLocalPush(false)}
+                      disabled={isSyncing}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      {isSyncing ? 'Pushing...' : 'Push to Cloud'}
+                    </Button>
+                    <Button
+                      onClick={handleLocalPull}
+                      disabled={isSyncing}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {isSyncing ? 'Pulling...' : 'Pull from Cloud'}
+                    </Button>
+                    <Button
+                      onClick={handleForcePush}
+                      disabled={isSyncing}
+                      variant="destructive"
+                    >
+                      <AlertTriangle className="mr-2 h-4 w-4" />
+                      Force Push
+                    </Button>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      Local Mode Sync Guide
+                    </h3>
+                    <ul className="text-sm space-y-1 text-gray-700">
+                      <li>• <strong>Push</strong>: Upload local changes to cloud (requires local seq = server seq)</li>
+                      <li>• <strong>Pull</strong>: Download cloud changes to local (shows export dialog if conflicts)</li>
+                      <li>• <strong>Force Push</strong>: Overwrite server with local state (⚠️ DANGEROUS)</li>
+                    </ul>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
         </Accordion>
       </ScrollArea>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        affectedImages={affectedImages}
+        onExport={handleExportAndContinuePull}
+        onSkipExport={handleSkipExportAndContinue}
+        onCancel={handleCancelPull}
+      />
     </div>
   )
 }

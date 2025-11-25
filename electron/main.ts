@@ -6,9 +6,11 @@ import crypto from 'crypto'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
+
 const __dirname = path.dirname(__filename)
 
 import fs from 'fs/promises'
+import { initializeDatabase, dbOperations, closeDatabase } from './database.js'
 
 
 // Helper to validate files
@@ -123,6 +125,48 @@ function createWindow() {
     }
   });
 
+  ipcMain.handle('get-roam-path', () => {
+    return path.join(app.getPath('appData'), 'image-management');
+  });
+
+  ipcMain.handle('save-thumbnails-to-local', async (event, filePaths: string[]) => {
+    try {
+      // Get AppData directory for this app
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
+
+      // Ensure the directory exists
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      const savedFiles: string[] = [];
+
+      for (const filePath of filePaths) {
+        try {
+          const fileName = path.basename(filePath);
+          const destPath = path.join(appDataPath, fileName);
+
+          // Copy file to AppData
+          await fs.copyFile(filePath, destPath);
+          savedFiles.push(destPath);
+        } catch (error) {
+          console.error(`Failed to save thumbnail ${filePath}:`, error);
+        }
+      }
+
+      return {
+        success: true,
+        savedFiles,
+        directory: appDataPath,
+      };
+    } catch (error) {
+      console.error('Failed to save files to local:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
+
   ipcMain.handle('save-files-to-local', async (event, filePaths: string[]) => {
     try {
       // Get AppData directory for this app
@@ -211,7 +255,7 @@ function createWindow() {
       };
     }
   });
-    ipcMain.handle('get-device-id', async () => {
+  ipcMain.handle('get-device-id', async () => {
     try {
       // 1. Get Hardware UUID (Motherboard/System UUID)
       const systemData = await si.uuid();
@@ -242,6 +286,38 @@ function createWindow() {
     }
   });
 
+  // Save downloaded image buffer to AppData
+  ipcMain.handle('save-image-buffer', async (event, fileName: string, buffer: ArrayBuffer) => {
+    try {
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      const filePath = path.join(appDataPath, fileName);
+      await fs.writeFile(filePath, Buffer.from(buffer));
+
+      return filePath;
+    } catch (error) {
+      console.error('Failed to save image buffer:', error);
+      return null;
+    }
+  });
+
+  // Save downloaded thumbnail buffer to AppData
+  ipcMain.handle('save-thumbnail-buffer', async (event, fileName: string, buffer: ArrayBuffer) => {
+    try {
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      const filePath = path.join(appDataPath, fileName);
+      await fs.writeFile(filePath, Buffer.from(buffer));
+
+      return filePath;
+    } catch (error) {
+      console.error('Failed to save thumbnail buffer:', error);
+      return null;
+    }
+  });
+
   ipcMain.handle('dialog:open', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Select Images',
@@ -261,6 +337,167 @@ function createWindow() {
     } else {
       return filePaths;
     }
+  });
+
+  // ========== Database IPC Handlers ==========
+  ipcMain.handle('db:initialize', async () => {
+    try {
+      await initializeDatabase();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
+  ipcMain.handle('db:getAllImages', async () => {
+    try {
+      return dbOperations.getAllImages();
+    } catch (error) {
+      console.error('Failed to get all images:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('db:getImageByUuid', async (event, uuid: string) => {
+    try {
+      return dbOperations.getImageByUuid(uuid);
+    } catch (error) {
+      console.error('Failed to get image by UUID:', error);
+      return null;
+    }
+  });
+
+  ipcMain.handle('db:getPaginatedImages', async (event, page: number, pageSize: number) => {
+    try {
+      return dbOperations.getPaginatedImages(page, pageSize);
+    } catch (error) {
+      console.error('Failed to get paginated images:', error);
+      return { images: [], total: 0 };
+    }
+  });
+
+  ipcMain.handle('db:insertImage', async (event, image: any) => {
+    try {
+      return dbOperations.insertImage(image);
+    } catch (error) {
+      console.error('Failed to insert image:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('db:insertImages', async (event, images: any[]) => {
+    try {
+      return dbOperations.insertImages(images);
+    } catch (error) {
+      console.error('Failed to insert images:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('db:updateImage', async (event, uuid: string, updates: any) => {
+    try {
+      await dbOperations.updateImage(uuid, updates);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to update image:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('db:deleteImage', async (event, uuid: string) => {
+    try {
+      await dbOperations.deleteImage(uuid);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete image:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('db:deleteImages', async (event, uuids: string[]) => {
+    try {
+      await dbOperations.deleteImages(uuids);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete images:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('db:searchImages', async (event, query: string) => {
+    try {
+      return dbOperations.searchImages(query);
+    } catch (error) {
+      console.error('Failed to search images:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('db:clearAllImages', async () => {
+    try {
+      await dbOperations.clearAllImages();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to clear all images:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('db:getSyncMetadata', async () => {
+    try {
+      return dbOperations.getSyncMetadata();
+    } catch (error) {
+      console.error('Failed to get sync metadata:', error);
+      return { lastSyncSequence: 0, lastSyncTime: null };
+    }
+  });
+
+  ipcMain.handle('db:updateSyncMetadata', async (event, metadata: any) => {
+    try {
+      dbOperations.updateSyncMetadata(metadata);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to update sync metadata:', error);
+      throw error;
+    }
+  });
+
+  // Export images to a directory
+  ipcMain.handle('export-images', async (event, images: Array<{ uuid: string, filePath: string, filename: string }>, destination: string) => {
+    try {
+      await fs.mkdir(destination, { recursive: true });
+
+      const results = [];
+      for (const image of images) {
+        try {
+          const destPath = path.join(destination, image.filename);
+          await fs.copyFile(image.filePath, destPath);
+          results.push({ uuid: image.uuid, success: true, path: destPath });
+        } catch (error) {
+          console.error(`Failed to export image ${image.uuid}:`, error);
+          results.push({ uuid: image.uuid, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+        }
+      }
+
+      return { success: true, results };
+    } catch (error) {
+      console.error('Failed to export images:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
+  // Select directory dialog
+  ipcMain.handle('dialog:selectDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Select Export Directory',
+      properties: ['openDirectory', 'createDirectory']
+    });
+
+    if (canceled || filePaths.length === 0) {
+      return null;
+    }
+    return filePaths[0];
   });
 
   // In development mode, load from Vite dev server
@@ -285,6 +522,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    closeDatabase()
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  closeDatabase()
 })

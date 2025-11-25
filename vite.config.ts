@@ -10,6 +10,13 @@ export default defineConfig({
       main: {
         // Entry point for the Electron main process
         entry: 'electron/main.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+            
+            },
+          },
+        },
       },
       preload: {
         // Entry point for the preload script

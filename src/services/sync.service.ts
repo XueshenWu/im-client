@@ -47,3 +47,14 @@ export const getMyOperations = async (limit?: number): Promise<MyOperationsRespo
   })
   return response.data
 }
+
+/**
+ * Sync service object - provides all sync functions as methods
+ * This allows importing either individual functions or the entire service object
+ */
+export const syncService = {
+  getCurrentSequence,
+  getSyncOperations,
+  getSyncStatus,
+  getMyOperations,
+}

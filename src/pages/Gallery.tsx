@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from 'react-i18next'
-import CloudPhotoWall from "@/components/gallery/CloudPhotoWall";
+import HybridPhotoWall from "@/components/gallery/HybridPhotoWall";
 import HomeLink from '@/components/common/home-link'
 import { ViewSwitch, type View } from "@/components/gallery/ViewSwitch";
 import DetailList from "@/components/gallery/DetailList";
@@ -33,7 +33,7 @@ export default function Gallery() {
 
           <div className='flex-1 min-h-0'>
             {
-              view==='photowall'?<CloudPhotoWall />:<DetailList/>
+              view==='photowall'?<HybridPhotoWall />:<DetailList/>
             }
           </div>
 
