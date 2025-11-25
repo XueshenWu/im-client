@@ -22,17 +22,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build for Windows
-        run: npm run build:win:no-check
-
-      - name: Zip build output
-        run: |
-          cd release/win-unpacked
-          zip -r "../ImageManagement-win-${{ github.sha }}.zip" .
-          cd ../..
+      - name: Build for Linux
+        run: npm run build:linux:no-check
 
       - name: Copy artifacts to runner storage
         run: |
           ARTIFACT_DIR="/opt/artifacts/${{ github.sha }}"
           mkdir -p "$ARTIFACT_DIR"
-          cp release/*.zip "$ARTIFACT_DIR/"
+          cp release/*.AppImage "$ARTIFACT_DIR/" 2>/dev/null || true
+          cp release/*.deb "$ARTIFACT_DIR/" 2>/dev/null || true
+          cp release/*.rpm "$ARTIFACT_DIR/" 2>/dev/null || true

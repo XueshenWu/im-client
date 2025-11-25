@@ -55,10 +55,15 @@
           "target": "dir",
           "arch": ["x64"]
         }
-      ]
+      ],
+      "executableName": "ImageManagement"
     },
     "compression": "store",
     "npmRebuild": false,
+    "extraMetadata": {
+      "name": "image-management",
+      "productName": "Image Management"
+    },
     "mac": {
       "target": [
         "dmg",
