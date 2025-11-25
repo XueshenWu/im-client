@@ -25,8 +25,14 @@ jobs:
       - name: Build for Windows
         run: npm run build:win:no-check
 
+      - name: Zip build output
+        run: |
+          cd release/win-unpacked
+          zip -r "../ImageManagement-win-${{ github.sha }}.zip" .
+          cd ../..
+
       - name: Copy artifacts to runner storage
         run: |
           ARTIFACT_DIR="/opt/artifacts/${{ github.sha }}"
           mkdir -p "$ARTIFACT_DIR"
-          cp -r release/* "$ARTIFACT_DIR/"
+          cp release/*.zip "$ARTIFACT_DIR/"
