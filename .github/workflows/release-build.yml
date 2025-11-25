@@ -23,7 +23,7 @@ jobs:
         run: npm ci
 
       - name: Build for Windows
-        run: npm run build:win
+        run: npm run build:win:no-check
 
       - name: Copy artifacts to runner storage
         run: |

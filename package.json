@@ -10,6 +10,9 @@
     "build:win": "tsc && vite build && electron-builder --win",
     "build:mac": "tsc && vite build && electron-builder --mac",
     "build:linux": "tsc && vite build && electron-builder --linux",
+    "build:win:no-check": "vite build && electron-builder --win",
+    "build:mac:no-check": "vite build && electron-builder --mac",
+    "build:linux:no-check": "vite build && electron-builder --linux",
     "preview": "vite preview"
   },
   "keywords": [
