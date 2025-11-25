@@ -51,10 +51,15 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
-      ]
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "sign": null
     },
+    "compression": "store",
+    "npmRebuild": false,
     "mac": {
       "target": [
         "dmg",
