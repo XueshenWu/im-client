@@ -10,12 +10,13 @@ todo.md
 # Dependencies
 node_modules
 .pnpm-store
-
+release
 
 # Build outputs
 dist
 dist-electron
-release
+release_sk
+release.bat
 
 # Editor directories and files
 .vscode/*
