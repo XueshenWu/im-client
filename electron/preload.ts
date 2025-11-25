@@ -34,8 +34,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     initialize: () => ipcRenderer.invoke('db:initialize'),
     getAllImages: () => ipcRenderer.invoke('db:getAllImages'),
     getImageByUuid: (uuid: string) => ipcRenderer.invoke('db:getImageByUuid', uuid),
-    getPaginatedImages: (page: number, pageSize: number) =>
-      ipcRenderer.invoke('db:getPaginatedImages', page, pageSize),
+    getPaginatedImages: (page: number, pageSize: number, sortBy?: string, sortOrder?: string) =>
+      ipcRenderer.invoke('db:getPaginatedImages', page, pageSize, sortBy, sortOrder),
     insertImage: (image: any) => ipcRenderer.invoke('db:insertImage', image),
     insertImages: (images: any[]) => ipcRenderer.invoke('db:insertImages', images),
     updateImage: (uuid: string, updates: any) => ipcRenderer.invoke('db:updateImage', uuid, updates),

@@ -58,11 +58,13 @@ class LocalDatabaseService {
    */
   async getPaginatedImages(
     page: number,
-    pageSize: number
+    pageSize: number,
+    sortBy?: 'filename' | 'fileSize' | 'format' | 'updatedAt' | 'createdAt',
+    sortOrder?: 'asc' | 'desc'
   ): Promise<{ images: LocalImage[]; total: number }> {
     await this.ensureInitialized();
     try {
-      const result = await window.electronAPI?.db.getPaginatedImages(page, pageSize);
+      const result = await window.electronAPI?.db.getPaginatedImages(page, pageSize, sortBy, sortOrder);
       return result || { images: [], total: 0 };
     } catch (error) {
       console.error('[LocalDB] Failed to get paginated images:', error);

@@ -167,14 +167,24 @@ export const dbOperations = {
     return sql.get('SELECT * FROM images WHERE uuid = ? AND deletedAt IS NULL', [uuid]);
   },
 
-  async getPaginatedImages(page: number, pageSize: number): Promise<{ images: any[]; total: number }> {
+  async getPaginatedImages(
+    page: number,
+    pageSize: number,
+    sortBy?: 'filename' | 'fileSize' | 'format' | 'updatedAt' | 'createdAt',
+    sortOrder?: 'asc' | 'desc'
+  ): Promise<{ images: any[]; total: number }> {
     const offset = (page - 1) * pageSize;
 
     const countResult = await sql.get('SELECT COUNT(*) as count FROM images WHERE deletedAt IS NULL');
     const total = countResult ? countResult.count : 0;
 
+    // Build ORDER BY clause
+    const orderByColumn = sortBy || 'createdAt';
+    const orderDirection = sortOrder || 'desc';
+    const orderBy = `${orderByColumn} ${orderDirection.toUpperCase()}`;
+
     const images = await sql.all(
-      'SELECT * FROM images WHERE deletedAt IS NULL ORDER BY createdAt DESC LIMIT ? OFFSET ?',
+      `SELECT * FROM images WHERE deletedAt IS NULL ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
       [pageSize, offset]
     );
 

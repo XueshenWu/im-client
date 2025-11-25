@@ -368,9 +368,14 @@ function createWindow() {
     }
   });
 
-  ipcMain.handle('db:getPaginatedImages', async (event, page: number, pageSize: number) => {
+  ipcMain.handle('db:getPaginatedImages', async (event, page: number, pageSize: number, sortBy?: string, sortOrder?: string) => {
     try {
-      return dbOperations.getPaginatedImages(page, pageSize);
+      return dbOperations.getPaginatedImages(
+        page,
+        pageSize,
+        sortBy as any,
+        sortOrder as 'asc' | 'desc'
+      );
     } catch (error) {
       console.error('Failed to get paginated images:', error);
       return { images: [], total: 0 };

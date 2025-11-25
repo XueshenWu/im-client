@@ -58,7 +58,7 @@ interface ElectronAPI {
     initialize: () => Promise<{ success: boolean; error?: string }>
     getAllImages: () => Promise<any[]>
     getImageByUuid: (uuid: string) => Promise<any | undefined>
-    getPaginatedImages: (page: number, pageSize: number) => Promise<{ images: any[]; total: number }>
+    getPaginatedImages: (page: number, pageSize: number, sortBy?: string, sortOrder?: string) => Promise<{ images: any[]; total: number }>
     insertImage: (image: any) => Promise<any>
     insertImages: (images: any[]) => Promise<any[]>
     updateImage: (uuid: string, updates: any) => Promise<{ success: boolean }>
