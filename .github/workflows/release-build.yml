@@ -22,10 +22,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build for all platforms
-        run: |
-          npm run build:win
-          npm run build:linux
+      - name: Build for Windows
+        run: npm run build:win
 
       - name: Copy artifacts to runner storage
         run: |
