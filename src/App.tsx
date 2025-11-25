@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
@@ -40,7 +40,7 @@ function App() {
   }, [sourceMode]);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/gallery" replace />} />
@@ -53,7 +53,9 @@ function App() {
         </Route>
       </Routes>
       <ImageViewer />
-    </BrowserRouter>
+    </HashRouter>
+
+    
   )
 }
 
