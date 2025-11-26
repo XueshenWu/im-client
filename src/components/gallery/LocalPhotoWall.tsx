@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, ListFilter, Check } from 'lucide-react';
+import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, ListFilter, Check, Download, X, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageItem, ImageSource } from '@/types/gallery';
 import LocalPhotoCard from './LocalPhotoCard';
 import { localDatabase } from '@/services/localDatabase.service';
+import { localImageService } from '@/services/localImage.service';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose, DrawerBody } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 
 interface LocalPhotoWallProps {
   columnWidth?: number;
@@ -20,6 +22,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
   gap = 12
 }) => {
   const { t } = useTranslation();
+  const { refreshTrigger } = useGalleryRefreshStore();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -28,6 +31,11 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
   // Sorting state
   const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Drawer state for mobile
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -80,11 +88,11 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
             const aspectRatio = img.width && img.height
               ? img.width / img.height
               : await new Promise<number>((resolve) => {
-                  const image = new Image();
-                  image.onload = () => resolve(image.width / image.height);
-                  image.onerror = () => resolve(1);
-                  image.src = preview;
-                });
+                const image = new Image();
+                image.onload = () => resolve(image.width / image.height);
+                image.onerror = () => resolve(1);
+                image.src = preview;
+              });
 
             return {
               name: img.filename,
@@ -163,6 +171,16 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
 
   // Reset sort
   const handleResetSort = () => {
+
+    if (sortBy === 'updatedAt') {
+      if (sortOrder === 'desc') {
+        return
+      }
+      setSortOrder('desc');
+      return;
+    }
+
+
     setSortBy('updatedAt');
     setSortOrder('desc');
 
@@ -171,6 +189,106 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
     setPage(1);
     setHasMore(true);
   };
+
+  // Selection handlers
+  const handleSelectImage = (imageId: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(imageId)) {
+        newSet.delete(imageId);
+      } else {
+        newSet.add(imageId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const handleStartSelection = (imageId: string) => {
+    setSelectionMode(true);
+    setSelectedIds(new Set([imageId]));
+  };
+
+  // Export handler - use Electron API
+  const handleExport = async () => {
+    if (selectedIds.size === 0) return;
+
+    setExporting(true);
+    try {
+      // Get selected images
+      const selectedImages = images.filter(img => img.id && selectedIds.has(img.id));
+
+      // Ask user to select destination directory
+      const destination = await window.electronAPI?.selectDirectory();
+      if (!destination) {
+        setExporting(false);
+        return;
+      }
+
+      // Export images using Electron API
+      const imagesToExport = selectedImages.map(img => ({
+        path: img.path || '',
+        name: img.name || '',
+      }));
+
+      await window.electronAPI?.exportImages(imagesToExport, destination);
+
+      // Clear selection after export
+      handleClearSelection();
+
+      alert(t('gallery.exportSuccess', { count: selectedImages.length }));
+    } catch (error) {
+      console.error('Export error:', error);
+      alert(t('gallery.exportError'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Delete handler
+  const handleDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    if (!window.confirm(t('gallery.confirmDelete', { count: selectedIds.size }))) {
+      return;
+    }
+
+    setExporting(true); // Reuse loading state
+    try {
+      const uuids = Array.from(selectedIds);
+      await localImageService.deleteImages(uuids);
+
+      // Clear selection and refresh
+      handleClearSelection();
+
+      // Reset images and reload
+      setImages([]);
+      setPage(1);
+      setHasMore(true);
+      loadingRef.current = false;
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert(t('gallery.deleteError'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Listen for gallery refresh trigger
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      // Reset state and trigger reload
+      setImages([]);
+      setPage(1);
+      setHasMore(true);
+      loadingRef.current = false;
+      handleClearSelection();
+    }
+  }, [refreshTrigger]);
 
   // Initial load and reload when sorting changes
   useEffect(() => {
@@ -259,7 +377,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
         onClick={() => handleSort(column)}
         className={cn(
           "gap-1.5 px-3 font-medium transition-all",
-          isActive ? "bg-blue-600 text-white hover:bg-blue-500":"hover:bg-blue-600 hover:text-white bg-gray-100 border-gray-700"
+          isActive ? "bg-blue-600 text-white hover:bg-blue-500" : "hover:bg-blue-600 hover:text-white bg-gray-100 border-gray-700"
         )}
       >
         <span>{label}</span>
@@ -306,6 +424,52 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
 
   return (
     <div className="h-full w-full flex flex-col">
+      {/* Selection Toolbar */}
+      {selectionMode && (
+        <div className="flex items-center justify-between px-6 py-3 bg-blue-50 border-b border-blue-200">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearSelection}
+              className="text-gray-700 hover:text-gray-900"
+            >
+              <X className="h-4 w-4 mr-1" />
+              {t('common.cancel')}
+            </Button>
+            <span className="text-sm font-medium text-gray-700">
+              {t('gallery.selectedCount', { count: selectedIds.size })}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleExport}
+              disabled={selectedIds.size === 0 || exporting}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-1" />
+              )}
+              {t('gallery.export')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              disabled={selectedIds.size === 0 || exporting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              {t('gallery.delete')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Controls Bar */}
       <div className="flex items-center justify-between px-6 py-3 border-gray-200">
         {/* Desktop Sort Controls (visible on lg and up) */}
@@ -398,6 +562,10 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
                 <LocalPhotoCard
                   key={img.id || img.path}
                   image={img}
+                  selectionMode={selectionMode}
+                  isSelected={img.id ? selectedIds.has(img.id) : false}
+                  onSelect={handleSelectImage}
+                  onStartSelection={handleStartSelection}
                 />
               ))}
             </div>

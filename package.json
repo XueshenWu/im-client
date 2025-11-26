@@ -13,9 +13,8 @@
     "build:win:no-check": "vite build && electron-builder --win",
     "build:mac:no-check": "vite build && electron-builder --mac",
     "build:linux:no-check": "vite build && electron-builder --linux",
-    "release": "npm run build:win:no-check && npm run release:zip && npm run release:upload",
-    "release:zip": "powershell Compress-Archive -Path release/win-unpacked/* -DestinationPath release/ImageManagement-portable.zip -Force",
-    "release:upload": "scp -i release_sk -o StrictHostKeyChecking=no release/ImageManagement-portable.zip xueshen@34.130.189.192:/opt/artifacts/latest/",
+    "release": "npm run build:win:no-check && npm run release:upload",
+    "release:upload": "scp -i release_sk -o StrictHostKeyChecking=no \"release/Image Management 1.0.0.exe\" xueshen@34.130.189.192:/opt/artifacts/latest/ImageManagement-portable.exe",
     "preview": "vite preview"
   },
   "keywords": [
@@ -55,7 +54,7 @@
     "win": {
       "target": [
         {
-          "target": "dir",
+          "target": "portable",
           "arch": ["x64"]
         }
       ],

@@ -342,8 +342,13 @@ class LocalSyncService {
         // Use the existing update API
         await api.put(`/api/images/uuid/${pair.localImage.uuid}`, pair.changes);
         console.log(`[LocalSync] Updated remote metadata: ${pair.localImage.filename}`);
-      } catch (error) {
-        console.error(`[LocalSync] Failed to update remote ${pair.localImage.filename}:`, error);
+      } catch (error: any) {
+        // Handle 404 errors specifically - image doesn't exist on server
+        if (error?.statusCode === 404 || error?.response?.status === 404) {
+          console.warn(`[LocalSync] Image ${pair.localImage.filename} (UUID: ${pair.localImage.uuid}) not found on server. It may have been created locally and needs to be uploaded instead.`);
+        } else {
+          console.error(`[LocalSync] Failed to update remote ${pair.localImage.filename}:`, error);
+        }
       }
     });
 

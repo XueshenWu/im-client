@@ -141,9 +141,14 @@ export class ImageSyncClient {
    * Update the last sync sequence
    */
   updateLastSyncSequence(sequence: number): void {
+    const oldSeq = this.lastSyncSequence
     this.lastSyncSequence = sequence
     localStorage.setItem(STORAGE_KEY_SEQUENCE, sequence.toString())
-    console.log(`[SyncClient] Updated lastSyncSequence to ${sequence}`)
+    if (oldSeq !== sequence) {
+      console.log(`[SyncClient] ✅ Updated lastSyncSequence: ${oldSeq} → ${sequence}`)
+    } else {
+      console.log(`[SyncClient] ℹ️  Sequence unchanged: ${sequence}`)
+    }
   }
 
   /**

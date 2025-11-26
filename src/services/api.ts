@@ -23,11 +23,12 @@ api.interceptors.request.use(
       try {
         // We'll add sync headers dynamically
         const clientId = await syncClient.waitForClientId()
-        const lastSyncSequence = localStorage.getItem('lastSyncSequence')
+        const lastSyncSequence = syncClient.getLastSyncSequence()
 
-        if (clientId && lastSyncSequence) {
+        if (clientId) {
           config.headers['X-Client-ID'] = clientId
-          config.headers['X-Last-Sync-Sequence'] = lastSyncSequence
+          config.headers['X-Last-Sync-Sequence'] = lastSyncSequence.toString()
+          console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url} - Sending seq: ${lastSyncSequence}`)
         }
       } catch (error) {
         console.warn('[API] Failed to add sync headers:', error)
@@ -57,10 +58,10 @@ api.interceptors.response.use(
     if (currentSequence) {
       const sequence = parseInt(currentSequence, 10)
       if (!isNaN(sequence)) {
-        console.log('server resp: seq = ', sequence)
+        const oldSeq = syncClient.getLastSyncSequence()
+        console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url} - Server seq: ${sequence}, Old client seq: ${oldSeq}`)
         syncClient.updateLastSyncSequence(sequence)
-        // localStorage.setItem('lastSyncSequence', sequence.toString())
-
+        console.log(`[API Response] Updated client seq to: ${syncClient.getLastSyncSequence()}`)
       }
     }
     return response

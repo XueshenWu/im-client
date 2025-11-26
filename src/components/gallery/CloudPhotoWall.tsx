@@ -158,6 +158,16 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
 
   // Reset sort
   const handleResetSort = () => {
+
+
+    if (sortBy === 'updatedAt') {
+      if (sortOrder === 'desc') {
+        return
+      }
+      setSortOrder('desc');
+      return;
+    }
+
     setSortBy('updatedAt');
     setSortOrder('desc');
 

@@ -20,17 +20,29 @@ class StateDiffService {
     const toUpdate: UpdatePair[] = [];
     const toReplace: ReplacePair[] = [];
 
-    // Find images to upload (in local but not in remote)
+    // Categorize images based on presence in local vs remote
+    // Note: An image missing from one side could mean either:
+    // 1. It's new on the other side (needs upload/download)
+    // 2. It was deleted from that side (needs deletion on the other side)
+    // We categorize for BOTH push and pull operations:
+
+    // Images in LOCAL but not in REMOTE:
     for (const localImage of localImages) {
       if (!remoteByUuid.has(localImage.uuid)) {
+        // For PUSH: assume it's new locally → upload to remote
         toUpload.push(localImage);
+        // For PULL: assume it was deleted from remote → delete from local
+        toDeleteLocal.push(localImage.uuid);
       }
     }
 
-    // Find images to download (in remote but not in local)
+    // Images in REMOTE but not in LOCAL:
     for (const remoteImage of remoteImages) {
       if (!localByUuid.has(remoteImage.uuid)) {
+        // For PULL: assume it's new remotely → download to local
         toDownload.push(remoteImage);
+        // For PUSH: assume it was deleted locally → delete from remote
+        toDeleteRemote.push(remoteImage.uuid);
       }
     }
 
