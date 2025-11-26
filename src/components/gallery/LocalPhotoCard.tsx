@@ -72,6 +72,15 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
     }
   };
 
+
+  const getLocalImageUrl = (path: string) => {
+    // 1. Normalize backslashes to forward slashes
+    const normalizedPath = path.replace(/\\/g, '/');
+    
+    // 2. IMPORTANT: Use 3 slashes (///) so C: is treated as a file path, not a domain
+    return `local-image:///${normalizedPath}`; 
+  };
+
   const handleSelect = () => {
     if (!selectionMode && onStartSelection && image.id) {
       onStartSelection(image.id);
@@ -142,7 +151,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
         >
           {image.preview ? (
             <img
-              src={image.preview}
+              src={getLocalImageUrl(image.preview)}
               alt={displayName}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"

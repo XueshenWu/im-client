@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import { deleteImages } from "./services"
+
 // CSS modules
 declare module '*.css' {
   const content: Record<string, string>
@@ -35,6 +37,18 @@ interface ElectronAPI {
     directory?: string
     error?: string
   }>
+  generateThumbnail: (sourcePath: string) => Promise<{
+    success: boolean
+    thumbnailPath?: string
+    imageBuffer?: number[]
+    sourcePath?: string
+    error?: string
+  }>
+  saveGeneratedThumbnail: (thumbnailPath: string, buffer: ArrayBuffer) => Promise<{
+    success: boolean
+    thumbnailPath?: string
+    error?: string
+  }>
 
   getRoamPath: () => Promise<string>
   getLocalImages: (options?: { limit?: number; offset?: number }) => Promise<{
@@ -53,6 +67,9 @@ interface ElectronAPI {
     results?: Array<{ uuid: string; success: boolean; path?: string; error?: string }>
     error?: string
   }>
+
+  deleteImages: (image_names: string[]) => Promise<string[]>
+
 
   // Database operations
   db: {
@@ -88,13 +105,13 @@ declare global {
   }
 
   interface LocalImageFile {
-  name: string
-  path: string
-  size: number
-  createdAt: string
-  modifiedAt: string
-}
+    name: string
+    path: string
+    size: number
+    createdAt: string
+    modifiedAt: string
+  }
 
 }
 
-export {}
+export { }

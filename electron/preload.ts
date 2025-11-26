@@ -29,6 +29,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRoamPath: () => ipcRenderer.invoke('get-roam-path'),
   saveThumbnailsToLocal: (filePaths: string[]) =>
     ipcRenderer.invoke('save-thumbnails-to-local', filePaths),
+  generateThumbnail: (sourcePath: string) =>
+    ipcRenderer.invoke('generate-thumbnail', sourcePath),
+  saveGeneratedThumbnail: (thumbnailPath: string, buffer: ArrayBuffer) =>
+    ipcRenderer.invoke('save-generated-thumbnail', thumbnailPath, buffer),
+  deleteImages: (image_names: string[]) => ipcRenderer.invoke('delete-images', image_names),
+
 
   // Database operations
   db: {

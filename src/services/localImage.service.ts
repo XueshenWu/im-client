@@ -107,6 +107,9 @@ class LocalImageService {
 
   /**
    * Delete multiple images
+   * 
+   * - Delete db records
+   * - Delete files
    */
   async deleteImages(uuids: string[]): Promise<void> {
     try {

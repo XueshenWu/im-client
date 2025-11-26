@@ -3,14 +3,15 @@
 
 <head>
   <meta charset="UTF-8" />
+  <script src="http://localhost:8097"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self'; 
              connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; 
-             script-src 'self'; 
+             script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097; 
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
              font-src 'self' data: https://fonts.gstatic.com; 
-             img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*;" 
+             img-src 'self' data: blob: local-image: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*;" 
 />
    <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -129,11 +129,14 @@ class LocalDatabaseService {
 
   /**
    * Delete multiple images by UUIDs
+   * 
+
    */
   async deleteImages(uuids: string[]): Promise<void> {
     await this.ensureInitialized();
     try {
       await window.electronAPI?.db.deleteImages(uuids);
+
     } catch (error) {
       console.error('[LocalDB] Failed to delete images:', error);
       throw error;

@@ -1,13 +1,17 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell } from 'electron'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import si from 'systeminformation'
 import crypto from 'crypto'
+import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-assembler';
+
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
 
 const __dirname = path.dirname(__filename)
+
+const __FILE_PREFIX = path.join(app.getPath('appData'), 'image-management');
 
 import fs from 'fs/promises'
 import { initializeDatabase, dbOperations, closeDatabase } from './database.js'
@@ -62,10 +66,10 @@ function createWindow() {
         'Content-Security-Policy': [
           "default-src 'self'; " +
           "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; " +
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
           "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-          "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*; " +
+          "img-src 'self' data: blob: local-image: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*; " +
           "font-src 'self' data: https://fonts.gstatic.com;"
         ]
       }
@@ -170,6 +174,10 @@ function createWindow() {
       };
     }
   });
+
+
+
+
 
 
   ipcMain.handle('save-files-to-local', async (event, filePaths: string[]) => {
@@ -323,6 +331,10 @@ function createWindow() {
     }
   });
 
+
+  
+
+
   ipcMain.handle('dialog:open', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Select Images',
@@ -373,6 +385,15 @@ function createWindow() {
     }
   });
 
+  ipcMain.handle('db:getImagePathByUUIDs', async (event, uuids: string[]) => {
+    try {
+      return dbOperations.getImagePathByUUIDs(uuids);
+    } catch (error) {
+      console.error('Failed to get image paths by UUIDs:', error);
+      return [];
+    }
+  });
+
   ipcMain.handle('db:getPaginatedImages', async (event, page: number, pageSize: number, sortBy?: string, sortOrder?: string) => {
     try {
       return dbOperations.getPaginatedImages(
@@ -415,9 +436,19 @@ function createWindow() {
     }
   });
 
-  ipcMain.handle('db:deleteImage', async (event, uuid: string) => {
+
+
+  ipcMain.handle('db:deleteImage', async (_, uuid: string) => {
     try {
       await dbOperations.deleteImage(uuid);
+      const paths = await dbOperations.getImagePathByUUIDs([uuid]);
+      if (!paths || paths.length === 0) {
+        return { success: true };
+      }
+
+      await shell.trashItem(paths[0].filePath);
+      await shell.trashItem(paths[0].thumbnailPath);
+
       return { success: true };
     } catch (error) {
       console.error('Failed to delete image:', error);
@@ -425,9 +456,20 @@ function createWindow() {
     }
   });
 
-  ipcMain.handle('db:deleteImages', async (event, uuids: string[]) => {
+  ipcMain.handle('db:deleteImages', async (_, uuids: string[]) => {
     try {
       await dbOperations.deleteImages(uuids);
+      const paths = await dbOperations.getImagePathByUUIDs(uuids);
+
+      if (paths) {
+        await Promise.allSettled(paths.flatMap(({ filePath, thumbnailPath }) => {
+          return [
+            shell.trashItem(filePath),
+            shell.trashItem(thumbnailPath)
+          ]
+        }))
+
+      }
       return { success: true };
     } catch (error) {
       console.error('Failed to delete images:', error);
@@ -510,6 +552,50 @@ function createWindow() {
     return filePaths[0];
   });
 
+  // Generate thumbnail from image file
+  ipcMain.handle('generate-thumbnail', async (_event, sourcePath: string) => {
+    try {
+      // Use canvas-based thumbnail generation instead of sharp
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      const fileName = path.basename(sourcePath);
+      const thumbnailFileName = `thumb_${fileName}`;
+      const thumbnailPath = path.join(appDataPath, thumbnailFileName);
+
+      // Read the original image
+      const imageBuffer = await fs.readFile(sourcePath);
+
+      // Return the path and buffer for renderer to generate thumbnail
+      return {
+        success: true,
+        thumbnailPath,
+        imageBuffer: Array.from(imageBuffer),
+        sourcePath,
+      };
+    } catch (error) {
+      console.error('Failed to prepare thumbnail generation:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
+  // Save generated thumbnail buffer
+  ipcMain.handle('save-generated-thumbnail', async (_event, thumbnailPath: string, buffer: ArrayBuffer) => {
+    try {
+      await fs.writeFile(thumbnailPath, Buffer.from(buffer));
+      return { success: true, thumbnailPath };
+    } catch (error) {
+      console.error('Failed to save thumbnail:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
   // In development mode, load from Vite dev server
   // In production, load from built files
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -520,8 +606,44 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+
+
+
+
+  protocol.handle('local-image', (request) => {
+    try {
+      // 1. Get the path part of the URL
+      // request.url will look like: "local-image:///C:/Users/name/..."
+      // The substring(13) strips "local-image://" leaving "/C:/Users/..."
+      let filePath = request.url.slice('local-image://'.length);
+
+      // 2. Decode characters (like %20 for spaces)
+      filePath = decodeURIComponent(filePath);
+
+      // 3. Clean up the path for Windows
+      // The browser URL path usually starts with a slash, e.g., "/C:/Users/..."
+      // pathToFileURL expects "C:/Users/..." on Windows, so we remove the leading slash.
+      if (process.platform === 'win32' && filePath.startsWith('/') && filePath.includes(':')) {
+        filePath = filePath.slice(1);
+      }
+
+      // 4. Create the secure file:// URL and fetch
+      // pathToFileURL handles all remaining slash/backslash conversions
+      return net.fetch(pathToFileURL(filePath).toString());
+
+    } catch (error) {
+      console.error('Local Image Protocol Error:', error);
+      // Return a 500 response so the renderer knows it failed
+      return new Response('Failed to load image', { status: 500 });
+    }
+  });
+
+
   createWindow()
+
+
+
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

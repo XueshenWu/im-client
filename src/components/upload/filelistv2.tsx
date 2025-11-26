@@ -30,6 +30,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { localImageService } from '@/services/localImage.service';
 import { LocalImage } from '@/types/local';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
+import { generateThumbnail } from '@/utils/thumbnailGenerator';
 
 // Upload configuration
 const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
@@ -42,7 +43,6 @@ interface UploadStatus {
   status: 'staged' | 'pending' | 'uploading' | 'completed' | 'failed';
   error?: string;
 }
-
 
 const fileToMockImage = (file: FileWithPreview): Image => ({
   id: 0,
@@ -232,10 +232,15 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [uploadStatuses, setUploadStatuses] = React.useState<Map<string, UploadStatus>>(new Map());
   const [isUploading, setIsUploading] = React.useState(false);
-  const [previousFileCount, setPreviousFileCount] = React.useState(0);
+
+  // FIX 1: Use useRef instead of useState for tracking file count.
+  // This prevents re-renders when we just want to update the counter.
+  const previousFileCountRef = React.useRef(0);
+
   const { openViewer } = useImageViewerStore();
   const { sourceMode } = useSettingsStore();
   const { triggerRefresh } = useGalleryRefreshStore();
+
   const allFilesCompleted = React.useMemo(() => {
     if (files.length === 0) return false;
 
@@ -245,30 +250,34 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
     });
   }, [files, uploadStatuses]);
 
-  // Set staged status for new files that don't have a status yet
+  // FIX 2: Functional state update for initialization.
+  // We removed 'uploadStatuses' from the dependency array to break the update cycle.
+  // This now only runs when the 'files' array actually changes.
   React.useEffect(() => {
-    const newStatuses = new Map(uploadStatuses);
-    let hasChanges = false;
+    setUploadStatuses((prev) => {
+      const newStatuses = new Map(prev);
+      let hasChanges = false;
 
-    files.forEach((file) => {
-      if (!newStatuses.has(file.name)) {
-        newStatuses.set(file.name, {
-          fileName: file.name,
-          progress: 0,
-          status: 'staged',
-        });
-        hasChanges = true;
-      }
+      files.forEach((file) => {
+        if (!newStatuses.has(file.name)) {
+          newStatuses.set(file.name, {
+            fileName: file.name,
+            progress: 0,
+            status: 'staged',
+          });
+          hasChanges = true;
+        }
+      });
+
+      return hasChanges ? newStatuses : prev;
     });
+  }, [files]);
 
-    if (hasChanges) {
-      setUploadStatuses(newStatuses);
-    }
-  }, [files, uploadStatuses]);
-
-  // Clear completed/failed files when new files are added
+  // FIX 3: Robust cleanup logic using the Ref.
   React.useEffect(() => {
-    if (files.length > previousFileCount && uploadStatuses.size > 0) {
+    const prevCount = previousFileCountRef.current;
+
+    if (files.length > prevCount && uploadStatuses.size > 0) {
       // New files were added - remove old completed/failed files
       const completedOrFailedFiles: string[] = [];
 
@@ -286,9 +295,12 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       // Clear statuses
       setUploadStatuses(new Map());
     }
-    setPreviousFileCount(files.length);
-  }, [files.length, uploadStatuses, removeFile, previousFileCount]);
-  // Add this handler before the return statement
+    
+    // Update the ref without triggering a re-render
+    previousFileCountRef.current = files.length;
+  }, [files.length, uploadStatuses, removeFile]);
+
+
   const handleThumbnailClick = (file: FileWithPreview, index: number) => {
     // Only allow viewing images
     if (!file.type.startsWith('image/')) return;
@@ -397,7 +409,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               const newMap = new Map(prev);
               newMap.set(file.name, {
                 fileName: file.name,
-                progress: 30,
+                progress: 20,
                 status: 'uploading',
               });
               return newMap;
@@ -415,12 +427,44 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               console.warn(`File ${file.name} has no source path, skipping local save`);
             }
 
-            // Update progress
+            // Update progress - file saved
             setUploadStatuses((prev) => {
               const newMap = new Map(prev);
               newMap.set(file.name, {
                 fileName: file.name,
-                progress: 70,
+                progress: 50,
+                status: 'uploading',
+              });
+              return newMap;
+            });
+
+            // Generate thumbnail
+            let thumbnailPath = '';
+            let imageWidth = 0;
+            let imageHeight = 0;
+
+            if (file.sourcePath && file.type.startsWith('image/')) {
+              try {
+                const thumbnailResult = await generateThumbnail(file.sourcePath, 300);
+                if (thumbnailResult.success && thumbnailResult.thumbnailPath) {
+                  thumbnailPath = thumbnailResult.thumbnailPath;
+                  imageWidth = thumbnailResult.width || 0;
+                  imageHeight = thumbnailResult.height || 0;
+                  console.log(`[Upload] Generated thumbnail for ${file.name}`);
+                } else {
+                  console.warn(`[Upload] Failed to generate thumbnail for ${file.name}:`, thumbnailResult.error);
+                }
+              } catch (error) {
+                console.error(`[Upload] Thumbnail generation error for ${file.name}:`, error);
+              }
+            }
+
+            // Update progress - thumbnail generated
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(file.name, {
+                fileName: file.name,
+                progress: 80,
                 status: 'uploading',
               });
               return newMap;
@@ -432,11 +476,11 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               filename: file.name,
               originalName: file.name,
               filePath: localFilePath,
-              thumbnailPath: '', // TODO: Generate thumbnail
+              thumbnailPath: thumbnailPath,
               fileSize: file.size,
               format: (file.type.split('/')[1] as any) || 'jpg',
-              width: 0,
-              height: 0,
+              width: imageWidth,
+              height: imageHeight,
               hash: '',
               mimeType: file.type,
               isCorrupted: false,
@@ -637,7 +681,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className={(header.column.columnDef.meta as any)?.className }
+                      className={(header.column.columnDef.meta as any)?.className}
                     >
                       {header.isPlaceholder
                         ? null

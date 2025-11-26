@@ -14,6 +14,7 @@ import {
   ChunkedUploadStatus,
   CancelChunkedUploadResponse,
   UploadImagesResponse,
+  GetImagesByUUIDResponse,
 } from '@/types/api'
 
 /**
@@ -94,7 +95,7 @@ export const deleteImagesByUuid = async (uuids: string[]): Promise<{ success: bo
 /**
  * Upload images (multipart form-data)
  */
-export const uploadImages = async (files: File[]): Promise<UploadImagesResponse> => {
+export const uploadImages = async (files: File[], uuids?: string[]): Promise<UploadImagesResponse> => {
   const formData = new FormData()
 
   // Debug: Log what we're uploading
@@ -105,10 +106,22 @@ export const uploadImages = async (files: File[]): Promise<UploadImagesResponse>
     formData.append('images', file)
   })
 
+  // Include UUIDs if provided (for local mode sync)
+  if (uuids && uuids.length > 0) {
+    const uuidsJson = JSON.stringify(uuids)
+    formData.append('uuids', uuidsJson)
+    console.log('Including UUIDs:', uuids)
+    console.log('UUIDs JSON string:', uuidsJson)
+  }
+
   // Debug: Log FormData contents
   console.log('FormData entries:')
   for (const pair of formData.entries()) {
-    console.log(pair[0], ':', pair[1])
+    if (pair[0] === 'uuids') {
+      console.log('uuids:', pair[1])
+    } else {
+      console.log(pair[0], ':', typeof pair[1] === 'object' ? `File(${(pair[1] as File).name})` : pair[1])
+    }
   }
 
   const response = await api.post<UploadImagesResponse>('/api/images/upload', formData, {
@@ -349,6 +362,14 @@ export const replaceImageAuto = async (uuid: string, file: File): Promise<Image>
   }
   return replaceImage(uuid, file);
 }
+
+export const getImagesByUuid = async (uuids: string[]): Promise<Image[]> => {
+  const response = await api.post<GetImagesByUUIDResponse>('/api/images/batch', {
+    uuids,
+  })
+  return response.data.data
+}
+
 
 /**
  * Replace an image using chunked upload

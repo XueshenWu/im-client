@@ -18,12 +18,17 @@ export interface LocalImage extends Omit<Image, 'id'> {
  * State difference between local and remote
  */
 export interface StateDiff {
-  toUpload: LocalImage[]; // Images only in local
-  toDownload: Image[]; // Images only in remote
-  toDeleteLocal: string[]; // UUIDs to remove from local
-  toDeleteRemote: string[]; // UUIDs to remove from remote
-  toUpdate: UpdatePair[]; // Different metadata
-  toReplace: ReplacePair[]; // Different content (hash mismatch)
+  // --- REMOTE ACTIONS (PUSH: Local -> Remote) ---
+  toUpload: LocalImage[];           // New file locally -> Upload binary + meta
+  toReplaceRemote: LocalImage[];    // Binary changed locally -> Upload binary + meta
+  toUpdateRemote: LocalImage[];     // Only metadata changed locally -> Update DB
+  toDeleteRemote: string[];         // Deleted locally -> Delete on Server
+
+  // --- LOCAL ACTIONS (PULL: Remote -> Local) ---
+  toDownload: Image[];              // New file remotely -> Download binary + meta
+  toReplaceLocal: Image[];          // Binary changed remotely -> Download binary + meta
+  toUpdateLocal: Image[];           // Only metadata changed remotely -> Update DB
+  toDeleteLocal: string[];          // Deleted remotely -> Delete on Disk
 }
 
 export interface UpdatePair {

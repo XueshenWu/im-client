@@ -272,14 +272,11 @@ export default function Sync() {
     if (!confirm('⚠️ FORCE PUSH will overwrite the server with your local state. This is dangerous and may cause data loss for other clients. Are you sure?')) {
       return
     }
-    if (!confirm('Type CONFIRM in the next dialog to proceed with force push.')) {
+    if (!confirm('Please confirm to proceed with force push.')) {
       return
     }
-    const confirmation = prompt('Type CONFIRM to proceed with force push:')
-    if (confirmation !== 'CONFIRM') {
-      alert('Force push cancelled.')
-      return
-    }
+   
+   
     await handleLocalPush(true)
   }
 

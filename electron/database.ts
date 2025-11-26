@@ -191,6 +191,23 @@ export const dbOperations = {
     return { images, total };
   },
 
+  async getImagePathByUUIDs(uuids: string[]): Promise<
+   {
+      filePath: string;
+      thumbnailPath: string;
+    }[]
+  > {
+    const rows = await sql.all(
+      'SELECT uuid, filePath, thumbnailPath FROM images WHERE uuid IN (?) AND deletedAt IS NULL',
+      [uuids]
+    );
+
+    return rows.map((row: any) => ({
+      filePath: row.filePath,
+      thumbnailPath: row.thumbnailPath,
+    }));
+  },
+
   async insertImage(image: any): Promise<any> {
     const bindData: any = {};
     Object.keys(image).forEach(k => bindData['$' + k] = image[k]);

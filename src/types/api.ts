@@ -82,6 +82,13 @@ export interface UpdateImageRequest {
   originalName?: string
 }
 
+export interface GetImagesByUUIDResponse {
+  success: boolean
+  data: Image[]
+  count: number
+  requested: number
+}
+
 export interface UploadImagesRequest {
   images: File[]
 }

@@ -26,6 +26,9 @@ import { imageService } from '@/services/api';
 import { uploadImageAuto, replaceImageAuto, deleteImage } from '@/services/images.service';
 import { createCroppedImage, blobToFile } from '@/utils/cropImage';
 import { format } from 'date-fns';
+import { localImageService } from '@/services/localImage.service';
+import { LocalImage } from '@/types/local';
+import { generateThumbnail } from '@/utils/thumbnailGenerator';
 
 
 const formatBytes = (bytes: number) => {
@@ -64,6 +67,28 @@ export const ImageViewer: React.FC = () => {
   const imgRef = React.useRef<HTMLImageElement>(null);
 
   const { triggerRefresh } = useGalleryRefreshStore();
+
+  // Detect if this is a local image and construct appropriate URL
+  const imageUrl = React.useMemo(() => {
+    if (!currentImage) return '';
+
+    const isLocalImage = (currentImage as any).source === 'local' ||
+                         (currentImage as any).filepath;
+
+    if (isLocalImage) {
+      const filepath = (currentImage as any).filepath || currentImage.filePath;
+      if (filepath) {
+        // Normalize path and construct local-image:// URL (same as gallery thumbnails)
+        const normalizedPath = filepath.replace(/\\/g, '/');
+        return `local-image:///${normalizedPath}`;
+      }
+    }
+
+    // Fall back to cloud URLs
+    return currentImage.previewUrl || imageService.getImageFileUrl(currentImage.uuid);
+  }, [currentImage]);
+
+  const isLocalImage = currentImage ? (currentImage as any).source === 'local' : false;
 
   // Reset zoom and rotation when image changes
   useEffect(() => {
@@ -120,12 +145,72 @@ export const ImageViewer: React.FC = () => {
         : `cropped_${currentImage.originalName}`;
       const croppedFile = blobToFile(croppedBlob, fileName);
 
-      if (replaceOriginal) {
-        // Replace the original image (uses chunked upload if > 50MB)
-        await replaceImageAuto(currentImage.uuid, croppedFile);
+      if (isLocalImage) {
+        // LOCAL MODE: Save to local storage
+        // First, save the cropped file to AppData using Electron API
+        const arrayBuffer = await croppedFile.arrayBuffer();
+        const savedPath = await window.electronAPI?.saveImageBuffer(fileName, arrayBuffer);
+
+        if (!savedPath) {
+          throw new Error('Failed to save cropped image to local storage');
+        }
+
+        // Generate thumbnail for the cropped image
+        let thumbnailPath = '';
+        let imageWidth = 0;
+        let imageHeight = 0;
+
+        try {
+          const thumbnailResult = await generateThumbnail(savedPath, 300);
+          if (thumbnailResult.success && thumbnailResult.thumbnailPath) {
+            thumbnailPath = thumbnailResult.thumbnailPath;
+            imageWidth = thumbnailResult.width || 0;
+            imageHeight = thumbnailResult.height || 0;
+          }
+        } catch (error) {
+          console.error('Failed to generate thumbnail for cropped image:', error);
+        }
+
+        if (replaceOriginal) {
+          // Update the existing record
+          await localImageService.updateImage(currentImage.uuid, {
+            filePath: savedPath,
+            thumbnailPath: thumbnailPath,
+            fileSize: croppedFile.size,
+            width: imageWidth,
+            height: imageHeight,
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          // Create a new record
+          const newImage: LocalImage = {
+            uuid: crypto.randomUUID(),
+            filename: fileName,
+            originalName: fileName,
+            filePath: savedPath,
+            thumbnailPath: thumbnailPath,
+            fileSize: croppedFile.size,
+            format: (format as any),
+            width: imageWidth,
+            height: imageHeight,
+            hash: '',
+            mimeType: croppedFile.type,
+            isCorrupted: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null,
+          };
+          await localImageService.addImage(newImage);
+        }
       } else {
-        // Upload as new image (uses chunked upload if > 50MB)
-        await uploadImageAuto(croppedFile);
+        // CLOUD MODE: Upload to cloud
+        if (replaceOriginal) {
+          // Replace the original image (uses chunked upload if > 50MB)
+          await replaceImageAuto(currentImage.uuid, croppedFile);
+        } else {
+          // Upload as new image (uses chunked upload if > 50MB)
+          await uploadImageAuto(croppedFile);
+        }
       }
 
       // Trigger gallery refresh to show updated data
@@ -136,6 +221,7 @@ export const ImageViewer: React.FC = () => {
       closeViewer();
     } catch (error) {
       console.error('Error saving cropped image:', error);
+      alert('Failed to save cropped image. Please try again.');
     } finally {
       setIsCropping(false);
     }
@@ -190,23 +276,43 @@ export const ImageViewer: React.FC = () => {
 
   if (!currentImage) return null;
 
-  const imageUrl = currentImage.previewUrl || imageService.getImageFileUrl(currentImage.uuid);
   const hasMultipleImages = images.length > 1;
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(`${imageUrl}?info=true`);
-      if (!response.ok) return;
+      if (isLocalImage) {
+        // Use Electron API to read local file
+        const filepath = (currentImage as any).filepath || currentImage.filePath;
+        const buffer = await window.electronAPI?.readLocalFile(filepath);
+        if (!buffer) {
+          console.error('Failed to read local file');
+          return;
+        }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = currentImage.originalName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        const blob = new Blob([buffer]);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = currentImage.originalName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // Cloud image download (existing logic)
+        const response = await fetch(`${imageUrl}?info=true`);
+        if (!response.ok) return;
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = currentImage.originalName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Download error:', error);
     }
@@ -226,11 +332,19 @@ export const ImageViewer: React.FC = () => {
     if (!window.confirm(t('viewer.confirmDelete'))) return;
 
     try {
-      await deleteImage(currentImage.id);
+      if (isLocalImage) {
+        // LOCAL MODE: Delete from local database
+        await localImageService.deleteImage(currentImage.uuid);
+      } else {
+        // CLOUD MODE: Delete from cloud
+        await deleteImage(currentImage.id);
+      }
+
       triggerRefresh();
       closeViewer();
     } catch (error) {
       console.error('Delete error:', error);
+      alert('Failed to delete image. Please try again.');
     }
   };
 

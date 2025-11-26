@@ -10,70 +10,80 @@ class StateDiffService {
    * Calculate the difference between local and remote states
    */
   calculateDiff(localImages: LocalImage[], remoteImages: Image[]): StateDiff {
+    // 1. Indexing (Same as before)
     const localByUuid = new Map(localImages.map((img) => [img.uuid, img]));
     const remoteByUuid = new Map(remoteImages.map((img) => [img.uuid, img]));
+    const allUuids = new Set([...localByUuid.keys(), ...remoteByUuid.keys()]);
 
-    const toUpload: LocalImage[] = [];
-    const toDownload: Image[] = [];
-    const toDeleteLocal: string[] = [];
-    const toDeleteRemote: string[] = [];
-    const toUpdate: UpdatePair[] = [];
-    const toReplace: ReplacePair[] = [];
-
-    // Categorize images based on presence in local vs remote
-    // Note: An image missing from one side could mean either:
-    // 1. It's new on the other side (needs upload/download)
-    // 2. It was deleted from that side (needs deletion on the other side)
-    // We categorize for BOTH push and pull operations:
-
-    // Images in LOCAL but not in REMOTE:
-    for (const localImage of localImages) {
-      if (!remoteByUuid.has(localImage.uuid)) {
-        // For PUSH: assume it's new locally → upload to remote
-        toUpload.push(localImage);
-        // For PULL: assume it was deleted from remote → delete from local
-        toDeleteLocal.push(localImage.uuid);
-      }
-    }
-
-    // Images in REMOTE but not in LOCAL:
-    for (const remoteImage of remoteImages) {
-      if (!localByUuid.has(remoteImage.uuid)) {
-        // For PULL: assume it's new remotely → download to local
-        toDownload.push(remoteImage);
-        // For PUSH: assume it was deleted locally → delete from remote
-        toDeleteRemote.push(remoteImage.uuid);
-      }
-    }
-
-    // Compare images that exist in both local and remote
-    for (const localImage of localImages) {
-      const remoteImage = remoteByUuid.get(localImage.uuid);
-      if (!remoteImage) continue; // Already handled in toUpload
-
-      // Check if content changed (hash mismatch)
-      if (localImage.hash && remoteImage.hash && localImage.hash !== remoteImage.hash) {
-        toReplace.push({ localImage, remoteImage });
-        continue;
-      }
-
-      // Check if metadata changed
-      const changes = this.findMetadataChanges(localImage, remoteImage);
-      if (Object.keys(changes).length > 0) {
-        toUpdate.push({ localImage, remoteImage, changes });
-      }
-    }
-
-    return {
-      toUpload,
-      toDownload,
-      toDeleteLocal,
-      toDeleteRemote,
-      toUpdate,
-      toReplace,
+    // 2. Initialize Buckets
+    const diff: StateDiff = {
+      toUpload: [], toReplaceRemote: [], toUpdateRemote: [], toDeleteRemote: [],
+      toDownload: [], toReplaceLocal: [], toUpdateLocal: [], toDeleteLocal: []
     };
-  }
 
+    // 3. Iterate Union
+    for (const uuid of allUuids) {
+      const local = localByUuid.get(uuid);
+      const remote = remoteByUuid.get(uuid);
+
+      // --- CASE 1: Local Only (New or Zombie?) ---
+      if (local && !remote) {
+        if (local.deletedAt) continue; // It's dead, ignore.
+        diff.toUpload.push(local);     // It's new, upload it.
+      }
+
+      // --- CASE 2: Remote Only (New or Zombie?) ---
+      else if (!local && remote) {
+        if (remote.deletedAt) continue; // It's dead, ignore.
+        diff.toDownload.push(remote);   // It's new, download it.
+      }
+
+      // --- CASE 3: Both Exist (Conflict!) ---
+      else if (local && remote) {
+        const localTime = new Date(local.updatedAt).getTime();
+        const remoteTime = new Date(remote.updatedAt).getTime();
+
+        // >>> SUB-CASE A: Local is Newer (Push Changes) <<<
+        if (localTime > remoteTime) {
+          if (local.deletedAt) {
+            // Local was deleted recently -> Propagate delete
+            diff.toDeleteRemote.push(uuid);
+          } else if (local.hash !== remote.hash) {
+            // Binary content changed -> Re-upload file
+            diff.toReplaceRemote.push(local);
+          } else {
+            // Only metadata might have changed
+            const changes = this.findMetadataChanges(local, remote);
+            if (Object.keys(changes).length > 0) {
+              diff.toUpdateRemote.push(local);
+            }
+          }
+        }
+
+        // >>> SUB-CASE B: Remote is Newer (Pull Changes) <<<
+        else if (remoteTime > localTime) {
+          if (remote.deletedAt) {
+            // Remote was deleted recently -> Propagate delete
+            diff.toDeleteLocal.push(uuid);
+          } else if (local.hash !== remote.hash) {
+            // Binary content changed -> Re-download file
+            diff.toReplaceLocal.push(remote);
+          } else {
+            // Only metadata might have changed
+            const changes = this.findMetadataChanges(local, remote);
+            if (Object.keys(changes).length > 0) {
+              diff.toUpdateLocal.push(remote);
+            }
+          }
+        }
+
+        // >>> SUB-CASE C: Synced (Timestamps Equal) <<<
+        // Do nothing.
+      }
+    }
+
+    return diff;
+  }
   /**
    * Find metadata differences between local and remote images
    */
@@ -96,14 +106,10 @@ class StateDiffService {
     if (local.height !== remote.height) {
       changes.height = remote.height;
     }
-    if (local.collectionId !== remote.collectionId) {
-      changes.collectionId = remote.collectionId;
-    }
+
 
     // Compare JSON fields (tags, exifData)
-    if (JSON.stringify(local.tags) !== JSON.stringify(remote.tags)) {
-      changes.tags = remote.tags;
-    }
+
     if (JSON.stringify(local.exifData) !== JSON.stringify(remote.exifData)) {
       changes.exifData = remote.exifData;
     }
@@ -115,17 +121,17 @@ class StateDiffService {
    * Check if diff contains operations that require pull first
    * Returns true if diff has replacements or deletions
    */
-  requiresPullFirst(diff: StateDiff): boolean {
-    return diff.toReplace.length > 0 || diff.toDeleteRemote.length > 0;
-  }
+  // requiresPullFirst(diff: StateDiff): boolean {
+  //   return diff.toReplace.length > 0 || diff.toDeleteRemote.length > 0;
+  // }
 
   /**
    * Check if diff is safe for fast-forward push
    * Only additions and metadata updates are safe
    */
-  canFastForwardPush(diff: StateDiff): boolean {
-    return !this.requiresPullFirst(diff);
-  }
+  // canFastForwardPush(diff: StateDiff): boolean {
+  //   return !this.requiresPullFirst(diff);
+  // }
 
   /**
    * Get summary of diff for display
@@ -135,8 +141,10 @@ class StateDiffService {
     toDownload: number;
     toDeleteLocal: number;
     toDeleteRemote: number;
-    toUpdate: number;
-    toReplace: number;
+    toUpdateRemote: number;
+    toUpdateLocal: number;
+    toReplaceRemote: number;
+    toReplaceLocal: number;
     totalChanges: number;
   } {
     const summary = {
@@ -144,8 +152,10 @@ class StateDiffService {
       toDownload: diff.toDownload.length,
       toDeleteLocal: diff.toDeleteLocal.length,
       toDeleteRemote: diff.toDeleteRemote.length,
-      toUpdate: diff.toUpdate.length,
-      toReplace: diff.toReplace.length,
+      toUpdateRemote: diff.toUpdateRemote.length,
+      toUpdateLocal: diff.toUpdateLocal.length,
+      toReplaceRemote: diff.toReplaceRemote.length,
+      toReplaceLocal: diff.toReplaceLocal.length,
       totalChanges: 0,
     };
 
@@ -154,8 +164,10 @@ class StateDiffService {
       summary.toDownload +
       summary.toDeleteLocal +
       summary.toDeleteRemote +
-      summary.toUpdate +
-      summary.toReplace;
+      summary.toUpdateRemote +
+      summary.toUpdateLocal +
+      summary.toReplaceRemote +
+      summary.toReplaceLocal;
 
     return summary;
   }
@@ -163,19 +175,19 @@ class StateDiffService {
   /**
    * Get images that will be affected by pull (replaced or deleted)
    */
-  getAffectedImages(diff: StateDiff): LocalImage[] {
-    const affected: LocalImage[] = [];
+  // getAffectedImages(diff: StateDiff): LocalImage[] {
+  //   const affected: LocalImage[] = [];
 
-    // Images that will be replaced
-    for (const pair of diff.toReplace) {
-      affected.push(pair.localImage);
-    }
+  //   // Images that will be replaced
+  //   for (const pair of diff.toReplace) {
+  //     affected.push(pair.localImage);
+  //   }
 
-    // Images that will be deleted
-    // (Note: toDeleteLocal contains UUIDs, need to get full images elsewhere)
+  //   // Images that will be deleted
+  //   // (Note: toDeleteLocal contains UUIDs, need to get full images elsewhere)
 
-    return affected;
-  }
+  //   return affected;
+  // }
 }
 
 // Singleton instance

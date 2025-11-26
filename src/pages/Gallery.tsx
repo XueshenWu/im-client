@@ -1,3 +1,5 @@
+
+<script src="http://localhost:8097"></script>
 import { useState } from "react";
 import { useTranslation } from 'react-i18next'
 import HybridPhotoWall from "@/components/gallery/HybridPhotoWall";
