@@ -3,7 +3,8 @@ import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import si from 'systeminformation'
 import crypto from 'crypto'
-import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-assembler';
+import { v4 as uuidv4 } from 'uuid'
+
 
 
 // Get __dirname equivalent in ES modules
@@ -11,7 +12,6 @@ const __filename = fileURLToPath(import.meta.url)
 
 const __dirname = path.dirname(__filename)
 
-const __FILE_PREFIX = path.join(app.getPath('appData'), 'image-management');
 
 import fs from 'fs/promises'
 import { initializeDatabase, dbOperations, closeDatabase } from './database.js'
@@ -69,7 +69,7 @@ function createWindow() {
           "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
           "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-          "img-src 'self' data: blob: local-image: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*; " +
+          "img-src 'self' data: blob: local-image: local-thumbnail: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*; " +
           "font-src 'self' data: https://fonts.gstatic.com;"
         ]
       }
@@ -138,7 +138,7 @@ function createWindow() {
     return path.join(app.getPath('appData'), 'image-management');
   });
 
-  ipcMain.handle('save-thumbnails-to-local', async (event, filePaths: string[]) => {
+  ipcMain.handle('save-thumbnails-to-local', async (event, files: Array<{ sourcePath: string; uuid: string }>) => {
     try {
       // Get AppData directory for this app
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
@@ -148,16 +148,15 @@ function createWindow() {
 
       const savedFiles: string[] = [];
 
-      for (const filePath of filePaths) {
+      for (const file of files) {
         try {
-          const fileName = path.basename(filePath);
-          const destPath = path.join(appDataPath, fileName);
+          const destPath = path.join(appDataPath, `${file.uuid}.jpg`);
 
-          // Copy file to AppData
-          await fs.copyFile(filePath, destPath);
+          // Copy file to AppData with UUID-based name (always .jpg for thumbnails)
+          await fs.copyFile(file.sourcePath, destPath);
           savedFiles.push(destPath);
         } catch (error) {
-          console.error(`Failed to save thumbnail ${filePath}:`, error);
+          console.error(`Failed to save thumbnail ${file.sourcePath}:`, error);
         }
       }
 
@@ -180,7 +179,7 @@ function createWindow() {
 
 
 
-  ipcMain.handle('save-files-to-local', async (event, filePaths: string[]) => {
+  ipcMain.handle('save-files-to-local', async (event, files: Array<{ sourcePath: string; uuid: string; format: string }>) => {
     try {
       // Get AppData directory for this app
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
@@ -190,16 +189,15 @@ function createWindow() {
 
       const savedFiles: string[] = [];
 
-      for (const filePath of filePaths) {
+      for (const file of files) {
         try {
-          const fileName = path.basename(filePath);
-          const destPath = path.join(appDataPath, fileName);
+          const destPath = path.join(appDataPath, `${file.uuid}.${file.format}`);
 
-          // Copy file to AppData
-          await fs.copyFile(filePath, destPath);
+          // Copy file to AppData with UUID-based name
+          await fs.copyFile(file.sourcePath, destPath);
           savedFiles.push(destPath);
         } catch (error) {
-          console.error(`Failed to save file ${filePath}:`, error);
+          console.error(`Failed to save file ${file.sourcePath}:`, error);
         }
       }
 
@@ -279,7 +277,7 @@ function createWindow() {
       return crypto.createHash('sha256').update(rawId + 'my-salt').digest('hex');
     } catch (error) {
       console.error('Hardware ID failed, falling back to random UUID', error);
-      return crypto.randomUUID();
+      return uuidv4();
     }
   });
 
@@ -299,29 +297,48 @@ function createWindow() {
     }
   });
 
-  // Save downloaded image buffer to AppData
-  ipcMain.handle('save-image-buffer', async (event, fileName: string, buffer: ArrayBuffer) => {
+
+
+ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, buffer: ArrayBuffer) => {
+  try {
+    const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
+    await fs.mkdir(appDataPath, { recursive: true });
+
+    // 1. Construct path using RAW UUID (No trim/sanitize) to match DB
+    // We only remove a leading dot from format to prevent "uuid..png"
+    const cleanFormat = format.replace(/^\./, ''); 
+    const filePath = path.join(appDataPath, `${uuid}.${cleanFormat}`);
+
+    // 2. EXPLICITLY DELETE (UNLINK) IF EXISTS
+    // This releases the file handle if Windows has locked it "pending deletion"
     try {
-      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
-      await fs.mkdir(appDataPath, { recursive: true });
-
-      const filePath = path.join(appDataPath, fileName);
-      await fs.writeFile(filePath, Buffer.from(buffer));
-
-      return filePath;
-    } catch (error) {
-      console.error('Failed to save image buffer:', error);
-      return null;
+      await fs.unlink(filePath);
+    } catch (error: any) {
+      // Ignore if file doesn't exist (ENOENT)
+      // Throw if strictly locked/permission error (EBUSY/EPERM)
+      if (error.code !== 'ENOENT') {
+        console.error('Error deleting old image:', error);
+        throw error;
+      }
     }
-  });
+
+    // 3. Write the new image file
+    await fs.writeFile(filePath, Buffer.from(buffer));
+
+    return filePath;
+  } catch (error) {
+    console.error('Failed to save image buffer:', error);
+    return null;
+  }
+});
 
   // Save downloaded thumbnail buffer to AppData
-  ipcMain.handle('save-thumbnail-buffer', async (event, fileName: string, buffer: ArrayBuffer) => {
+  ipcMain.handle('save-thumbnail-buffer', async (event, uuid: string, buffer: ArrayBuffer) => {
     try {
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
       await fs.mkdir(appDataPath, { recursive: true });
 
-      const filePath = path.join(appDataPath, fileName);
+      const filePath = path.join(appDataPath, `${uuid}.jpg`);
       await fs.writeFile(filePath, Buffer.from(buffer));
 
       return filePath;
@@ -385,11 +402,11 @@ function createWindow() {
     }
   });
 
-  ipcMain.handle('db:getImagePathByUUIDs', async (event, uuids: string[]) => {
+  ipcMain.handle('db:getImageFormatByUUIDs', async (_, uuids: string[]) => {
     try {
-      return dbOperations.getImagePathByUUIDs(uuids);
+      return dbOperations.getImageFormatByUUIDs(uuids);
     } catch (error) {
-      console.error('Failed to get image paths by UUIDs:', error);
+      console.error('Failed to get image formats by UUIDs:', error);
       return [];
     }
   });
@@ -440,14 +457,19 @@ function createWindow() {
 
   ipcMain.handle('db:deleteImage', async (_, uuid: string) => {
     try {
-      await dbOperations.deleteImage(uuid);
-      const paths = await dbOperations.getImagePathByUUIDs([uuid]);
-      if (!paths || paths.length === 0) {
-        return { success: true };
-      }
+      // Get format before deleting from DB
+      const formats = await dbOperations.getImageFormatByUUIDs([uuid]);
 
-      await shell.trashItem(paths[0].filePath);
-      await shell.trashItem(paths[0].thumbnailPath);
+      await dbOperations.deleteImage(uuid);
+
+      if (formats && formats.length > 0) {
+        const { getImagePath, getThumbnailPath } = await import('./database.js');
+        const imagePath = getImagePath(uuid, formats[0].format);
+        const thumbnailPath = getThumbnailPath(uuid);
+
+        await shell.trashItem(imagePath);
+        await shell.trashItem(thumbnailPath);
+      }
 
       return { success: true };
     } catch (error) {
@@ -458,18 +480,25 @@ function createWindow() {
 
   ipcMain.handle('db:deleteImages', async (_, uuids: string[]) => {
     try {
-      await dbOperations.deleteImages(uuids);
-      const paths = await dbOperations.getImagePathByUUIDs(uuids);
+      // Get formats before deleting from DB
+      const formats = await dbOperations.getImageFormatByUUIDs(uuids);
 
-      if (paths) {
-        await Promise.allSettled(paths.flatMap(({ filePath, thumbnailPath }) => {
+      await dbOperations.deleteImages(uuids);
+
+      if (formats && formats.length > 0) {
+        const { getImagePath, getThumbnailPath } = await import('./database.js');
+
+        await Promise.allSettled(formats.flatMap(({ uuid, format }) => {
+          const imagePath = getImagePath(uuid, format);
+          const thumbnailPath = getThumbnailPath(uuid);
+
           return [
-            shell.trashItem(filePath),
+            shell.trashItem(imagePath),
             shell.trashItem(thumbnailPath)
           ]
         }))
-
       }
+
       return { success: true };
     } catch (error) {
       console.error('Failed to delete images:', error);
@@ -516,15 +545,18 @@ function createWindow() {
   });
 
   // Export images to a directory
-  ipcMain.handle('export-images', async (event, images: Array<{ uuid: string, filePath: string, filename: string }>, destination: string) => {
+  ipcMain.handle('export-images', async (_, images: Array<{ uuid: string, format: string, filename: string }>, destination: string) => {
     try {
       await fs.mkdir(destination, { recursive: true });
+
+      const { getImagePath } = await import('./database.js');
 
       const results = [];
       for (const image of images) {
         try {
+          const sourcePath = getImagePath(image.uuid, image.format);
           const destPath = path.join(destination, image.filename);
-          await fs.copyFile(image.filePath, destPath);
+          await fs.copyFile(sourcePath, destPath);
           results.push({ uuid: image.uuid, success: true, path: destPath });
         } catch (error) {
           console.error(`Failed to export image ${image.uuid}:`, error);
@@ -553,15 +585,13 @@ function createWindow() {
   });
 
   // Generate thumbnail from image file
-  ipcMain.handle('generate-thumbnail', async (_event, sourcePath: string) => {
+  ipcMain.handle('generate-thumbnail', async (_, sourcePath: string, uuid: string) => {
     try {
       // Use canvas-based thumbnail generation instead of sharp
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
       await fs.mkdir(appDataPath, { recursive: true });
 
-      const fileName = path.basename(sourcePath);
-      const thumbnailFileName = `thumb_${fileName}`;
-      const thumbnailPath = path.join(appDataPath, thumbnailFileName);
+      const thumbnailPath = path.join(appDataPath, `${uuid}.jpg`);
 
       // Read the original image
       const imageBuffer = await fs.readFile(sourcePath);
@@ -596,6 +626,23 @@ function createWindow() {
     }
   });
 
+  // Calculate file hash (SHA-256)
+  ipcMain.handle('calculate-file-hash', async (_event, filePath: string) => {
+    try {
+      const fileBuffer = await fs.readFile(filePath);
+      const hashSum = crypto.createHash('sha256');
+      hashSum.update(fileBuffer);
+      const hash = hashSum.digest('hex');
+      return { success: true, hash };
+    } catch (error) {
+      console.error('Failed to calculate file hash:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
   // In development mode, load from Vite dev server
   // In production, load from built files
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -611,31 +658,47 @@ app.whenReady().then(async () => {
 
 
 
+  // Protocol for full-size images: local-image://{uuid}.{format}
   protocol.handle('local-image', (request) => {
     try {
-      // 1. Get the path part of the URL
-      // request.url will look like: "local-image:///C:/Users/name/..."
-      // The substring(13) strips "local-image://" leaving "/C:/Users/..."
-      let filePath = request.url.slice('local-image://'.length);
+      // request.url will look like: "local-image://{uuid}.{format}"
+      const fileNameWithExt = request.url.slice('local-image://'.length);
+      const fileName = decodeURIComponent(fileNameWithExt);
 
-      // 2. Decode characters (like %20 for spaces)
-      filePath = decodeURIComponent(filePath);
+      // Build path: {AppData}/image-management/images/{uuid}.{format}
+      const filePath = path.join(
+        app.getPath('appData'),
+        'image-management',
+        'images',
+        fileName
+      );
 
-      // 3. Clean up the path for Windows
-      // The browser URL path usually starts with a slash, e.g., "/C:/Users/..."
-      // pathToFileURL expects "C:/Users/..." on Windows, so we remove the leading slash.
-      if (process.platform === 'win32' && filePath.startsWith('/') && filePath.includes(':')) {
-        filePath = filePath.slice(1);
-      }
-
-      // 4. Create the secure file:// URL and fetch
-      // pathToFileURL handles all remaining slash/backslash conversions
       return net.fetch(pathToFileURL(filePath).toString());
-
     } catch (error) {
       console.error('Local Image Protocol Error:', error);
-      // Return a 500 response so the renderer knows it failed
       return new Response('Failed to load image', { status: 500 });
+    }
+  });
+
+  // Protocol for thumbnails: local-thumbnail://{uuid}
+  protocol.handle('local-thumbnail', (request) => {
+    try {
+      // request.url will look like: "local-thumbnail://{uuid}"
+      const uuid = request.url.slice('local-thumbnail://'.length);
+      const decodedUuid = decodeURIComponent(uuid);
+
+      // Build path: {AppData}/image-management/thumbnails/{uuid}.jpg
+      const filePath = path.join(
+        app.getPath('appData'),
+        'image-management',
+        'thumbnails',
+        `${decodedUuid}.jpg`
+      );
+
+      return net.fetch(pathToFileURL(filePath).toString());
+    } catch (error) {
+      console.error('Local Thumbnail Protocol Error:', error);
+      return new Response('Failed to load thumbnail', { status: 500 });
     }
   });
 

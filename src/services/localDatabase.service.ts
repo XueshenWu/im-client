@@ -4,7 +4,7 @@
  */
 
 import { LocalImage, SyncMetadata } from '../types/local';
-import { Image } from '../types/api';
+
 
 class LocalDatabaseService {
   private isInitialized = false;

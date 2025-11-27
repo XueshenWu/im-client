@@ -22,13 +22,14 @@ import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
-import { imageService } from '@/services/api';
-import { uploadImageAuto, replaceImageAuto, deleteImage } from '@/services/images.service';
+import { replaceImage, deleteImage } from '@/services/images.service';
 import { createCroppedImage, blobToFile } from '@/utils/cropImage';
 import { format } from 'date-fns';
 import { localImageService } from '@/services/localImage.service';
 import { LocalImage } from '@/types/local';
 import { generateThumbnail } from '@/utils/thumbnailGenerator';
+import { getImageUrl, getCloudImagePresignedUrlEndpoint } from '@/utils/imagePaths';
+import { v4 as uuidv4 } from 'uuid';
 
 
 const formatBytes = (bytes: number) => {
@@ -59,6 +60,7 @@ export const ImageViewer: React.FC = () => {
   const [rotation, setRotation] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [cloudImageUrl, setCloudImageUrl] = useState<string>('');
 
   // Crop mode states
   const [crop, setCrop] = useState<Crop>();
@@ -68,27 +70,48 @@ export const ImageViewer: React.FC = () => {
 
   const { triggerRefresh } = useGalleryRefreshStore();
 
-  // Detect if this is a local image and construct appropriate URL
+  const isLocalImage = currentImage ? (currentImage as any).source === 'local' : false;
+
+  // Fetch presigned URL for cloud images
+  useEffect(() => {
+    if (!currentImage || isLocalImage) {
+      setCloudImageUrl('');
+      return;
+    }
+
+    // Fetch presigned URL from the endpoint
+    const fetchPresignedUrl = async () => {
+      try {
+        const endpoint = getCloudImagePresignedUrlEndpoint(currentImage.uuid);
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+          console.error('Failed to fetch presigned URL');
+          return;
+        }
+        const data = await response.json();
+        if (data.success && data.data.presignedUrl) {
+          setCloudImageUrl(data.data.presignedUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching presigned URL:', error);
+      }
+    };
+
+    fetchPresignedUrl();
+  }, [currentImage, isLocalImage]);
+
+  // Determine the image URL to use
   const imageUrl = React.useMemo(() => {
     if (!currentImage) return '';
 
-    const isLocalImage = (currentImage as any).source === 'local' ||
-                         (currentImage as any).filepath;
-
     if (isLocalImage) {
-      const filepath = (currentImage as any).filepath || currentImage.filePath;
-      if (filepath) {
-        // Normalize path and construct local-image:// URL (same as gallery thumbnails)
-        const normalizedPath = filepath.replace(/\\/g, '/');
-        return `local-image:///${normalizedPath}`;
-      }
+      // Use UUID-based URL for local images
+      return getImageUrl(currentImage.uuid, currentImage.format);
     }
 
-    // Fall back to cloud URLs
-    return currentImage.previewUrl || imageService.getImageFileUrl(currentImage.uuid);
-  }, [currentImage]);
-
-  const isLocalImage = currentImage ? (currentImage as any).source === 'local' : false;
+    // For cloud images, use the fetched presigned URL
+    return cloudImageUrl;
+  }, [currentImage, isLocalImage, cloudImageUrl]);
 
   // Reset zoom and rotation when image changes
   useEffect(() => {
@@ -141,29 +164,35 @@ export const ImageViewer: React.FC = () => {
 
       // Convert blob to file
       const fileName = replaceOriginal
-        ? currentImage.originalName
-        : `cropped_${currentImage.originalName}`;
+        ? currentImage.filename
+        : `cropped_${currentImage.filename}`;
       const croppedFile = blobToFile(croppedBlob, fileName);
 
       if (isLocalImage) {
         // LOCAL MODE: Save to local storage
-        // First, save the cropped file to AppData using Electron API
         const arrayBuffer = await croppedFile.arrayBuffer();
-        const savedPath = await window.electronAPI?.saveImageBuffer(fileName, arrayBuffer);
+
+        // Generate UUID for the new/updated image
+        const imageUuid = replaceOriginal ? currentImage.uuid : uuidv4();
+
+        // Save the cropped image buffer using UUID
+        const savedPath = await window.electronAPI?.saveImageBuffer(
+          imageUuid,
+          format === 'png' ? 'png' : 'jpg',
+          arrayBuffer
+        );
 
         if (!savedPath) {
           throw new Error('Failed to save cropped image to local storage');
         }
 
         // Generate thumbnail for the cropped image
-        let thumbnailPath = '';
         let imageWidth = 0;
         let imageHeight = 0;
 
         try {
-          const thumbnailResult = await generateThumbnail(savedPath, 300);
-          if (thumbnailResult.success && thumbnailResult.thumbnailPath) {
-            thumbnailPath = thumbnailResult.thumbnailPath;
+          const thumbnailResult = await generateThumbnail(savedPath, imageUuid, 300);
+          if (thumbnailResult.success) {
             imageWidth = thumbnailResult.width || 0;
             imageHeight = thumbnailResult.height || 0;
           }
@@ -174,8 +203,6 @@ export const ImageViewer: React.FC = () => {
         if (replaceOriginal) {
           // Update the existing record
           await localImageService.updateImage(currentImage.uuid, {
-            filePath: savedPath,
-            thumbnailPath: thumbnailPath,
             fileSize: croppedFile.size,
             width: imageWidth,
             height: imageHeight,
@@ -184,13 +211,10 @@ export const ImageViewer: React.FC = () => {
         } else {
           // Create a new record
           const newImage: LocalImage = {
-            uuid: crypto.randomUUID(),
+            uuid: imageUuid,
             filename: fileName,
-            originalName: fileName,
-            filePath: savedPath,
-            thumbnailPath: thumbnailPath,
             fileSize: croppedFile.size,
-            format: (format as any),
+            format: (format === 'png' ? 'png' : 'jpg') as any,
             width: imageWidth,
             height: imageHeight,
             hash: '',
@@ -203,13 +227,76 @@ export const ImageViewer: React.FC = () => {
           await localImageService.addImage(newImage);
         }
       } else {
-        // CLOUD MODE: Upload to cloud
+        // CLOUD MODE: Upload to cloud using presigned URLs
         if (replaceOriginal) {
-          // Replace the original image (uses chunked upload if > 50MB)
-          await replaceImageAuto(currentImage.uuid, croppedFile);
+          // Replace the original image using presigned URLs
+          await replaceImage(currentImage.uuid, croppedFile);
         } else {
-          // Upload as new image (uses chunked upload if > 50MB)
-          await uploadImageAuto(croppedFile);
+          // Upload as new image using presigned URL workflow
+          const { requestPresignedURLs, uploadToPresignedURL } = await import('@/services/images.service');
+          const { generateThumbnailBlob } = await import('@/utils/thumbnailGenerator');
+
+          // Generate UUID and calculate metadata
+          const newUuid = uuidv4();
+          const imageFormat = format === 'png' ? 'png' : 'jpg';
+
+          // Calculate dimensions from the cropped blob
+          const img = new Image();
+          const imageUrl = URL.createObjectURL(croppedFile);
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              URL.revokeObjectURL(imageUrl);
+              resolve();
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(imageUrl);
+              reject(new Error('Failed to load cropped image'));
+            };
+            img.src = imageUrl;
+          });
+
+          const width = img.naturalWidth;
+          const height = img.naturalHeight;
+
+          // Calculate file hash using Web Crypto API
+          const arrayBuffer = await croppedFile.arrayBuffer();
+          const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+          // Request presigned URLs
+          const presignedURLs = await requestPresignedURLs([{
+            uuid: newUuid,
+            filename: fileName,
+            fileSize: croppedFile.size,
+            format: imageFormat,
+            width,
+            height,
+            hash,
+            mimeType: croppedFile.type,
+            isCorrupted: false,
+          }]);
+
+          if (!presignedURLs || presignedURLs.length === 0) {
+            throw new Error('Failed to get presigned URLs');
+          }
+
+          const urls = presignedURLs[0];
+
+          // Generate and upload thumbnail first
+          const thumbnailBlob = await generateThumbnailBlob(croppedFile, 300);
+          const thumbnailSuccess = await uploadToPresignedURL(urls.thumbnailUrl, thumbnailBlob, true);
+
+          if (!thumbnailSuccess) {
+            throw new Error('Failed to upload thumbnail');
+          }
+
+          // Upload the cropped image
+          const imageSuccess = await uploadToPresignedURL(urls.imageUrl, croppedFile, false);
+
+          if (!imageSuccess) {
+            throw new Error('Failed to upload cropped image');
+          }
         }
       }
 
@@ -281,33 +368,35 @@ export const ImageViewer: React.FC = () => {
   const handleDownload = async () => {
     try {
       if (isLocalImage) {
-        // Use Electron API to read local file
-        const filepath = (currentImage as any).filepath || currentImage.filePath;
-        const buffer = await window.electronAPI?.readLocalFile(filepath);
-        if (!buffer) {
-          console.error('Failed to read local file');
+        // Fetch using the local-image:// protocol
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          console.error('Failed to fetch local image');
           return;
         }
-
-        const blob = new Blob([buffer]);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = currentImage.originalName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else {
-        // Cloud image download (existing logic)
-        const response = await fetch(`${imageUrl}?info=true`);
-        if (!response.ok) return;
 
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = currentImage.originalName;
+        link.download = currentImage.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // Cloud image download - fetch from presigned URL endpoint
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          console.error('Failed to fetch cloud image');
+          return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = currentImage.filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -352,14 +441,14 @@ export const ImageViewer: React.FC = () => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeViewer()}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 bg-black border-none" aria-describedby={undefined}>
         <VisuallyHidden.Root>
-          <DialogTitle>{currentImage.originalName}</DialogTitle>
+          <DialogTitle>{currentImage.filename}</DialogTitle>
         </VisuallyHidden.Root>
         {/* Top toolbar */}
         <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-white">
               <h2 className="text-lg font-semibold truncate max-w-[400px]">
-                {currentImage.originalName}
+                {currentImage.filename}
               </h2>
               {hasMultipleImages && viewMode === 'view' && (
                 <span className="text-sm text-gray-300">
@@ -551,7 +640,7 @@ export const ImageViewer: React.FC = () => {
               )}
               <img
                 src={imageUrl}
-                alt={currentImage.originalName}
+                alt={currentImage.filename}
                 className="max-w-full max-h-full object-contain transition-transform duration-200"
                 style={{
                   transform: `scale(${zoom}) rotate(${rotation}deg)`,
@@ -573,7 +662,7 @@ export const ImageViewer: React.FC = () => {
                 <img
                   ref={imgRef}
                   src={imageUrl}
-                  alt={currentImage.originalName}
+                  alt={currentImage.filename}
                   style={{
                     width: 'auto',
                     height: 'auto',
@@ -596,7 +685,7 @@ export const ImageViewer: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 text-white text-sm max-w-2xl">
               <div>
                 <div className="text-gray-400">{t('viewer.filename')}</div>
-                <div className="font-medium">{currentImage.originalName}</div>
+                <div className="font-medium">{currentImage.filename}</div>
               </div>
               <div>
                 <div className="text-gray-400">{t('viewer.fileSize')}</div>

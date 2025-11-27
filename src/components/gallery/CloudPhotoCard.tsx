@@ -14,6 +14,7 @@ import { deleteImage } from '@/services/images.service';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
+import { getCloudImagePresignedUrlEndpoint, getCloudThumbnailUrl } from '@/utils/imagePaths';
 
 interface CloudPhotoCardProps {
   image: ImageItem;
@@ -40,26 +41,37 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   }
 
   const cloudData = image.cloudData;
-  const displayName = cloudData?.originalName || cloudData?.filename || 'Unknown';
+  const displayName = cloudData?.filename || 'Unknown';
   const fileSize = cloudData?.fileSize;
 
   const handleDownload = async () => {
     if (!cloudData?.uuid) return;
 
     try {
-      const imageUrl = `${imageService.getImageFileUrl(cloudData.uuid)}?info=true`;
-      const response = await fetch(imageUrl);
+      debugger
+
+      const endpoint = getCloudImagePresignedUrlEndpoint(cloudData.uuid);
+      let response = await fetch(endpoint);
 
       if (!response.ok) {
         console.error('Download failed:', response.statusText);
         return;
       }
 
+      const data = await response.json();
+      if (!data.success || !data.data.presignedUrl) {
+        alert('Invalid presigned URL response');
+        return;
+      }
+      const presignedUrl = data.data.presignedUrl;
+      response = await fetch(presignedUrl);
+
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = cloudData.originalName || 'image.jpg';
+      link.download = cloudData.filename || 'image.jpg';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -123,9 +135,9 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           }}
           onClick={handleCardClick}
         >
-          {image.preview ? (
+          {cloudData?.uuid ? (
             <img
-              src={image.preview}
+              src={getCloudThumbnailUrl(cloudData.uuid, cloudData.format)}
               alt={displayName}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"

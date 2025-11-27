@@ -72,7 +72,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
           // Convert API images to ImageItem format
           const cloudImages: ImageItem[] = result.data.map((img: Image) => ({
             id: img.uuid,
-            preview: imageService.getThumbnailUrl(img.thumbnailPath),
+          
             aspectRatio: img.width / img.height,
             source: 'cloud' as const,
             cloudData: img,
@@ -215,8 +215,29 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
         if (!image?.cloudData?.uuid) continue;
 
         try {
-          const imageUrl = `${imageService.getImageFileUrl(image.cloudData.uuid)}?info=true`;
-          const response = await fetch(imageUrl);
+          // First, fetch the presigned URL and metadata from the endpoint
+          const endpoint = imageService.getImageFileUrl(image.cloudData.uuid);
+          const presignedResponse = await fetch(endpoint);
+
+          if (!presignedResponse.ok) {
+            console.error(`Failed to get presigned URL for ${imageId}:`, presignedResponse.statusText);
+            continue;
+          }
+
+          const presignedData = await presignedResponse.json();
+          if (!presignedData.success || !presignedData.data.presignedUrl) {
+            console.error(`Invalid presigned URL response for ${imageId}`);
+            continue;
+          }
+
+          // Extract metadata from the response
+          const metadata = presignedData.data.metadata;
+          const originalName = presignedData.data.filename || `image-${imageId}.jpg`;
+          const fileSize = metadata.fileSize || 0;
+          const imageFormat = metadata.format || 'unknown';
+
+          // Now download the image using the presigned URL
+          const response = await fetch(presignedData.data.presignedUrl);
 
           if (!response.ok) {
             console.error(`Failed to download image ${imageId}:`, response.statusText);
@@ -224,9 +245,6 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
           }
 
           const blob = await response.blob();
-          const originalName = response.headers.get('x-image-original-name') || `image-${imageId}.jpg`;
-          const fileSize = parseInt(response.headers.get('x-image-file-size') || '0', 10);
-          const imageFormat = response.headers.get('x-image-format') || 'unknown';
 
           imagesFolder?.file(originalName, blob);
 

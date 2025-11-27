@@ -147,7 +147,7 @@ class LocalImageService {
         if (image) {
           images.push({
             uuid: image.uuid,
-            filePath: image.filePath,
+            format: image.format,
             filename: image.filename,
           });
         }
@@ -169,7 +169,7 @@ class LocalImageService {
         results: result.results ?? []
       };
 
-     
+
     } catch (error) {
       console.error('[LocalImage] Failed to export images:', error);
       return { success: false, results: [] };
@@ -193,13 +193,10 @@ class LocalImageService {
    * Convert server Image to LocalImage format
    * Used when pulling from cloud
    */
-  serverImageToLocal(serverImage: Image, filePath: string, thumbnailPath: string): LocalImage {
+  serverImageToLocal(serverImage: Image): LocalImage {
     return {
       uuid: serverImage.uuid,
       filename: serverImage.filename,
-      originalName: serverImage.originalName,
-      filePath,
-      thumbnailPath,
       fileSize: serverImage.fileSize,
       format: serverImage.format,
       width: serverImage.width,
@@ -218,11 +215,10 @@ class LocalImageService {
    * Convert LocalImage to server Image format
    * Used when pushing to cloud
    */
-  localImageToServer(localImage: LocalImage): Omit<Image, 'id' | 'filePath' | 'thumbnailPath'> {
+  localImageToServer(localImage: LocalImage): Omit<Image, 'id'> {
     return {
       uuid: localImage.uuid,
       filename: localImage.filename,
-      originalName: localImage.originalName,
       fileSize: localImage.fileSize,
       format: localImage.format,
       width: localImage.width,

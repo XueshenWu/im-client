@@ -148,20 +148,15 @@ export const imageService = {
 
   /**
    * Get thumbnail URL for cloud images
+   * Thumbnails are publicly accessible from MinIO storage
    */
-  getThumbnailUrl(thumbnailPath: string): string {
-    return `${API_BASE_URL}${thumbnailPath}`
+  getThumbnailUrl(uuid: string, format: string): string {
+    return `${API_BASE_URL}/storage/thumbnails/${uuid}.${format}`
   },
 
   /**
-   * Get full image URL for cloud images
-   */
-  getImageUrl(filePath: string): string {
-    return `${API_BASE_URL}${filePath}`
-  },
-
-  /**
-   * Get image file URL by UUID for download
+   * Get presigned URL endpoint for cloud images
+   * Full images require a presigned URL from the server
    */
   getImageFileUrl(uuid: string): string {
     return `${API_BASE_URL}/api/images/file/uuid/${uuid}`

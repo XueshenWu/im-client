@@ -16,6 +16,7 @@ export interface ThumbnailResult {
  */
 export async function generateThumbnail(
   sourcePath: string,
+  uuid: string,
   maxWidth: number = 300
 ): Promise<ThumbnailResult> {
   try {
@@ -24,7 +25,7 @@ export async function generateThumbnail(
     }
 
     // Get image buffer from Electron
-    const result = await window.electronAPI.generateThumbnail(sourcePath);
+    const result = await window.electronAPI.generateThumbnail(sourcePath, uuid);
 
     if (!result.success || !result.imageBuffer || !result.thumbnailPath) {
       return {
@@ -106,24 +107,80 @@ export async function generateThumbnail(
   }
 }
 
+// /**
+//  * Generate thumbnails for multiple images
+//  */
+// export async function generateThumbnails(
+//   sourcePaths: string[],
+//   maxWidth: number = 300,
+//   onProgress?: (completed: number, total: number) => void
+// ): Promise<Map<string, ThumbnailResult>> {
+//   const results = new Map<string, ThumbnailResult>();
+//   let completed = 0;
+
+//   for (const sourcePath of sourcePaths) {
+//     const result = await generateThumbnail(sourcePath, maxWidth);
+//     results.set(sourcePath, result);
+
+//     completed++;
+//     onProgress?.(completed, sourcePaths.length);
+//   }
+
+//   return results;
+// }
+
 /**
- * Generate thumbnails for multiple images
+ * Generate a thumbnail blob from a File or Blob (for cloud upload)
+ * This version doesn't save to disk, just returns the blob for upload
  */
-export async function generateThumbnails(
-  sourcePaths: string[],
-  maxWidth: number = 300,
-  onProgress?: (completed: number, total: number) => void
-): Promise<Map<string, ThumbnailResult>> {
-  const results = new Map<string, ThumbnailResult>();
-  let completed = 0;
+export async function generateThumbnailBlob(
+  file: File | Blob,
+  maxWidth: number = 300
+): Promise<Blob> {
+  // Create object URL from the file
+  const imageUrl = URL.createObjectURL(file);
 
-  for (const sourcePath of sourcePaths) {
-    const result = await generateThumbnail(sourcePath, maxWidth);
-    results.set(sourcePath, result);
+  try {
+    // Load image into canvas
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageUrl;
+    });
 
-    completed++;
-    onProgress?.(completed, sourcePaths.length);
+    // Calculate thumbnail dimensions
+    const aspectRatio = img.width / img.height;
+    const thumbnailWidth = Math.min(maxWidth, img.width);
+    const thumbnailHeight = Math.round(thumbnailWidth / aspectRatio);
+
+    // Create canvas and draw resized image
+    const canvas = document.createElement('canvas');
+    canvas.width = thumbnailWidth;
+    canvas.height = thumbnailHeight;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('Failed to get canvas context');
+    }
+
+    ctx.drawImage(img, 0, 0, thumbnailWidth, thumbnailHeight);
+
+    // Convert canvas to blob
+    const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to create thumbnail blob'));
+        },
+        'image/jpeg',
+        0.8
+      );
+    });
+
+    return thumbnailBlob;
+  } finally {
+    // Clean up object URL
+    URL.revokeObjectURL(imageUrl);
   }
-
-  return results;
 }

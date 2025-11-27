@@ -150,10 +150,11 @@ export const createColumns = (
       maxSize: 60,
     },
     {
-      accessorKey: "thumbnailPath",
+      accessorKey: "uuid",
+      id: "thumbnail",
       header: () => t('table.preview'),
       cell: ({ row }) => {
-        const thumbnailUrl = imageService.getThumbnailUrl(row.original.thumbnailPath);
+        const thumbnailUrl = imageService.getThumbnailUrl(row.original.uuid, row.original.format);
         return <Thumbnail src={thumbnailUrl} />;
       },
       enableSorting: false,
@@ -162,7 +163,7 @@ export const createColumns = (
       maxSize: 100,
     },
     {
-      accessorKey: "originalName",
+      accessorKey: "filename",
       header: () => (
         <SortableHeader
           label={t('table.name')}
@@ -173,7 +174,7 @@ export const createColumns = (
         />
       ),
       cell: ({ row }) => {
-        const name = row.getValue("originalName") as string;
+        const name = row.getValue("filename") as string;
         return (
           <TooltipProvider>
             <Tooltip>
@@ -271,8 +272,23 @@ export const createColumns = (
 
         const handleDownload = async () => {
           try {
-            const imageUrl = `${imageService.getImageFileUrl(image.uuid)}?info=true`;
-            const response = await fetch(imageUrl);
+            // First, fetch the presigned URL from the endpoint
+            const endpoint = imageService.getImageFileUrl(image.uuid);
+            const presignedResponse = await fetch(endpoint);
+         
+            if (!presignedResponse.ok) {
+              console.error('Failed to get presigned URL:', presignedResponse.statusText);
+              return;
+            }
+
+            const presignedData = await presignedResponse.json();
+            if (!presignedData.success || !presignedData.data.presignedUrl) {
+              console.error('Invalid presigned URL response');
+              return;
+            }
+
+            // Now download the image using the presigned URL
+            const response = await fetch(presignedData.data.presignedUrl);
 
             if (!response.ok) {
               console.error('Download failed:', response.statusText);
@@ -283,7 +299,7 @@ export const createColumns = (
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = image.originalName;
+            link.download = image.filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -419,12 +435,34 @@ export default function DetailList() {
       let totalSize = 0;
       const invoiceItems: Array<{ name: string, size: string, format: string }> = [];
 
-      // Download each image with metadata from headers
+      // Download each image with metadata
       for (const uuid of selectedUuids) {
         try {
-          // Use ?info=true to get metadata in response headers
-          const imageUrl = `${imageService.getImageFileUrl(uuid)}?info=true`;
-          const response = await fetch(imageUrl);
+          // First, fetch the presigned URL and metadata from the endpoint
+          const endpoint = imageService.getImageFileUrl(uuid);
+          const presignedResponse = await fetch(endpoint);
+
+          if (!presignedResponse.ok) {
+            console.error(`Failed to get presigned URL for ${uuid}: ${presignedResponse.statusText}`);
+            continue;
+          }
+
+          const presignedData = await presignedResponse.json();
+          if (!presignedData.success || !presignedData.data.presignedUrl) {
+            console.error(`Invalid presigned URL response for ${uuid}`);
+            continue;
+          }
+
+          // Extract metadata from the response
+          const metadata = presignedData.data.metadata;
+          const originalName = presignedData.data.filename || `image-${uuid}.jpg`;
+          const fileSize = metadata.fileSize || 0;
+          const format = metadata.format || 'unknown';
+
+          console.log(`Extracted: name=${originalName}, size=${fileSize}, format=${format}`);
+
+          // Now download the image using the presigned URL
+          const response = await fetch(presignedData.data.presignedUrl);
 
           if (!response.ok) {
             console.error(`Failed to download image ${uuid}: ${response.statusText}`);
@@ -432,26 +470,6 @@ export default function DetailList() {
           }
 
           const blob = await response.blob();
-
-          // Debug: Log available headers
-          console.log('Available headers for', uuid);
-          response.headers.forEach((value, key) => {
-            console.log(`  ${key}: ${value}`);
-          });
-
-          // Extract metadata from response headers (try both cases as headers might be lowercase)
-          const originalName = response.headers.get('x-image-original-name') ||
-            response.headers.get('X-Image-Original-Name') ||
-            `image-${uuid}.jpg`;
-          const fileSizeStr = response.headers.get('x-image-file-size') ||
-            response.headers.get('X-Image-File-Size') ||
-            '0';
-          const fileSize = parseInt(fileSizeStr, 10);
-          const format = response.headers.get('x-image-format') ||
-            response.headers.get('X-Image-Format') ||
-            'unknown';
-
-          console.log(`Extracted: name=${originalName}, size=${fileSize}, format=${format}`);
 
           imagesFolder?.file(originalName, blob);
           totalSize += fileSize;
@@ -598,9 +616,9 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
       <div className="flex items-center justify-between shrink-0">
         <Input
           placeholder={t('table.filterByName')}
-          value={(table.getColumn("originalName")?.getFilterValue() as string) ?? ""}
+          value={(table.getColumn("filename")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("originalName")?.setFilterValue(event.target.value)
+            table.getColumn("filename")?.setFilterValue(event.target.value)
           }
           className="max-w-sm border-gray-300 ring-gray-400"
         />

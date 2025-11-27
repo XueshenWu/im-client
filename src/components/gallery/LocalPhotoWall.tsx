@@ -77,7 +77,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
             //    This replaces the old blob logic.
             if (!aspectRatio) {
                try {
-                 const tempUrl = `local-image://${img.filePath}`;
+                 const tempUrl = `local-image://${img.uuid}.${img.format}`;
                  aspectRatio = await new Promise<number>((resolve) => {
                    const image = new Image();
                    image.onload = () => resolve(image.width / image.height);
@@ -91,9 +91,8 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
 
             return {
               name: img.filename,
-              path: img.filePath, // We just pass the path now!
               size: img.fileSize,
-              preview: img.thumbnailPath,
+              format: img.format,
               aspectRatio: aspectRatio || 1,
               source: 'local' as ImageSource,
               id: img.uuid,
@@ -202,8 +201,9 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
         return;
       }
       const imagesToExport = selectedImages.map(img => ({
-        path: img.path || '',
-        name: img.name || '',
+        uuid: img.id || '',
+        format: img.format || '',
+        filename: img.name || '',
       }));
       await window.electronAPI?.exportImages(imagesToExport, destination);
       handleClearSelection();
@@ -261,7 +261,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
 
                 if (!aspectRatio) {
                   try {
-                    const tempUrl = `local-image://${img.filePath}`;
+                    const tempUrl = `local-image://${img.uuid}.${img.format}`;
                     aspectRatio = await new Promise<number>((resolve) => {
                       const image = new Image();
                       image.onload = () => resolve(image.width / image.height);
@@ -275,9 +275,8 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
 
                 return {
                   name: img.filename,
-                  path: img.filePath,
                   size: img.fileSize,
-                  preview: img.thumbnailPath,
+                  format: img.format,
                   aspectRatio: aspectRatio || 1,
                   source: 'local' as ImageSource,
                   id: img.uuid,
@@ -498,7 +497,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
             <div key={columnIndex} className="flex-1 flex flex-col gap-3" style={{ minWidth: `${columnWidth}px` }}>
               {column.map((img) => (
                 <LocalPhotoCard
-                  key={img.id || img.path}
+                  key={img.id}
                   image={img}
                   selectionMode={selectionMode}
                   isSelected={img.id ? selectedIds.has(img.id) : false}

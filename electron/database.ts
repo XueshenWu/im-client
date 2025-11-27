@@ -14,6 +14,27 @@ import type { Database } from 'sqlite3';
 let db: Database | null = null;
 
 /**
+ * Helper functions for UUID-based file path resolution
+ */
+export function getImagePath(uuid: string, format: string): string {
+  return path.join(
+    app.getPath('appData'),
+    'image-management',
+    'images',
+    `${uuid}.${format}`
+  );
+}
+
+export function getThumbnailPath(uuid: string): string {
+  return path.join(
+    app.getPath('appData'),
+    'image-management',
+    'thumbnails',
+    `${uuid}.jpg`
+  );
+}
+
+/**
  * Initialize the SQLite database
  */
 export async function initializeDatabase(): Promise<Database> {
@@ -69,9 +90,6 @@ async function createTables(database: Database): Promise<void> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       uuid TEXT UNIQUE NOT NULL,
       filename TEXT NOT NULL,
-      originalName TEXT NOT NULL,
-      filePath TEXT NOT NULL,
-      thumbnailPath TEXT NOT NULL,
       fileSize INTEGER NOT NULL,
       format TEXT NOT NULL,
       width INTEGER NOT NULL DEFAULT 0,
@@ -191,20 +209,20 @@ export const dbOperations = {
     return { images, total };
   },
 
-  async getImagePathByUUIDs(uuids: string[]): Promise<
+  async getImageFormatByUUIDs(uuids: string[]): Promise<
    {
-      filePath: string;
-      thumbnailPath: string;
+      uuid: string;
+      format: string;
     }[]
   > {
     const rows = await sql.all(
-      'SELECT uuid, filePath, thumbnailPath FROM images WHERE uuid IN (?) AND deletedAt IS NULL',
+      'SELECT uuid, format FROM images WHERE uuid IN (?) AND deletedAt IS NULL',
       [uuids]
     );
 
     return rows.map((row: any) => ({
-      filePath: row.filePath,
-      thumbnailPath: row.thumbnailPath,
+      uuid: row.uuid,
+      format: row.format,
     }));
   },
 
@@ -214,10 +232,10 @@ export const dbOperations = {
 
     const result = await sql.run(`
       INSERT INTO images (
-        uuid, filename, originalName, filePath, thumbnailPath, fileSize, format,
+        uuid, filename, fileSize, format,
         width, height, hash, mimeType, isCorrupted, createdAt, updatedAt, deletedAt, exifData
       ) VALUES (
-        $uuid, $filename, $originalName, $filePath, $thumbnailPath, $fileSize, $format,
+        $uuid, $filename, $fileSize, $format,
         $width, $height, $hash, $mimeType, $isCorrupted, $createdAt, $updatedAt, $deletedAt, $exifData
       )
     `, bindData);
@@ -238,10 +256,10 @@ export const dbOperations = {
 
         const stmt = db.prepare(`
           INSERT INTO images (
-            uuid, filename, originalName, filePath, thumbnailPath, fileSize, format,
+            uuid, filename, fileSize, format,
             width, height, hash, mimeType, isCorrupted, createdAt, updatedAt, deletedAt, exifData
           ) VALUES (
-            $uuid, $filename, $originalName, $filePath, $thumbnailPath, $fileSize, $format,
+            $uuid, $filename, $fileSize, $format,
             $width, $height, $hash, $mimeType, $isCorrupted, $createdAt, $updatedAt, $deletedAt, $exifData
           )
         `);
@@ -249,7 +267,7 @@ export const dbOperations = {
         images.forEach(img => {
           const bindData: any = {};
           Object.keys(img).forEach(k => bindData['$' + k] = img[k]);
-          
+
           stmt.run(bindData, function(this: any, err: Error | null) {
             if (err) {
               console.error('Error inserting image in transaction:', err);
@@ -305,8 +323,8 @@ export const dbOperations = {
 
   async searchImages(query: string): Promise<any[]> {
     return sql.all(
-      'SELECT * FROM images WHERE deletedAt IS NULL AND (filename LIKE ? OR originalName LIKE ?) ORDER BY createdAt DESC',
-      [`%${query}%`, `%${query}%`]
+      'SELECT * FROM images WHERE deletedAt IS NULL AND filename LIKE ? ORDER BY createdAt DESC',
+      [`%${query}%`]
     );
   },
 

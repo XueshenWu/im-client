@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { localImageService } from '@/services/localImage.service';
+import { getImageUrl, getThumbnailUrl } from '@/utils/imagePaths';
 
 interface LocalPhotoCardProps {
   image: ImageItem;
@@ -43,16 +44,15 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   const fileSize = image.size || 0;
 
   const handleDownload = async () => {
-    if (!image.path) return;
+    if (!image.id || !image.format) return;
 
     try {
-      const buffer = await window.electronAPI?.readLocalFile(image.path);
-      if (!buffer) {
-        console.error('Failed to read local file');
-        return;
-      }
+      // Construct the local-image URL and fetch it
+      const imageUrl = getImageUrl(image.id, image.format);
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error('Failed to fetch image');
 
-      const blob = new Blob([buffer]);
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -73,13 +73,6 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   };
 
 
-  const getLocalImageUrl = (path: string) => {
-    // 1. Normalize backslashes to forward slashes
-    const normalizedPath = path.replace(/\\/g, '/');
-    
-    // 2. IMPORTANT: Use 3 slashes (///) so C: is treated as a file path, not a domain
-    return `local-image:///${normalizedPath}`; 
-  };
 
   const handleSelect = () => {
     if (!selectionMode && onStartSelection && image.id) {
@@ -97,14 +90,11 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
       // Open viewer when clicking the card (not in selection mode)
       openViewer({
         uuid: image.id || '',
-        originalName: image.name || '',
         filename: image.name || '',
-        filepath: image.path || '',
         fileSize: image.size || 0,
-        format: image.name?.split('.').pop() || '',
+        format: image.format || '',
         width: 0,
         height: 0,
-        thumbnailPath: image.preview || '',
         source: 'local'
       } as any);
     }
@@ -113,14 +103,11 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   const handleViewDetails = () => {
     openViewer({
       uuid: image.id || '',
-      originalName: image.name || '',
       filename: image.name || '',
-      filepath: image.path || '',
       fileSize: image.size || 0,
-      format: image.name?.split('.').pop() || '',
+      format: image.format || '',
       width: 0,
       height: 0,
-      thumbnailPath: image.preview || '',
       source: 'local'
     } as any);
   };
@@ -149,9 +136,9 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
           }}
           onClick={handleCardClick}
         >
-          {image.preview ? (
+          {image.id ? (
             <img
-              src={getLocalImageUrl(image.preview)}
+              src={getThumbnailUrl(image.id)}
               alt={displayName}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"

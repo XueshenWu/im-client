@@ -4,12 +4,10 @@ import { Image } from './api';
 
 /**
  * Local image stored in SQLite database
- * Mirrors server Image type but with local file paths
+ * Paths are calculated on-the-fly using UUID + format
  */
 export interface LocalImage extends Omit<Image, 'id'> {
   id?: number; // SQLite ROWID, optional for new images
-  filePath: string; // Local AppData path
-  thumbnailPath: string; // Local thumbnail path
 }
 
 

@@ -16,23 +16,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readLocalFile: (path: string) => ipcRenderer.invoke('read-local-file', path),
   writeTempFile: (fileName: string, buffer: ArrayBuffer) =>
     ipcRenderer.invoke('write-temp-file', fileName, buffer),
-  saveImageBuffer: (fileName: string, buffer: ArrayBuffer) =>
-    ipcRenderer.invoke('save-image-buffer', fileName, buffer),
-  saveThumbnailBuffer: (fileName: string, buffer: ArrayBuffer) =>
-    ipcRenderer.invoke('save-thumbnail-buffer', fileName, buffer),
-  saveFilesToLocal: (filePaths: string[]) => ipcRenderer.invoke('save-files-to-local', filePaths),
+  saveImageBuffer: (uuid: string, format: string, buffer: ArrayBuffer) =>
+    ipcRenderer.invoke('save-image-buffer', uuid, format, buffer),
+  saveThumbnailBuffer: (uuid: string, buffer: ArrayBuffer) =>
+    ipcRenderer.invoke('save-thumbnail-buffer', uuid, buffer),
+  saveFilesToLocal: (files: Array<{ sourcePath: string; uuid: string; format: string }>) =>
+    ipcRenderer.invoke('save-files-to-local', files),
   getLocalImages: (options?: { limit?: number; offset?: number }) =>
     ipcRenderer.invoke('get-local-images', options),
   getDeviceId: () => ipcRenderer.invoke('get-device-id'),
-  exportImages: (images: Array<{uuid: string, filePath: string, filename: string}>, destination: string) =>
+  exportImages: (images: Array<{uuid: string, format: string, filename: string}>, destination: string) =>
     ipcRenderer.invoke('export-images', images, destination),
   getRoamPath: () => ipcRenderer.invoke('get-roam-path'),
-  saveThumbnailsToLocal: (filePaths: string[]) =>
-    ipcRenderer.invoke('save-thumbnails-to-local', filePaths),
-  generateThumbnail: (sourcePath: string) =>
-    ipcRenderer.invoke('generate-thumbnail', sourcePath),
+  saveThumbnailsToLocal: (files: Array<{ sourcePath: string; uuid: string }>) =>
+    ipcRenderer.invoke('save-thumbnails-to-local', files),
+  generateThumbnail: (sourcePath: string, uuid: string) =>
+    ipcRenderer.invoke('generate-thumbnail', sourcePath, uuid),
   saveGeneratedThumbnail: (thumbnailPath: string, buffer: ArrayBuffer) =>
     ipcRenderer.invoke('save-generated-thumbnail', thumbnailPath, buffer),
+  calculateFileHash: (filePath: string) =>
+    ipcRenderer.invoke('calculate-file-hash', filePath),
   deleteImages: (image_names: string[]) => ipcRenderer.invoke('delete-images', image_names),
 
 
@@ -41,6 +44,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     initialize: () => ipcRenderer.invoke('db:initialize'),
     getAllImages: () => ipcRenderer.invoke('db:getAllImages'),
     getImageByUuid: (uuid: string) => ipcRenderer.invoke('db:getImageByUuid', uuid),
+    getImageFormatByUUIDs: (uuids: string[]) => ipcRenderer.invoke('db:getImageFormatByUUIDs', uuids),
     getPaginatedImages: (page: number, pageSize: number, sortBy?: string, sortOrder?: string) =>
       ipcRenderer.invoke('db:getPaginatedImages', page, pageSize, sortBy, sortOrder),
     insertImage: (image: any) => ipcRenderer.invoke('db:insertImage', image),

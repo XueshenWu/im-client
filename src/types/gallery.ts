@@ -4,15 +4,14 @@ export type ImageSource = 'local' | 'cloud'
 
 export interface ImageItem {
   // Common fields
-  id?: string // For cloud images, this will be the image ID; for local, it's the path
-  path?: string // For local images
-  preview?: string
+  id?: string // UUID for both local and cloud images
   aspectRatio?: number
   source: ImageSource
 
   // Local image fields
   name?: string
   size?: number
+  format?: string // File format extension (jpg, png, etc.)
   createdAt?: string
   modifiedAt?: string
 

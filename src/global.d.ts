@@ -21,23 +21,23 @@ interface ElectronAPI {
   expandPath: (path: string, recursive?: boolean) => Promise<string[]>
   readLocalFile: (path: string) => Promise<ArrayBuffer | null>
   writeTempFile: (fileName: string, buffer: ArrayBuffer) => Promise<string | null>
-  saveImageBuffer: (fileName: string, buffer: ArrayBuffer) => Promise<string | null>
-  saveThumbnailBuffer: (fileName: string, buffer: ArrayBuffer) => Promise<string | null>
+  saveImageBuffer: (uuid: string, format: string, buffer: ArrayBuffer) => Promise<string | null>
+  saveThumbnailBuffer: (uuid: string, buffer: ArrayBuffer) => Promise<string | null>
   openDialog: () => Promise<string[]>
   selectDirectory: () => Promise<string | null>
-  saveFilesToLocal: (filePaths: string[]) => Promise<{
+  saveFilesToLocal: (files: Array<{ sourcePath: string; uuid: string; format: string }>) => Promise<{
     success: boolean
     savedFiles?: string[]
     directory?: string
     error?: string
   }>
-  saveThumbnailsToLocal: (filePaths: string[]) => Promise<{
+  saveThumbnailsToLocal: (files: Array<{ sourcePath: string; uuid: string }>) => Promise<{
     success: boolean
     savedFiles?: string[]
     directory?: string
     error?: string
   }>
-  generateThumbnail: (sourcePath: string) => Promise<{
+  generateThumbnail: (sourcePath: string, uuid: string) => Promise<{
     success: boolean
     thumbnailPath?: string
     imageBuffer?: number[]
@@ -47,6 +47,11 @@ interface ElectronAPI {
   saveGeneratedThumbnail: (thumbnailPath: string, buffer: ArrayBuffer) => Promise<{
     success: boolean
     thumbnailPath?: string
+    error?: string
+  }>
+  calculateFileHash: (filePath: string) => Promise<{
+    success: boolean
+    hash?: string
     error?: string
   }>
 
@@ -60,7 +65,7 @@ interface ElectronAPI {
   }>
   getDeviceId: () => Promise<string>
   exportImages: (
-    images: Array<{ uuid: string; filePath: string; filename: string }>,
+    images: Array<{ uuid: string; format: string; filename: string }>,
     destination: string
   ) => Promise<{
     success: boolean
@@ -76,6 +81,7 @@ interface ElectronAPI {
     initialize: () => Promise<{ success: boolean; error?: string }>
     getAllImages: () => Promise<any[]>
     getImageByUuid: (uuid: string) => Promise<any | undefined>
+    getImageFormatByUUIDs: (uuids: string[]) => Promise<Array<{ uuid: string; format: string }>>
     getPaginatedImages: (page: number, pageSize: number, sortBy?: string, sortOrder?: string) => Promise<{ images: any[]; total: number }>
     insertImage: (image: any) => Promise<any>
     insertImages: (images: any[]) => Promise<any[]>

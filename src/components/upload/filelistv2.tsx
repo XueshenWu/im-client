@@ -19,18 +19,17 @@ import {
 } from '@/components/ui/table';
 import withDropzone, { WithDropzoneProps, FileWithPreview } from '@/components/upload/dropzone';
 import {
-  uploadImages,
-  initChunkedUpload,
-  uploadChunk,
-  completeChunkedUpload,
+  requestPresignedURLs,
+  uploadToPresignedURL,
 } from '@/services/images.service';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
-import { Image } from '@/types/api';
+import type { Image } from '@/types/api';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { localImageService } from '@/services/localImage.service';
 import { LocalImage } from '@/types/local';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
-import { generateThumbnail } from '@/utils/thumbnailGenerator';
+import { generateThumbnail, generateThumbnailBlob } from '@/utils/thumbnailGenerator';
+import { v4 as uuidv4 } from 'uuid';
 
 // Upload configuration
 const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
@@ -48,9 +47,6 @@ const fileToMockImage = (file: FileWithPreview): Image => ({
   id: 0,
   uuid: file.preview,
   filename: file.name,
-  originalName: file.name,
-  filePath: '',
-  thumbnailPath: '',
   fileSize: file.size,
   format: (file.type.split('/')[1] as 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff') || 'jpg',
   width: 0,
@@ -61,7 +57,6 @@ const fileToMockImage = (file: FileWithPreview): Image => ({
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   deletedAt: null,
-  previewUrl: file.preview,
 });
 
 // Define columns for the file list table
@@ -295,7 +290,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       // Clear statuses
       setUploadStatuses(new Map());
     }
-    
+
     // Update the ref without triggering a re-render
     previousFileCountRef.current = files.length;
   }, [files.length, uploadStatuses, removeFile]);
@@ -335,42 +330,42 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   /**
    * Upload a single file using chunked upload
    */
-  const uploadFileChunked = async (file: File): Promise<void> => {
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  // const uploadFileChunked = async (file: File): Promise<void> => {
+  //   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-    // Initialize upload session
-    const session = await initChunkedUpload({
-      filename: file.name,
-      totalSize: file.size,
-      chunkSize: CHUNK_SIZE,
-      totalChunks,
-      mimeType: file.type,
-    });
+  //   // Initialize upload session
+  //   const session = await initChunkedUpload({
+  //     filename: file.name,
+  //     totalSize: file.size,
+  //     chunkSize: CHUNK_SIZE,
+  //     totalChunks,
+  //     mimeType: file.type,
+  //   });
 
-    // Upload chunks
-    for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
-      const start = chunkNumber * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const chunk = file.slice(start, end);
+  //   // Upload chunks
+  //   for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
+  //     const start = chunkNumber * CHUNK_SIZE;
+  //     const end = Math.min(start + CHUNK_SIZE, file.size);
+  //     const chunk = file.slice(start, end);
 
-      await uploadChunk(session.sessionId, chunk, chunkNumber);
+  //     await uploadChunk(session.sessionId, chunk, chunkNumber);
 
-      // Update progress
-      const progress = Math.round(((chunkNumber + 1) / totalChunks) * 100);
-      setUploadStatuses((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(file.name, {
-          fileName: file.name,
-          progress,
-          status: 'uploading',
-        });
-        return newMap;
-      });
-    }
+  //     // Update progress
+  //     const progress = Math.round(((chunkNumber + 1) / totalChunks) * 100);
+  //     setUploadStatuses((prev) => {
+  //       const newMap = new Map(prev);
+  //       newMap.set(file.name, {
+  //         fileName: file.name,
+  //         progress,
+  //         status: 'uploading',
+  //       });
+  //       return newMap;
+  //     });
+  //   }
 
-    // Complete the upload
-    await completeChunkedUpload(session.sessionId);
-  };
+  //   // Complete the upload
+  //   await completeChunkedUpload(session.sessionId);
+  // };
 
   /**
    * Handle form submission - upload all files
@@ -415,16 +410,24 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               return newMap;
             });
 
-            // Save file to AppData (if has source path)
-            let localFilePath = '';
+            // Generate UUID for this image
+            const uuid = uuidv4();
+            const format = (file.type.split('/')[1] as any) || 'jpg';
+
+            // Save file to AppData with UUID-based name (if has source path)
             if (file.sourcePath) {
-              const result = await window.electronAPI?.saveFilesToLocal([file.sourcePath]);
-              if (result?.success && result.savedFiles && result.savedFiles.length > 0) {
-                localFilePath = result.savedFiles[0];
+              const result = await window.electronAPI?.saveFilesToLocal([{
+                sourcePath: file.sourcePath,
+                uuid,
+                format,
+              }]);
+              if (!result?.success || !result.savedFiles || result.savedFiles.length === 0) {
+                throw new Error('Failed to save file to local storage');
               }
             } else {
               // File doesn't have source path (e.g., from drag-drop of blob)
               console.warn(`File ${file.name} has no source path, skipping local save`);
+              throw new Error('No source path available');
             }
 
             // Update progress - file saved
@@ -439,15 +442,13 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
             });
 
             // Generate thumbnail
-            let thumbnailPath = '';
             let imageWidth = 0;
             let imageHeight = 0;
 
             if (file.sourcePath && file.type.startsWith('image/')) {
               try {
-                const thumbnailResult = await generateThumbnail(file.sourcePath, 300);
-                if (thumbnailResult.success && thumbnailResult.thumbnailPath) {
-                  thumbnailPath = thumbnailResult.thumbnailPath;
+                const thumbnailResult = await generateThumbnail(file.sourcePath, uuid, 300);
+                if (thumbnailResult.success) {
                   imageWidth = thumbnailResult.width || 0;
                   imageHeight = thumbnailResult.height || 0;
                   console.log(`[Upload] Generated thumbnail for ${file.name}`);
@@ -472,13 +473,10 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
 
             // Create LocalImage record
             const localImage: LocalImage = {
-              uuid: crypto.randomUUID(),
+              uuid,
               filename: file.name,
-              originalName: file.name,
-              filePath: localFilePath,
-              thumbnailPath: thumbnailPath,
               fileSize: file.size,
-              format: (file.type.split('/')[1] as any) || 'jpg',
+              format,
               width: imageWidth,
               height: imageHeight,
               hash: '',
@@ -531,36 +529,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       }
 
       // CLOUD MODE: Original logic
-      // STEP 1: Always save files with paths to local storage first (for backup)
-      const filesWithPaths = files.filter(file => file.sourcePath);
 
-      let localSavedCount = 0;
 
-      // Save files to local storage if they have paths
-      if (filesWithPaths.length > 0) {
-        try {
-          const filePaths = filesWithPaths.map(file => file.sourcePath!);
-          const result = await window.electronAPI?.saveFilesToLocal(filePaths);
 
-          if (result?.success) {
-            localSavedCount = result.savedFiles?.length || 0;
-          }
-        } catch (error) {
-          console.error('Failed to save to local storage:', error);
-        }
-      }
-
-      // STEP 2: Upload to cloud - Separate files into small and large
-      const smallFiles: File[] = [];
-      const largeFiles: File[] = [];
-
-      files.forEach((file) => {
-        if (file.size < SIZE_THRESHOLD) {
-          smallFiles.push(file);
-        } else {
-          largeFiles.push(file);
-        }
-      });
 
       // Initialize upload status for all files
       const initialStatuses = new Map<string, UploadStatus>();
@@ -573,60 +544,177 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       });
       setUploadStatuses(initialStatuses);
 
-      // Upload small files using regular upload
-      if (smallFiles.length > 0) {
+      // STEP 1: Generate UUIDs, calculate hashes, dimensions, and request presigned URLs
+      const fileMetadata = await Promise.all(files.map(async (file) => {
+        const uuid = uuidv4();
+        const format = (file.type.split('/')[1] as 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff') || 'jpg';
+
+        // Calculate hash - REQUIRED for cloud upload
+        let hash = '';
+        if (!file.sourcePath) {
+          throw new Error(`File ${file.name} has no source path - cannot calculate hash`);
+        }
+
+        if (!window.electronAPI?.calculateFileHash) {
+          throw new Error('Electron API not available for hash calculation');
+        }
+
+        const hashResult = await window.electronAPI.calculateFileHash(file.sourcePath);
+        if (!hashResult.success || !hashResult.hash) {
+          throw new Error(`Failed to calculate hash for ${file.name}: ${hashResult.error || 'Unknown error'}`);
+        }
+
+        hash = hashResult.hash;
+
+        // Calculate width and height for image files
+        let width = 0;
+        let height = 0;
+
+        if (file.type.startsWith('image/')) {
+          try {
+            const imageUrl = URL.createObjectURL(file);
+            const img = new Image();
+
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => {
+                width = img.naturalWidth;
+                height = img.naturalHeight;
+                URL.revokeObjectURL(imageUrl);
+                resolve();
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(imageUrl);
+                reject(new Error('Failed to load image'));
+              };
+              img.src = imageUrl;
+            });
+          } catch (error) {
+            console.warn(`Failed to get dimensions for ${file.name}:`, error);
+            // Continue with 0x0 dimensions if we can't read them
+          }
+        }
+
+        return {
+          file,
+          uuid,
+          filename: file.name,
+          fileSize: file.size,
+          format,
+          mimeType: file.type,
+          hash,
+          width,
+          height,
+        };
+      }));
+
+      const presignedURLs = await requestPresignedURLs(fileMetadata.map(meta => ({
+        uuid: meta.uuid,
+        filename: meta.filename,
+        fileSize: meta.fileSize,
+        format: meta.format,
+        width: meta.width,
+        height: meta.height,
+        hash: meta.hash,
+        mimeType: meta.mimeType,
+        isCorrupted: false,
+      })))
+      files.forEach((file) => {
+        setUploadStatuses((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(file.name, {
+            fileName: file.name,
+            progress: 30,
+            status: 'uploading',
+          });
+          return newMap;
+        });
+      })
+
+
+
+      const presignedURLMap = new Map<string, { imageUrl: string, thumbnailUrl: string }>();
+
+      for (const url of presignedURLs) {
+        presignedURLMap.set(url.uuid, {
+          imageUrl: url.imageUrl,
+          thumbnailUrl: url.thumbnailUrl,
+        });
+      }
+     
+      // STEP 2: Upload thumbnails first, then images
+      for (const meta of fileMetadata) {
+        const file = meta.file;
         try {
-          smallFiles.forEach((file) => {
+          const urls = presignedURLMap.get(meta.uuid);
+          if (!urls) {
+            throw new Error('No presigned URLs found for file');
+          }
+
+          // Generate and upload thumbnail FIRST for image files
+          if (file.type.startsWith('image/')) {
+            // Update progress - generating thumbnail
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(file.name, {
+                fileName: file.name,
+                progress: 40,
+                status: "uploading",
+              });
+              return newMap;
+            });
+
+            // Generate thumbnail blob
+            const thumbnailBlob = await generateThumbnailBlob(file, 300);
+
+            // Update progress - uploading thumbnail
             setUploadStatuses((prev) => {
               const newMap = new Map(prev);
               newMap.set(file.name, {
                 fileName: file.name,
                 progress: 50,
-                status: 'uploading',
+                status: "uploading",
               });
               return newMap;
             });
-          });
 
-          await uploadImages(smallFiles);
+            // Upload thumbnail to presigned URL - ABORT if this fails
+            const thumbnailSuccess = await uploadToPresignedURL(urls.thumbnailUrl, thumbnailBlob, true);
 
-          // Mark as completed and track count
-          smallFiles.forEach((file) => {
-            completedCount++;
+            if (!thumbnailSuccess) {
+              throw new Error('Failed to upload thumbnail');
+            }
+
+            // Update progress after thumbnail upload
             setUploadStatuses((prev) => {
               const newMap = new Map(prev);
               newMap.set(file.name, {
                 fileName: file.name,
-                progress: 100,
-                status: 'completed',
+                progress: 60,
+                status: "uploading",
               });
               return newMap;
             });
-          });
-        } catch (error) {
-          console.error('Regular upload failed:', error);
-          smallFiles.forEach((file) => {
-            failedCount++;
-            setUploadStatuses((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(file.name, {
-                fileName: file.name,
-                progress: 0,
-                status: 'failed',
-                error: error instanceof Error ? error.message : 'Upload failed',
-              });
-              return newMap;
+          }
+
+          // Now upload the image (only if thumbnail succeeded)
+          const imageSuccess = await uploadToPresignedURL(urls.imageUrl, file);
+
+          if (!imageSuccess) {
+            throw new Error('Failed to upload image');
+          }
+
+          // Update progress after image upload
+          setUploadStatuses((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(file.name, {
+              fileName: file.name,
+              progress: 90,
+              status: "uploading",
             });
+            return newMap;
           });
-        }
-      }
 
-      // Upload large files using chunked upload
-      for (const file of largeFiles) {
-        try {
-          await uploadFileChunked(file);
-
-          // Mark as completed and track count
+          // Mark as completed
           completedCount++;
           setUploadStatuses((prev) => {
             const newMap = new Map(prev);
@@ -637,8 +725,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
             });
             return newMap;
           });
+
         } catch (error) {
-          console.error(`Chunked upload failed for ${file.name}:`, error);
+          console.error(`Upload failed for ${file.name}:`, error);
           failedCount++;
           setUploadStatuses((prev) => {
             const newMap = new Map(prev);
@@ -652,6 +741,11 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           });
         }
       }
+
+
+
+
+
 
       // Show completion message using tracked counts
       if (failedCount === 0) {

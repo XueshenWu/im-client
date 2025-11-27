@@ -1,5 +1,5 @@
 import api from './api'
-import {
+import type {
   ApiResponse,
   ApiListResponse,
   Image,
@@ -15,6 +15,7 @@ import {
   CancelChunkedUploadResponse,
   UploadImagesResponse,
   GetImagesByUUIDResponse,
+  PreSignURLsResponse,
 } from '@/types/api'
 
 /**
@@ -93,6 +94,36 @@ export const deleteImagesByUuid = async (uuids: string[]): Promise<{ success: bo
 }
 
 /**
+ * request minio URLs for upload
+ * insert metadata into db with status:pending
+ */
+export const requestPresignedURLs = async (images: Omit<Image, "status" | "createdAt" | "updatedAt" | "deletedAt" | "id">[]): Promise<PreSignURLsResponse['data']> => {
+  const response = await api.post<PreSignURLsResponse>('/api/images/presignUrls', { images })
+  return response.data.data
+}
+
+// upload to presigned minio put url with mimetype
+export const uploadToPresignedURL = async (url: string, file: File | Blob, thumbnail?: boolean): Promise<boolean> => {
+  try {
+    // For presigned URLs, we send the file/blob directly as the body, not in FormData
+    const contentType = thumbnail ? "image/jpeg" : file instanceof File ? file.type : 'image/jpeg';
+    await api.put(url, file, {
+      headers: {
+        'Content-Type': contentType,
+      },
+    })
+    return true
+  } catch (error) {
+    console.error('Error uploading to presigned URL:', error);
+    return false
+  }
+
+}
+
+
+
+
+/**
  * Upload images (multipart form-data)
  */
 export const uploadImages = async (files: File[], uuids?: string[]): Promise<UploadImagesResponse> => {
@@ -142,226 +173,87 @@ export const batchUpload = async (config: Record<string, any>): Promise<any> => 
 }
 
 /**
- * Replace an existing image with a new file
+ * Replace an existing image with a new file using presigned URLs
+ * Server returns presigned URLs for uploading the new image and thumbnail
  */
 export const replaceImage = async (uuid: string, file: File): Promise<Image> => {
-  const formData = new FormData()
-  formData.append('image', file)
+  // Calculate file metadata
+  const format = file.name.split('.').pop()?.toLowerCase() || 'jpg';
 
-  const response = await api.put<ApiResponse<Image>>(
-    `/api/images/uuid/${uuid}/replace`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
-  )
-
-  return response.data.data
-}
-
-// ===== Chunked Upload APIs =====
-
-/**
- * Initialize a chunked upload session
- * @param request Upload session initialization parameters
- * @returns Upload session details including sessionId
- */
-export const initChunkedUpload = async (
-  request: InitChunkedUploadRequest
-): Promise<InitChunkedUploadResponse['data']> => {
-  const response = await api.post<InitChunkedUploadResponse>(
-    '/api/images/chunked/init',
-    request
-  )
-  return response.data.data
-}
-
-/**
- * Upload a single chunk to an existing session
- * @param sessionId Upload session ID
- * @param chunk File chunk as Blob
- * @param chunkNumber Zero-based chunk index
- * @returns Upload progress information
- */
-export const uploadChunk = async (
-  sessionId: string,
-  chunk: Blob,
-  chunkNumber: number
-): Promise<UploadChunkResponse['data']> => {
-  const formData = new FormData()
-  formData.append('chunk', chunk)
-  formData.append('chunkNumber', chunkNumber.toString())
-
-  const response = await api.post<UploadChunkResponse>(
-    `/api/images/chunked/upload/${sessionId}`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
-  )
-  return response.data.data
-}
-
-/**
- * Complete chunked upload and assemble the file
- * @param sessionId Upload session ID
- * @returns The created Image object
- */
-export const completeChunkedUpload = async (
-  sessionId: string
-): Promise<Image> => {
-  const response = await api.post<CompleteChunkedUploadResponse>(
-    `/api/images/chunked/complete/${sessionId}`
-  )
-  return response.data.data
-}
-
-/**
- * Get the status of an upload session
- * @param sessionId Upload session ID
- * @returns Current upload session status
- */
-export const getChunkedUploadStatus = async (
-  sessionId: string
-): Promise<ChunkedUploadStatus['data']> => {
-  const response = await api.get<ChunkedUploadStatus>(
-    `/api/images/chunked/status/${sessionId}`
-  )
-  return response.data.data
-}
-
-/**
- * Cancel and cleanup an upload session
- * @param sessionId Upload session ID
- * @returns Cancellation confirmation
- */
-export const cancelChunkedUpload = async (
-  sessionId: string
-): Promise<CancelChunkedUploadResponse> => {
-  const response = await api.delete<CancelChunkedUploadResponse>(
-    `/api/images/chunked/${sessionId}`
-  )
-  return response.data
-}
-
-// ===== Chunked Replace APIs =====
-
-/**
- * Initialize a chunked replace session
- */
-export const initChunkedReplace = async (
-  uuid: string,
-  request: InitChunkedUploadRequest
-): Promise<InitChunkedUploadResponse['data']> => {
-  const response = await api.post<InitChunkedUploadResponse>(
-    `/api/images/uuid/${uuid}/chunked-replace/init`,
-    request
-  )
-  return response.data.data
-}
-
-/**
- * Upload a chunk for replace session
- */
-export const uploadChunkedReplaceChunk = async (
-  uuid: string,
-  sessionId: string,
-  chunk: Blob,
-  chunkNumber: number
-): Promise<UploadChunkResponse['data']> => {
-  const formData = new FormData()
-  formData.append('chunk', chunk)
-  formData.append('chunkNumber', chunkNumber.toString())
-
-  const response = await api.post<UploadChunkResponse>(
-    `/api/images/uuid/${uuid}/chunked-replace/upload/${sessionId}`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
-  )
-  return response.data.data
-}
-
-/**
- * Complete chunked replace
- */
-export const completeChunkedReplace = async (
-  uuid: string,
-  sessionId: string
-): Promise<Image> => {
-  const response = await api.post<CompleteChunkedUploadResponse>(
-    `/api/images/uuid/${uuid}/chunked-replace/complete/${sessionId}`
-  )
-  return response.data.data
-}
-
-// ===== Helper Functions =====
-
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB threshold
-
-/**
- * Upload a file using chunked upload if above threshold
- */
-export const uploadImageAuto = async (file: File): Promise<Image> => {
-  if (file.size > SIZE_THRESHOLD) {
-    return uploadImageChunked(file);
+  // Calculate dimensions
+  let width = 0, height = 0;
+  if (file.type.startsWith('image/')) {
+    const imageUrl = URL.createObjectURL(file);
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => {
+        width = img.naturalWidth;
+        height = img.naturalHeight;
+        URL.revokeObjectURL(imageUrl);
+        resolve();
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(imageUrl);
+        reject(new Error('Failed to load image'));
+      };
+      img.src = imageUrl;
+    });
   }
-  const response = await uploadImages([file]);
-  // Handle both response formats: { data: Image[] } or { data: { uploaded: Image[] } }
-  const images = response.data as Image[] | { uploaded: Image[] };
-  if (response.success && images) {
-    const uploadedImages = Array.isArray(images) ? images : images.uploaded;
-    if (uploadedImages && uploadedImages.length > 0) {
-      return uploadedImages[0];
-    }
-  }
-  throw new Error(response.message || 'Upload failed');
-}
 
-/**
- * Upload a large file using chunked upload
- */
-export const uploadImageChunked = async (file: File): Promise<Image> => {
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  // Calculate file hash using Web Crypto API
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // Initialize session
-  const session = await initChunkedUpload({
+  // Request presigned URLs from the replace endpoint
+  const response = await api.put<{
+    success: boolean;
+    message: string;
+    data: {
+      image: Image;
+      uploadUrls: {
+        imageUrl: string;
+        thumbnailUrl: string;
+        expiresIn: number;
+      };
+    };
+  }>(`/api/images/uuid/${uuid}/replace`, {
     filename: file.name,
-    totalSize: file.size,
-    chunkSize: CHUNK_SIZE,
-    totalChunks,
+    fileSize: file.size,
+    format,
+    width,
+    height,
+    hash,
     mimeType: file.type,
   });
 
-  // Upload each chunk
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
-    await uploadChunk(session.sessionId, chunk, i);
+  if (!response.data.success) {
+    throw new Error(response.data.message || 'Failed to get replace URLs');
   }
 
-  // Complete upload
-  return completeChunkedUpload(session.sessionId);
+  const { uploadUrls, image } = response.data.data;
+
+  // Generate and upload thumbnail first
+  const { generateThumbnailBlob } = await import('@/utils/thumbnailGenerator');
+  const thumbnailBlob = await generateThumbnailBlob(file, 300);
+  const thumbnailSuccess = await uploadToPresignedURL(uploadUrls.thumbnailUrl, thumbnailBlob, true);
+
+  if (!thumbnailSuccess) {
+    throw new Error('Failed to upload thumbnail');
+  }
+
+  // Upload the new image
+  const imageSuccess = await uploadToPresignedURL(uploadUrls.imageUrl, file, false);
+
+  if (!imageSuccess) {
+    throw new Error('Failed to upload replacement image');
+  }
+
+  return image;
 }
 
-/**
- * Replace an image using chunked upload if above threshold
- */
-export const replaceImageAuto = async (uuid: string, file: File): Promise<Image> => {
-  if (file.size > SIZE_THRESHOLD) {
-    return replaceImageChunked(uuid, file);
-  }
-  return replaceImage(uuid, file);
-}
+
 
 export const getImagesByUuid = async (uuids: string[]): Promise<Image[]> => {
   const response = await api.post<GetImagesByUUIDResponse>('/api/images/batch', {
@@ -369,31 +261,234 @@ export const getImagesByUuid = async (uuids: string[]): Promise<Image[]> => {
   })
   return response.data.data
 }
+// ===== Chunked Upload APIs =====
 
+// /**
+//  * Initialize a chunked upload session
+//  * @param request Upload session initialization parameters
+//  * @returns Upload session details including sessionId
+//  */
+// export const initChunkedUpload = async (
+//   request: InitChunkedUploadRequest
+// ): Promise<InitChunkedUploadResponse['data']> => {
+//   const response = await api.post<InitChunkedUploadResponse>(
+//     '/api/images/chunked/init',
+//     request
+//   )
+//   return response.data.data
+// }
+
+// /**
+//  * Upload a single chunk to an existing session
+//  * @param sessionId Upload session ID
+//  * @param chunk File chunk as Blob
+//  * @param chunkNumber Zero-based chunk index
+//  * @returns Upload progress information
+//  */
+// export const uploadChunk = async (
+//   sessionId: string,
+//   chunk: Blob,
+//   chunkNumber: number
+// ): Promise<UploadChunkResponse['data']> => {
+//   const formData = new FormData()
+//   formData.append('chunk', chunk)
+//   formData.append('chunkNumber', chunkNumber.toString())
+
+//   const response = await api.post<UploadChunkResponse>(
+//     `/api/images/chunked/upload/${sessionId}`,
+//     formData,
+//     {
+//       headers: {
+//         'Content-Type': 'multipart/form-data',
+//       },
+//     }
+//   )
+//   return response.data.data
+// }
+
+// /**
+//  * Complete chunked upload and assemble the file
+//  * @param sessionId Upload session ID
+//  * @returns The created Image object
+//  */
+// export const completeChunkedUpload = async (
+//   sessionId: string
+// ): Promise<Image> => {
+//   const response = await api.post<CompleteChunkedUploadResponse>(
+//     `/api/images/chunked/complete/${sessionId}`
+//   )
+//   return response.data.data
+// }
+
+// /**
+//  * Get the status of an upload session
+//  * @param sessionId Upload session ID
+//  * @returns Current upload session status
+//  */
+// export const getChunkedUploadStatus = async (
+//   sessionId: string
+// ): Promise<ChunkedUploadStatus['data']> => {
+//   const response = await api.get<ChunkedUploadStatus>(
+//     `/api/images/chunked/status/${sessionId}`
+//   )
+//   return response.data.data
+// }
+
+// /**
+//  * Cancel and cleanup an upload session
+//  * @param sessionId Upload session ID
+//  * @returns Cancellation confirmation
+//  */
+// export const cancelChunkedUpload = async (
+//   sessionId: string
+// ): Promise<CancelChunkedUploadResponse> => {
+//   const response = await api.delete<CancelChunkedUploadResponse>(
+//     `/api/images/chunked/${sessionId}`
+//   )
+//   return response.data
+// }
+
+
+// ===== Chunked Replace APIs =====
+
+// /**
+//  * Initialize a chunked replace session
+//  */
+// export const initChunkedReplace = async (
+//   uuid: string,
+//   request: InitChunkedUploadRequest
+// ): Promise<InitChunkedUploadResponse['data']> => {
+//   const response = await api.post<InitChunkedUploadResponse>(
+//     `/api/images/uuid/${uuid}/chunked-replace/init`,
+//     request
+//   )
+//   return response.data.data
+// }
+
+// /**
+//  * Upload a chunk for replace session
+//  */
+// export const uploadChunkedReplaceChunk = async (
+//   uuid: string,
+//   sessionId: string,
+//   chunk: Blob,
+//   chunkNumber: number
+// ): Promise<UploadChunkResponse['data']> => {
+//   const formData = new FormData()
+//   formData.append('chunk', chunk)
+//   formData.append('chunkNumber', chunkNumber.toString())
+
+//   const response = await api.post<UploadChunkResponse>(
+//     `/api/images/uuid/${uuid}/chunked-replace/upload/${sessionId}`,
+//     formData,
+//     {
+//       headers: {
+//         'Content-Type': 'multipart/form-data',
+//       },
+//     }
+//   )
+//   return response.data.data
+// }
+
+// /**
+//  * Complete chunked replace
+//  */
+// export const completeChunkedReplace = async (
+//   uuid: string,
+//   sessionId: string
+// ): Promise<Image> => {
+//   const response = await api.post<CompleteChunkedUploadResponse>(
+//     `/api/images/uuid/${uuid}/chunked-replace/complete/${sessionId}`
+//   )
+//   return response.data.data
+// }
+
+// ===== Helper Functions =====
+
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB threshold
 
 /**
- * Replace an image using chunked upload
+//  * Upload a file using chunked upload if above threshold
+//  */
+// export const uploadImageAuto = async (file: File): Promise<Image> => {
+//   if (file.size > SIZE_THRESHOLD) {
+//     return uploadImageChunked(file);
+//   }
+//   const response = await uploadImages([file]);
+//   // Handle both response formats: { data: Image[] } or { data: { uploaded: Image[] } }
+//   const images = response.data as Image[] | { uploaded: Image[] };
+//   if (response.success && images) {
+//     const uploadedImages = Array.isArray(images) ? images : images.uploaded;
+//     if (uploadedImages && uploadedImages.length > 0) {
+//       return uploadedImages[0];
+//     }
+//   }
+//   throw new Error(response.message || 'Upload failed');
+// }
+
+/**
+ * Upload a large file using chunked upload
  */
-export const replaceImageChunked = async (uuid: string, file: File): Promise<Image> => {
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+// export const uploadImageChunked = async (file: File): Promise<Image> => {
+//   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-  // Initialize session
-  const session = await initChunkedReplace(uuid, {
-    filename: file.name,
-    totalSize: file.size,
-    chunkSize: CHUNK_SIZE,
-    totalChunks,
-    mimeType: file.type,
-  });
+//   // Initialize session
+//   const session = await initChunkedUpload({
+//     filename: file.name,
+//     totalSize: file.size,
+//     chunkSize: CHUNK_SIZE,
+//     totalChunks,
+//     mimeType: file.type,
+//   });
 
-  // Upload each chunk
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
-    await uploadChunkedReplaceChunk(uuid, session.sessionId, chunk, i);
-  }
+//   // Upload each chunk
+//   for (let i = 0; i < totalChunks; i++) {
+//     const start = i * CHUNK_SIZE;
+//     const end = Math.min(start + CHUNK_SIZE, file.size);
+//     const chunk = file.slice(start, end);
+//     await uploadChunk(session.sessionId, chunk, i);
+//   }
 
-  // Complete replace
-  return completeChunkedReplace(uuid, session.sessionId);
-}
+//   // Complete upload
+//   return completeChunkedUpload(session.sessionId);
+// }
+
+// /**
+//  * Replace an image using chunked upload if above threshold
+//  */
+// export const replaceImageAuto = async (uuid: string, file: File): Promise<Image> => {
+//   if (file.size > SIZE_THRESHOLD) {
+//     return replaceImageChunked(uuid, file);
+//   }
+//   return replaceImage(uuid, file);
+// }
+
+
+
+// /**
+//  * Replace an image using chunked upload
+//  */
+// export const replaceImageChunked = async (uuid: string, file: File): Promise<Image> => {
+//   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+//   // Initialize session
+//   const session = await initChunkedReplace(uuid, {
+//     filename: file.name,
+//     totalSize: file.size,
+//     chunkSize: CHUNK_SIZE,
+//     totalChunks,
+//     mimeType: file.type,
+//   });
+
+//   // Upload each chunk
+//   for (let i = 0; i < totalChunks; i++) {
+//     const start = i * CHUNK_SIZE;
+//     const end = Math.min(start + CHUNK_SIZE, file.size);
+//     const chunk = file.slice(start, end);
+//     await uploadChunkedReplaceChunk(uuid, session.sessionId, chunk, i);
+//   }
+
+//   // Complete replace
+//   return completeChunkedReplace(uuid, session.sessionId);
+// }

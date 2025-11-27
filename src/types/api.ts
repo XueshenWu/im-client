@@ -22,9 +22,6 @@ export interface Image {
   id: number
   uuid: string
   filename: string
-  originalName: string
-  filePath: string
-  thumbnailPath: string
   fileSize: number
   format: 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff'
   width: number
@@ -36,7 +33,7 @@ export interface Image {
   updatedAt: string
   deletedAt: string | null
   exifData?: ExifData
-  previewUrl?: string
+  presignedUrl?: string
 }
 
 export interface ExifData {
@@ -79,9 +76,13 @@ export interface GetImagesParams {
 
 export interface UpdateImageRequest {
   filename?: string
-  originalName?: string
 }
 
+
+
+
+
+// FIXME 
 export interface GetImagesByUUIDResponse {
   success: boolean
   data: Image[]
@@ -146,7 +147,6 @@ export interface ChunkedUploadStatus {
   data: {
     sessionId: string
     filename: string
-    originalName: string
     status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'expired'
     uploadedChunks: number
     totalChunks: number
@@ -167,6 +167,19 @@ export interface UploadImagesResponse {
   message: string
   data?: Image[]
 }
+
+export interface PreSignURLsResponse {
+  success: boolean,
+  data: {
+    imageUrl: string;
+    thumbnailUrl: string;
+    objectName: string;
+    bucketName: string;
+    uuid: string;
+}[]
+
+}
+
 
 // Pagination Types
 export interface PaginationMeta {

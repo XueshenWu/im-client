@@ -98,43 +98,9 @@ const SortableHeader = ({
   );
 };
 
-// Local Thumbnail component for local files
-const LocalThumbnail = ({ path }: { path: string }) => {
-  const [imgSrc, setImgSrc] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let mounted = true;
-    let objectUrl: string | null = null;
-
-    const loadThumbnail = async () => {
-      try {
-        const buffer = await window.electronAPI?.readLocalFile(path);
-        if (buffer && mounted) {
-          const blob = new Blob([buffer]);
-          objectUrl = URL.createObjectURL(blob);
-          setImgSrc(objectUrl);
-        }
-      } catch (error) {
-        console.error('Failed to load thumbnail:', error);
-      }
-    };
-
-    loadThumbnail();
-
-    // Cleanup
-    return () => {
-      mounted = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [path]);
-
-  if (!imgSrc) {
-    return <div className="h-14 w-14 animate-pulse rounded bg-gray-200" />;
-  }
-
-  return <img src={imgSrc} alt="thumbnail" className="h-14 w-14 rounded object-cover" />;
+// Local Thumbnail component for local files (using UUID-based protocol)
+const LocalThumbnail = ({ uuid }: { uuid: string }) => {
+  return <img src={`local-thumbnail://${uuid}`} alt="thumbnail" className="h-14 w-14 rounded object-cover" />;
 };
 
 // Create columns for local detail list (similar to DetailList but with LocalThumbnail)
@@ -173,10 +139,10 @@ const createLocalColumns = (
     maxSize: 60,
   },
   {
-    accessorKey: "thumbnailPath",
+    accessorKey: "uuid",
     header: () => t('table.preview'),
     cell: ({ row }) => {
-      return <LocalThumbnail path={row.original.thumbnailPath} />;
+      return <LocalThumbnail uuid={row.original.uuid} />;
     },
     enableSorting: false,
     size: 100,
@@ -184,7 +150,7 @@ const createLocalColumns = (
     maxSize: 100,
   },
   {
-    accessorKey: "originalName",
+    accessorKey: "filename",
     header: () => (
       <SortableHeader
         label={t('table.name')}
@@ -195,7 +161,7 @@ const createLocalColumns = (
       />
     ),
     cell: ({ row }) => {
-      const name = row.getValue("originalName") as string;
+      const name = row.getValue("filename") as string;
       return (
         <TooltipProvider>
           <Tooltip>
@@ -293,14 +259,15 @@ const createLocalColumns = (
 
       const handleDownload = async () => {
         try {
-          const buffer = await window.electronAPI?.readLocalFile(image.filePath);
-          if (!buffer) return;
+          const imageUrl = `local-image://${image.uuid}.${image.format}`;
+          const response = await fetch(imageUrl);
+          if (!response.ok) return;
 
-          const blob = new Blob([buffer]);
+          const blob = await response.blob();
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = image.originalName;
+          link.download = image.filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -392,9 +359,6 @@ export default function LocalDetailList() {
         id: localImg.id,
         uuid: localImg.uuid,
         filename: localImg.filename,
-        originalName: localImg.originalName,
-        filePath: localImg.filePath,
-        thumbnailPath: localImg.thumbnailPath,
         fileSize: localImg.fileSize,
         format: localImg.format,
         width: localImg.width,
@@ -473,8 +437,8 @@ export default function LocalDetailList() {
 
       const imagesToExport = selectedImages.map(img => ({
         uuid: img.uuid,
-        filePath: img.filePath,
-        filename: img.originalName,
+        format: img.format,
+        filename: img.filename,
       }));
 
       const result = await window.electronAPI?.exportImages(imagesToExport, destination);
@@ -582,9 +546,9 @@ export default function LocalDetailList() {
       <div className="flex items-center justify-between shrink-0">
         <Input
           placeholder={t('table.filterByName')}
-          value={(table.getColumn("originalName")?.getFilterValue() as string) ?? ""}
+          value={(table.getColumn("filename")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("originalName")?.setFilterValue(event.target.value)
+            table.getColumn("filename")?.setFilterValue(event.target.value)
           }
           className="max-w-sm border-gray-300 ring-gray-400"
         />
