@@ -9,8 +9,8 @@ import {
   ContextMenuTrigger,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import { imageService } from '@/services/api';
-import { deleteImage } from '@/services/images.service';
+
+import { deleteImages } from '@/services/images.service';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
@@ -44,11 +44,20 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   const displayName = cloudData?.filename || 'Unknown';
   const fileSize = cloudData?.fileSize;
 
+
+  const handleCardClick = () =>{
+    if (!selectionMode){
+      return
+    }else{
+      handleSelect()
+    }
+  }
+
   const handleDownload = async () => {
     if (!cloudData?.uuid) return;
 
     try {
-      debugger
+
 
       const endpoint = getCloudImagePresignedUrlEndpoint(cloudData.uuid);
       let response = await fetch(endpoint);
@@ -95,7 +104,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
     }
   };
 
-  const handleCardClick = (e: React.MouseEvent) => {
+  const handleCardDoubleClick = (e: React.MouseEvent) => {
     if (selectionMode && onSelect && image.id) {
       e.preventDefault();
       onSelect(image.id);
@@ -111,13 +120,15 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
     }
   };
 
+ 
+
   const handleDelete = async () => {
     if (!cloudData?.id) return;
 
     if (!window.confirm(t('viewer.confirmDelete'))) return;
 
     try {
-      await deleteImage(cloudData.id);
+      await deleteImages([cloudData.uuid]);
       triggerRefresh();
     } catch (error) {
       console.error('Delete error:', error);
@@ -133,6 +144,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
             width: '100%',
             aspectRatio: image.aspectRatio || 1,
           }}
+          onDoubleClick={handleCardDoubleClick}
           onClick={handleCardClick}
         >
           {cloudData?.uuid ? (
@@ -152,6 +164,9 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           {selectionMode && (
             <div className="absolute top-2 right-2 z-10">
               <Checkbox
+                onClick={(e)=>{
+                  e.stopPropagation()
+                }}
                 checked={isSelected}
                 onCheckedChange={() => onSelect && image.id && onSelect(image.id)}
                 className="bg-white border-2 border-gray-300"
@@ -172,21 +187,20 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           </div>
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className='*:cursor-pointer *:hover:bg-gray-100'>
         {!selectionMode && (
           <>
             <ContextMenuItem onClick={handleSelect}>
               <CheckSquare className="mr-2 h-4 w-4" />
               {t('contextMenu.select')}
             </ContextMenuItem>
-            <ContextMenuSeparator />
+
           </>
         )}
         <ContextMenuItem onClick={handleCopyId}>
           <Copy className="mr-2 h-4 w-4" />
           {t('contextMenu.copyId')}
         </ContextMenuItem>
-        <ContextMenuSeparator />
         <ContextMenuItem onClick={handleViewDetails}>
           <Eye className="mr-2 h-4 w-4" />
           {t('contextMenu.viewDetails')}

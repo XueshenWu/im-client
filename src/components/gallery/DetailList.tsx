@@ -14,11 +14,11 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive } from "lucide-react"
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive, Copy } from "lucide-react"
 import JSZip from 'jszip'
 import { useImageViewerStore } from '@/stores/imageViewerStore'
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
-import { deleteImagesByUuid } from '@/services/images.service'
+import { deleteImages } from '@/services/images.service'
 import {
   Table,
   TableBody,
@@ -317,14 +317,15 @@ export const createColumns = (
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="*:cursor-pointer *:hover:bg-gray-100">
+             
               <DropdownMenuItem
                 onClick={() => navigator.clipboard.writeText(image.uuid)}
               >
+                <Copy className="mr-2 h-4 w-4" />
                 {t('contextMenu.copyId')}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+            
               <DropdownMenuItem onClick={() => onViewImage(image)}>
                 <Eye className="mr-2 h-4 w-4" />
                 {t('contextMenu.viewDetails')}
@@ -540,7 +541,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     try {
       setIsLoading(true);
 
-      await deleteImagesByUuid(selectedUuids);
+      await deleteImages(selectedUuids);
 
       // Clear selection and refresh data
       setRowSelection({});

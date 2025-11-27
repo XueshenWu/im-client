@@ -22,7 +22,7 @@ import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
-import { replaceImage, deleteImage } from '@/services/images.service';
+import { replaceImages, deleteImages } from '@/services/images.service';
 import { createCroppedImage, blobToFile } from '@/utils/cropImage';
 import { format } from 'date-fns';
 import { localImageService } from '@/services/localImage.service';
@@ -229,10 +229,18 @@ export const ImageViewer: React.FC = () => {
       } else {
         // CLOUD MODE: Upload to cloud using presigned URLs
         if (replaceOriginal) {
-          // Replace the original image using presigned URLs
-          await replaceImage(currentImage.uuid, croppedFile);
+          // Replace the original image using replaceImages
+          const result = await replaceImages([{
+            uuid: currentImage.uuid,
+            file: croppedFile,
+          }]);
+
+          if (result.stats.failed > 0) {
+            const error = result.errors[0];
+            throw new Error(error?.error || 'Failed to replace image');
+          }
         } else {
-          // Upload as new image using presigned URL workflow
+          // Upload as new image using requestPresignedURLs
           const { requestPresignedURLs, uploadToPresignedURL } = await import('@/services/images.service');
           const { generateThumbnailBlob } = await import('@/utils/thumbnailGenerator');
 
@@ -426,7 +434,7 @@ export const ImageViewer: React.FC = () => {
         await localImageService.deleteImage(currentImage.uuid);
       } else {
         // CLOUD MODE: Delete from cloud
-        await deleteImage(currentImage.id);
+        await deleteImages([currentImage.uuid]);
       }
 
       triggerRefresh();

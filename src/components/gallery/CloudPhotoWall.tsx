@@ -7,7 +7,7 @@ import CloudPhotoCard from './CloudPhotoCard';
 import { imageService } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
-import { deleteImagesByUuid } from '@/services/images.service';
+import { deleteImages } from '@/services/images.service';
 import JSZip from 'jszip';
 import { format } from 'date-fns';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose, DrawerBody } from '@/components/ui/drawer';
@@ -323,7 +323,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
         return;
       }
 
-      await deleteImagesByUuid(uuids);
+      await deleteImages(uuids);
 
       // Reset state and trigger reload
       setImages([]);

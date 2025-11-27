@@ -5,18 +5,98 @@ import type {
   Image,
   ImageStats,
   GetImagesParams,
-  UpdateImageRequest,
-  DeleteImageResponse,
-  InitChunkedUploadRequest,
-  InitChunkedUploadResponse,
-  UploadChunkResponse,
-  CompleteChunkedUploadResponse,
-  ChunkedUploadStatus,
-  CancelChunkedUploadResponse,
-  UploadImagesResponse,
   GetImagesByUUIDResponse,
   PreSignURLsResponse,
+  ExifData,
 } from '@/types/api'
+import exifr from 'exifr'
+
+/**
+ * Extract EXIF data from an image file
+ */
+export const extractExifData = async (file: File): Promise<ExifData | undefined> => {
+  try {
+    if (!file.type.startsWith('image/')) {
+      return undefined;
+    }
+
+    const exif = await exifr.parse(file, {
+      pick: [
+        'Make', 'Model', 'LensModel',
+        'Artist', 'Copyright', 'Software',
+        'ISO',
+        'ExposureTime', 'FNumber', 'FocalLength',
+        'DateTimeOriginal',
+        'Orientation',
+        'GPSLatitude', 'GPSLongitude', 'GPSAltitude',
+        'WhiteBalance', 'Flash', 'ExposureMode', 'MeteringMode', 'ColorSpace'
+      ]
+    });
+
+    if (!exif) return undefined;
+
+    // Map exifr output to our ExifData type
+    const exifData: any = {};
+
+    if (exif.Make) exifData.cameraMake = exif.Make;
+    if (exif.Model) exifData.cameraModel = exif.Model;
+    if (exif.LensModel) exifData.lensModel = exif.LensModel;
+
+    if (exif.Artist) exifData.artist = exif.Artist;
+    if (exif.Copyright) exifData.copyright = exif.Copyright;
+    if (exif.Software) exifData.software = exif.Software;
+
+    if (exif.ISO) exifData.iso = exif.ISO;
+
+    // Convert exposure time to shutter speed format
+    if (exif.ExposureTime) {
+      if (exif.ExposureTime < 1) {
+        exifData.shutterSpeed = `1/${Math.round(1 / exif.ExposureTime)}`;
+      } else {
+        exifData.shutterSpeed = `${exif.ExposureTime}s`;
+      }
+    }
+
+    // Convert F-number to aperture format
+    if (exif.FNumber) {
+      exifData.aperture = `f/${exif.FNumber}`;
+    }
+
+    // Convert focal length to string format
+    if (exif.FocalLength) {
+      exifData.focalLength = `${exif.FocalLength}mm`;
+    }
+
+    // Convert DateTimeOriginal to ISO 8601
+    if (exif.DateTimeOriginal) {
+      exifData.dateTaken = new Date(exif.DateTimeOriginal).toISOString();
+    }
+
+    if (exif.Orientation) exifData.orientation = exif.Orientation;
+
+    // GPS coordinates
+    if (exif.GPSLatitude !== undefined) exifData.gpsLatitude = String(exif.GPSLatitude);
+    if (exif.GPSLongitude !== undefined) exifData.gpsLongitude = String(exif.GPSLongitude);
+    if (exif.GPSAltitude !== undefined) exifData.gpsAltitude = String(exif.GPSAltitude);
+
+    // Additional metadata in extra field
+    const extra: any = {};
+    if (exif.WhiteBalance !== undefined) extra.whiteBalance = exif.WhiteBalance;
+    if (exif.Flash !== undefined) extra.flash = exif.Flash;
+    if (exif.ExposureMode !== undefined) extra.exposureMode = exif.ExposureMode;
+    if (exif.MeteringMode !== undefined) extra.meteringMode = exif.MeteringMode;
+    if (exif.ColorSpace !== undefined) extra.colorSpace = exif.ColorSpace;
+
+    if (Object.keys(extra).length > 0) {
+      exifData.extra = extra;
+    }
+
+    return Object.keys(exifData).length > 0 ? exifData : undefined;
+  } catch (error) {
+    console.warn(`Failed to extract EXIF data from ${file.name}:`, error);
+    return undefined;
+  }
+};
 
 /**
  * Get all images with optional EXIF data
@@ -37,14 +117,6 @@ export const getImageStats = async (): Promise<ImageStats> => {
 }
 
 /**
- * Get image by ID
- */
-export const getImageById = async (id: number): Promise<Image> => {
-  const response = await api.get<ApiResponse<Image>>(`/api/images/${id}`)
-  return response.data.data
-}
-
-/**
  * Get image by UUID
  */
 export const getImageByUuid = async (uuid: string): Promise<Image> => {
@@ -53,56 +125,66 @@ export const getImageByUuid = async (uuid: string): Promise<Image> => {
 }
 
 /**
- * Update image metadata
+ * Get multiple images by UUIDs
  */
-export const updateImage = async (
-  id: number,
-  data: UpdateImageRequest
-): Promise<Image> => {
-  const response = await api.put<ApiResponse<Image>>(`/api/images/${id}`, data)
+export const getImagesByUuid = async (uuids: string[], withExif?: boolean): Promise<Image[]> => {
+  const response = await api.post<GetImagesByUUIDResponse>('/api/images/batch/get/uuids', {
+    uuids,
+  }, {
+    params: { withExif }
+  })
   return response.data.data
 }
 
 /**
- * Delete image (soft delete)
+ * Update image EXIF data (single or batch)
+ * Uses unified endpoint - array length determines if it's single or batch operation
  */
-export const deleteImage = async (id: number): Promise<DeleteImageResponse> => {
-  const response = await api.delete<DeleteImageResponse>(`/api/images/${id}`)
-  return response.data
+export const updateImageExif = async (
+  updates: Array<{ uuid: string; exifData: Partial<ExifData> }>
+): Promise<{ updated: Image[]; stats: { requested: number; successful: number; failed: number }; errors: Array<{ uuid: string; error: string }> }> => {
+  const response = await api.patch<{
+    success: boolean;
+    message: string;
+    data: {
+      updated: Image[];
+      stats: { requested: number; successful: number; failed: number };
+      errors: Array<{ uuid: string; error: string }>;
+    };
+  }>('/api/images/update/exif', { updates })
+  return response.data.data
 }
 
 /**
- * Delete multiple images by ID (batch soft delete)
+ * Delete images (single or batch)
+ * Uses unified endpoint - array length determines if it's single or batch operation
  */
-export const deleteImages = async (ids: number[]): Promise<{ success: boolean; message: string; deleted: number }> => {
-  const response = await api.post<{ success: boolean; message: string; deleted: number }>(
-    '/api/images/batch/delete/ids',
-    { ids }
-  )
-  return response.data
+export const deleteImages = async (uuids: string[]): Promise<{ deleted: Image[]; stats: { requested: number; successful: number; failed: number } }> => {
+  const response = await api.delete<{
+    success: boolean;
+    message: string;
+    data: {
+      deleted: Image[];
+      stats: { requested: number; successful: number; failed: number };
+    };
+  }>('/api/images/delete', {
+    data: { uuids }
+  })
+  return response.data.data
 }
 
 /**
- * Delete multiple images by UUID (batch soft delete)
- */
-export const deleteImagesByUuid = async (uuids: string[]): Promise<{ success: boolean; message: string; deleted: number }> => {
-  const response = await api.post<{ success: boolean; message: string; deleted: number }>(
-    '/api/images/batch/delete/uuids',
-    { uuids }
-  )
-  return response.data
-}
-
-/**
- * request minio URLs for upload
- * insert metadata into db with status:pending
+ * Request presigned URLs for upload
+ * Insert metadata into db with status:pending
  */
 export const requestPresignedURLs = async (images: Omit<Image, "status" | "createdAt" | "updatedAt" | "deletedAt" | "id">[]): Promise<PreSignURLsResponse['data']> => {
   const response = await api.post<PreSignURLsResponse>('/api/images/presignUrls', { images })
   return response.data.data
 }
 
-// upload to presigned minio put url with mimetype
+/**
+ * Upload to presigned MinIO PUT URL with mimetype
+ */
 export const uploadToPresignedURL = async (url: string, file: File | Blob, thumbnail?: boolean): Promise<boolean> => {
   try {
     // For presigned URLs, we send the file/blob directly as the body, not in FormData
@@ -117,378 +199,212 @@ export const uploadToPresignedURL = async (url: string, file: File | Blob, thumb
     console.error('Error uploading to presigned URL:', error);
     return false
   }
-
-}
-
-
-
-
-/**
- * Upload images (multipart form-data)
- */
-export const uploadImages = async (files: File[], uuids?: string[]): Promise<UploadImagesResponse> => {
-  const formData = new FormData()
-
-  // Debug: Log what we're uploading
-  console.log('Uploading files:', files.length, 'files')
-
-  files.forEach((file, index) => {
-    console.log(`File ${index}:`, file.name, file.type, file.size)
-    formData.append('images', file)
-  })
-
-  // Include UUIDs if provided (for local mode sync)
-  if (uuids && uuids.length > 0) {
-    const uuidsJson = JSON.stringify(uuids)
-    formData.append('uuids', uuidsJson)
-    console.log('Including UUIDs:', uuids)
-    console.log('UUIDs JSON string:', uuidsJson)
-  }
-
-  // Debug: Log FormData contents
-  console.log('FormData entries:')
-  for (const pair of formData.entries()) {
-    if (pair[0] === 'uuids') {
-      console.log('uuids:', pair[1])
-    } else {
-      console.log(pair[0], ':', typeof pair[1] === 'object' ? `File(${(pair[1] as File).name})` : pair[1])
-    }
-  }
-
-  const response = await api.post<UploadImagesResponse>('/api/images/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  })
-
-  return response.data
 }
 
 /**
- * Batch upload from folder config
+ * Replace images (single or batch) - Complete workflow with file uploads
+ * Accepts files, calculates metadata, gets presigned URLs, and uploads
+ * Uses unified endpoint - array length determines if it's single or batch operation
  */
-export const batchUpload = async (config: Record<string, any>): Promise<any> => {
-  const response = await api.post('/api/images/batch', config)
-  return response.data
-}
+export const replaceImages = async (
+  replacements: Array<{
+    uuid: string;
+    file: File | Blob;
+  }>
+): Promise<{
+  replaced: Image[];
+  stats: { requested: number; successful: number; failed: number };
+  errors: Array<{ uuid: string; error: string }>;
+}> => {
+  // Process all files to extract metadata
+  const replacementRequests = await Promise.all(
+    replacements.map(async ({ uuid, file }) => {
+      const isFile = file instanceof File;
+      const filename = isFile ? file.name : 'image.jpg';
+      const format = filename.split('.').pop()?.toLowerCase() || 'jpg';
 
-/**
- * Replace an existing image with a new file using presigned URLs
- * Server returns presigned URLs for uploading the new image and thumbnail
- */
-export const replaceImage = async (uuid: string, file: File): Promise<Image> => {
-  // Calculate file metadata
-  const format = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      // Calculate dimensions
+      let width = 0, height = 0;
+      const imageUrl = URL.createObjectURL(file);
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          width = img.naturalWidth;
+          height = img.naturalHeight;
+          URL.revokeObjectURL(imageUrl);
+          resolve();
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(imageUrl);
+          reject(new Error('Failed to load image'));
+        };
+        img.src = imageUrl;
+      });
 
-  // Calculate dimensions
-  let width = 0, height = 0;
-  if (file.type.startsWith('image/')) {
-    const imageUrl = URL.createObjectURL(file);
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => {
-        width = img.naturalWidth;
-        height = img.naturalHeight;
-        URL.revokeObjectURL(imageUrl);
-        resolve();
+      // Calculate file hash using Web Crypto API
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // Extract EXIF data (only for File objects)
+      const exifData = isFile ? await extractExifData(file as File) : undefined;
+
+      return {
+        uuid,
+        filename,
+        format,
+        mimeType: file.type || 'image/jpeg',
+        width,
+        height,
+        fileSize: file.size,
+        hash,
+        exifData,
       };
-      img.onerror = () => {
-        URL.revokeObjectURL(imageUrl);
-        reject(new Error('Failed to load image'));
-      };
-      img.src = imageUrl;
-    });
-  }
+    })
+  );
 
-  // Calculate file hash using Web Crypto API
-  const arrayBuffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-  // Request presigned URLs from the replace endpoint
-  const response = await api.put<{
+  // Request presigned URLs from the server
+  const response = await api.patch<{
     success: boolean;
     message: string;
     data: {
-      image: Image;
-      uploadUrls: {
-        imageUrl: string;
-        thumbnailUrl: string;
-        expiresIn: number;
-      };
+      replaced: Array<{
+        image: Image;
+        uploadUrls: {
+          imageUrl: string;
+          thumbnailUrl: string;
+          expiresIn: number;
+        };
+      }>;
+      stats: { requested: number; successful: number; failed: number };
+      errors: Array<{ uuid: string; error: string }>;
     };
-  }>(`/api/images/uuid/${uuid}/replace`, {
-    filename: file.name,
-    fileSize: file.size,
-    format,
-    width,
-    height,
-    hash,
-    mimeType: file.type,
-  });
+  }>('/api/images/replace', { replacements: replacementRequests });
 
-  if (!response.data.success) {
-    throw new Error(response.data.message || 'Failed to get replace URLs');
-  }
+  const result = response.data.data;
 
-  const { uploadUrls, image } = response.data.data;
-
-  // Generate and upload thumbnail first
+  // Upload files to presigned URLs
   const { generateThumbnailBlob } = await import('@/utils/thumbnailGenerator');
-  const thumbnailBlob = await generateThumbnailBlob(file, 300);
-  const thumbnailSuccess = await uploadToPresignedURL(uploadUrls.thumbnailUrl, thumbnailBlob, true);
+  const uploadedImages: Image[] = [];
+  const uploadErrors: Array<{ uuid: string; error: string }> = [...result.errors];
 
-  if (!thumbnailSuccess) {
-    throw new Error('Failed to upload thumbnail');
+  for (let i = 0; i < result.replaced.length; i++) {
+    const replacement = result.replaced[i];
+    const originalFile = replacements[i].file;
+
+    try {
+      // Generate and upload thumbnail first
+      const thumbnailBlob = await generateThumbnailBlob(originalFile, 300);
+      const thumbnailSuccess = await uploadToPresignedURL(
+        replacement.uploadUrls.thumbnailUrl,
+        thumbnailBlob,
+        true
+      );
+
+      if (!thumbnailSuccess) {
+        throw new Error('Failed to upload thumbnail');
+      }
+
+      // Upload the image
+      const imageSuccess = await uploadToPresignedURL(
+        replacement.uploadUrls.imageUrl,
+        originalFile,
+        false
+      );
+
+      if (!imageSuccess) {
+        throw new Error('Failed to upload image');
+      }
+
+      uploadedImages.push(replacement.image);
+    } catch (error) {
+      uploadErrors.push({
+        uuid: replacement.image.uuid,
+        error: error instanceof Error ? error.message : 'Upload failed',
+      });
+    }
   }
 
-  // Upload the new image
-  const imageSuccess = await uploadToPresignedURL(uploadUrls.imageUrl, file, false);
-
-  if (!imageSuccess) {
-    throw new Error('Failed to upload replacement image');
-  }
-
-  return image;
+  return {
+    replaced: uploadedImages,
+    stats: {
+      requested: replacements.length,
+      successful: uploadedImages.length,
+      failed: uploadErrors.length,
+    },
+    errors: uploadErrors,
+  };
 }
 
 
-
-export const getImagesByUuid = async (uuids: string[]): Promise<Image[]> => {
-  const response = await api.post<GetImagesByUUIDResponse>('/api/images/batch', {
-    uuids,
-  })
-  return response.data.data
-}
-// ===== Chunked Upload APIs =====
-
-// /**
-//  * Initialize a chunked upload session
-//  * @param request Upload session initialization parameters
-//  * @returns Upload session details including sessionId
-//  */
-// export const initChunkedUpload = async (
-//   request: InitChunkedUploadRequest
-// ): Promise<InitChunkedUploadResponse['data']> => {
-//   const response = await api.post<InitChunkedUploadResponse>(
-//     '/api/images/chunked/init',
-//     request
-//   )
-//   return response.data.data
-// }
-
-// /**
-//  * Upload a single chunk to an existing session
-//  * @param sessionId Upload session ID
-//  * @param chunk File chunk as Blob
-//  * @param chunkNumber Zero-based chunk index
-//  * @returns Upload progress information
-//  */
-// export const uploadChunk = async (
-//   sessionId: string,
-//   chunk: Blob,
-//   chunkNumber: number
-// ): Promise<UploadChunkResponse['data']> => {
-//   const formData = new FormData()
-//   formData.append('chunk', chunk)
-//   formData.append('chunkNumber', chunkNumber.toString())
-
-//   const response = await api.post<UploadChunkResponse>(
-//     `/api/images/chunked/upload/${sessionId}`,
-//     formData,
-//     {
-//       headers: {
-//         'Content-Type': 'multipart/form-data',
-//       },
-//     }
-//   )
-//   return response.data.data
-// }
-
-// /**
-//  * Complete chunked upload and assemble the file
-//  * @param sessionId Upload session ID
-//  * @returns The created Image object
-//  */
-// export const completeChunkedUpload = async (
-//   sessionId: string
-// ): Promise<Image> => {
-//   const response = await api.post<CompleteChunkedUploadResponse>(
-//     `/api/images/chunked/complete/${sessionId}`
-//   )
-//   return response.data.data
-// }
-
-// /**
-//  * Get the status of an upload session
-//  * @param sessionId Upload session ID
-//  * @returns Current upload session status
-//  */
-// export const getChunkedUploadStatus = async (
-//   sessionId: string
-// ): Promise<ChunkedUploadStatus['data']> => {
-//   const response = await api.get<ChunkedUploadStatus>(
-//     `/api/images/chunked/status/${sessionId}`
-//   )
-//   return response.data.data
-// }
-
-// /**
-//  * Cancel and cleanup an upload session
-//  * @param sessionId Upload session ID
-//  * @returns Cancellation confirmation
-//  */
-// export const cancelChunkedUpload = async (
-//   sessionId: string
-// ): Promise<CancelChunkedUploadResponse> => {
-//   const response = await api.delete<CancelChunkedUploadResponse>(
-//     `/api/images/chunked/${sessionId}`
-//   )
-//   return response.data
-// }
-
-
-// ===== Chunked Replace APIs =====
-
-// /**
-//  * Initialize a chunked replace session
-//  */
-// export const initChunkedReplace = async (
-//   uuid: string,
-//   request: InitChunkedUploadRequest
-// ): Promise<InitChunkedUploadResponse['data']> => {
-//   const response = await api.post<InitChunkedUploadResponse>(
-//     `/api/images/uuid/${uuid}/chunked-replace/init`,
-//     request
-//   )
-//   return response.data.data
-// }
-
-// /**
-//  * Upload a chunk for replace session
-//  */
-// export const uploadChunkedReplaceChunk = async (
-//   uuid: string,
-//   sessionId: string,
-//   chunk: Blob,
-//   chunkNumber: number
-// ): Promise<UploadChunkResponse['data']> => {
-//   const formData = new FormData()
-//   formData.append('chunk', chunk)
-//   formData.append('chunkNumber', chunkNumber.toString())
-
-//   const response = await api.post<UploadChunkResponse>(
-//     `/api/images/uuid/${uuid}/chunked-replace/upload/${sessionId}`,
-//     formData,
-//     {
-//       headers: {
-//         'Content-Type': 'multipart/form-data',
-//       },
-//     }
-//   )
-//   return response.data.data
-// }
-
-// /**
-//  * Complete chunked replace
-//  */
-// export const completeChunkedReplace = async (
-//   uuid: string,
-//   sessionId: string
-// ): Promise<Image> => {
-//   const response = await api.post<CompleteChunkedUploadResponse>(
-//     `/api/images/uuid/${uuid}/chunked-replace/complete/${sessionId}`
-//   )
-//   return response.data.data
-// }
-
-// ===== Helper Functions =====
-
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB threshold
-
 /**
-//  * Upload a file using chunked upload if above threshold
-//  */
-// export const uploadImageAuto = async (file: File): Promise<Image> => {
-//   if (file.size > SIZE_THRESHOLD) {
-//     return uploadImageChunked(file);
-//   }
-//   const response = await uploadImages([file]);
-//   // Handle both response formats: { data: Image[] } or { data: { uploaded: Image[] } }
-//   const images = response.data as Image[] | { uploaded: Image[] };
-//   if (response.success && images) {
-//     const uploadedImages = Array.isArray(images) ? images : images.uploaded;
-//     if (uploadedImages && uploadedImages.length > 0) {
-//       return uploadedImages[0];
-//     }
-//   }
-//   throw new Error(response.message || 'Upload failed');
-// }
-
-/**
- * Upload a large file using chunked upload
+ * Request download URLs with metadata and EXIF data
  */
-// export const uploadImageChunked = async (file: File): Promise<Image> => {
-//   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+export const requestDownloadUrls = async (
+  uuids: string[],
+  expiry?: number
+): Promise<Array<{
+  uuid: string;
+  filename: string;
+  downloadUrl: string;
+  expiresIn: number;
+  metadata: any;
+  exifData: ExifData | null;
+}>> => {
+  const response = await api.post<{
+    success: boolean;
+    count: number;
+    data: {
+      downloads: Array<{
+        uuid: string;
+        filename: string;
+        downloadUrl: string;
+        expiresIn: number;
+        metadata: any;
+        exifData: ExifData | null;
+      }>;
+      stats: { requested: number; successful: number; failed: number };
+      errors: Array<{ uuid: string; error: string }>;
+    };
+  }>('/api/images/requestDownloadUrls', { uuids }, {
+    params: { expiry }
+  })
+  return response.data.data.downloads
+}
 
-//   // Initialize session
-//   const session = await initChunkedUpload({
-//     filename: file.name,
-//     totalSize: file.size,
-//     chunkSize: CHUNK_SIZE,
-//     totalChunks,
-//     mimeType: file.type,
-//   });
+/**
+ * Get minimal metadata for all images (for efficient sync state comparison)
+ */
+export const getImagesMetadata = async (
+  since?: number
+): Promise<{
+  data: Array<{
+    uuid: string;
+    hash: string;
+    updatedAt: string;
+    fileSize: number;
+  }>;
+  currentSequence: number;
+  count: number;
+}> => {
+  const response = await api.get<{
+    success: boolean;
+    count: number;
+    currentSequence: number;
+    data: Array<{
+      uuid: string;
+      hash: string;
+      updatedAt: string;
+      fileSize: number;
+    }>;
+  }>('/api/images/metadata', {
+    params: { since }
+  })
+  return {
+    data: response.data.data,
+    currentSequence: response.data.currentSequence,
+    count: response.data.count,
+  }
+}
 
-//   // Upload each chunk
-//   for (let i = 0; i < totalChunks; i++) {
-//     const start = i * CHUNK_SIZE;
-//     const end = Math.min(start + CHUNK_SIZE, file.size);
-//     const chunk = file.slice(start, end);
-//     await uploadChunk(session.sessionId, chunk, i);
-//   }
-
-//   // Complete upload
-//   return completeChunkedUpload(session.sessionId);
-// }
-
-// /**
-//  * Replace an image using chunked upload if above threshold
-//  */
-// export const replaceImageAuto = async (uuid: string, file: File): Promise<Image> => {
-//   if (file.size > SIZE_THRESHOLD) {
-//     return replaceImageChunked(uuid, file);
-//   }
-//   return replaceImage(uuid, file);
-// }
-
-
-
-// /**
-//  * Replace an image using chunked upload
-//  */
-// export const replaceImageChunked = async (uuid: string, file: File): Promise<Image> => {
-//   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-
-//   // Initialize session
-//   const session = await initChunkedReplace(uuid, {
-//     filename: file.name,
-//     totalSize: file.size,
-//     chunkSize: CHUNK_SIZE,
-//     totalChunks,
-//     mimeType: file.type,
-//   });
-
-//   // Upload each chunk
-//   for (let i = 0; i < totalChunks; i++) {
-//     const start = i * CHUNK_SIZE;
-//     const end = Math.min(start + CHUNK_SIZE, file.size);
-//     const chunk = file.slice(start, end);
-//     await uploadChunkedReplaceChunk(uuid, session.sessionId, chunk, i);
-//   }
-
-//   // Complete replace
-//   return completeChunkedReplace(uuid, session.sessionId);
-// }

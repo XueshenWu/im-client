@@ -5,7 +5,7 @@
 import { localImageService } from './localImage.service';
 import { localDatabase } from './localDatabase.service';
 import { stateDiffService } from './stateDiff.service';
-import { getImages, uploadImages, getImageByUuid, getImagesByUuid } from './images.service';
+import { getImages, } from './images.service';
 import { getSyncStatus } from './sync.service';
 import { LocalImage, StateDiff } from '../types/local';
 import { Image } from '../types/api';

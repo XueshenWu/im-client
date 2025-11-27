@@ -30,6 +30,7 @@ import { LocalImage } from '@/types/local';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { generateThumbnail, generateThumbnailBlob } from '@/utils/thumbnailGenerator';
 import { v4 as uuidv4 } from 'uuid';
+import exifr from 'exifr';
 
 // Upload configuration
 const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
@@ -42,6 +43,93 @@ interface UploadStatus {
   status: 'staged' | 'pending' | 'uploading' | 'completed' | 'failed';
   error?: string;
 }
+
+/**
+ * Extract EXIF data from an image file
+ */
+const extractExifData = async (file: File): Promise<any> => {
+  try {
+    if (!file.type.startsWith('image/')) {
+      return undefined;
+    }
+
+    const exif = await exifr.parse(file, {
+      pick: [
+        'Make', 'Model', 'LensModel',
+        'Artist', 'Copyright', 'Software',
+        'ISO',
+        'ExposureTime', 'FNumber', 'FocalLength',
+        'DateTimeOriginal',
+        'Orientation',
+        'GPSLatitude', 'GPSLongitude', 'GPSAltitude',
+        'WhiteBalance', 'Flash', 'ExposureMode', 'MeteringMode', 'ColorSpace'
+      ]
+    });
+
+    if (!exif) return undefined;
+
+    // Map exifr output to our ExifData type
+    const exifData: any = {};
+
+    if (exif.Make) exifData.cameraMake = exif.Make;
+    if (exif.Model) exifData.cameraModel = exif.Model;
+    if (exif.LensModel) exifData.lensModel = exif.LensModel;
+
+    if (exif.Artist) exifData.artist = exif.Artist;
+    if (exif.Copyright) exifData.copyright = exif.Copyright;
+    if (exif.Software) exifData.software = exif.Software;
+
+    if (exif.ISO) exifData.iso = exif.ISO;
+
+    // Convert exposure time to shutter speed format
+    if (exif.ExposureTime) {
+      if (exif.ExposureTime < 1) {
+        exifData.shutterSpeed = `1/${Math.round(1 / exif.ExposureTime)}`;
+      } else {
+        exifData.shutterSpeed = `${exif.ExposureTime}s`;
+      }
+    }
+
+    // Convert F-number to aperture format
+    if (exif.FNumber) {
+      exifData.aperture = `f/${exif.FNumber}`;
+    }
+
+    // Convert focal length to string format
+    if (exif.FocalLength) {
+      exifData.focalLength = `${exif.FocalLength}mm`;
+    }
+
+    // Convert DateTimeOriginal to ISO 8601
+    if (exif.DateTimeOriginal) {
+      exifData.dateTaken = new Date(exif.DateTimeOriginal).toISOString();
+    }
+
+    if (exif.Orientation) exifData.orientation = exif.Orientation;
+
+    // GPS coordinates
+    if (exif.GPSLatitude !== undefined) exifData.gpsLatitude = String(exif.GPSLatitude);
+    if (exif.GPSLongitude !== undefined) exifData.gpsLongitude = String(exif.GPSLongitude);
+    if (exif.GPSAltitude !== undefined) exifData.gpsAltitude = String(exif.GPSAltitude);
+
+    // Additional metadata in extra field
+    const extra: any = {};
+    if (exif.WhiteBalance !== undefined) extra.whiteBalance = exif.WhiteBalance;
+    if (exif.Flash !== undefined) extra.flash = exif.Flash;
+    if (exif.ExposureMode !== undefined) extra.exposureMode = exif.ExposureMode;
+    if (exif.MeteringMode !== undefined) extra.meteringMode = exif.MeteringMode;
+    if (exif.ColorSpace !== undefined) extra.colorSpace = exif.ColorSpace;
+
+    if (Object.keys(extra).length > 0) {
+      exifData.extra = extra;
+    }
+
+    return Object.keys(exifData).length > 0 ? exifData : undefined;
+  } catch (error) {
+    console.warn(`Failed to extract EXIF data from ${file.name}:`, error);
+    return undefined;
+  }
+};
 
 const fileToMockImage = (file: FileWithPreview): Image => ({
   id: 0,
@@ -544,7 +632,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       });
       setUploadStatuses(initialStatuses);
 
-      // STEP 1: Generate UUIDs, calculate hashes, dimensions, and request presigned URLs
+      // STEP 1: Generate UUIDs, calculate hashes, dimensions, extract EXIF, and request presigned URLs
       const fileMetadata = await Promise.all(files.map(async (file) => {
         const uuid = uuidv4();
         const format = (file.type.split('/')[1] as 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff') || 'jpg';
@@ -594,6 +682,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           }
         }
 
+        // Extract EXIF data
+        const exifData = await extractExifData(file);
+
         return {
           file,
           uuid,
@@ -604,6 +695,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           hash,
           width,
           height,
+          exifData,
         };
       }));
 
@@ -617,6 +709,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         hash: meta.hash,
         mimeType: meta.mimeType,
         isCorrupted: false,
+        exifData: meta.exifData,
       })))
       files.forEach((file) => {
         setUploadStatuses((prev) => {

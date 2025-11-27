@@ -31,7 +31,7 @@ export function getLocalThumbnailUrl(uuid: string): string {
  * Cloud thumbnails are publicly accessible from MinIO
  */
 export function getCloudThumbnailUrl(uuid: string, format: string): string {
-  return `${API_BASE_URL}/storage/thumbnails/${uuid}.${format}`;
+  return `${API_BASE_URL}/storage/thumbnails/${uuid}.${format}?t=${new Date().getTime()}}`;
 }
 
 /**
