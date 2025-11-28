@@ -178,7 +178,7 @@ export const ImageViewer: React.FC = () => {
         // Save the cropped image buffer using UUID
         const savedPath = await window.electronAPI?.saveImageBuffer(
           imageUuid,
-          format === 'png' ? 'png' : 'jpg',
+          format === 'png' ? 'png' : 'jpeg',
           arrayBuffer
         );
 
@@ -214,7 +214,7 @@ export const ImageViewer: React.FC = () => {
             uuid: imageUuid,
             filename: fileName,
             fileSize: croppedFile.size,
-            format: (format === 'png' ? 'png' : 'jpg') as any,
+            format: (format === 'png' ? 'png' : 'jpeg') as any,
             width: imageWidth,
             height: imageHeight,
             hash: '',
@@ -223,6 +223,8 @@ export const ImageViewer: React.FC = () => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             deletedAt: null,
+            pageCount:1,
+            exifData:currentImage.exifData
           };
           await localImageService.addImage(newImage);
         }
@@ -246,7 +248,7 @@ export const ImageViewer: React.FC = () => {
 
           // Generate UUID and calculate metadata
           const newUuid = uuidv4();
-          const imageFormat = format === 'png' ? 'png' : 'jpg';
+          const imageFormat = format === 'png' ? 'png' : 'jpeg';
 
           // Calculate dimensions from the cropped blob
           const img = new Image();
@@ -377,13 +379,11 @@ export const ImageViewer: React.FC = () => {
     try {
       if (isLocalImage) {
         // Fetch using the local-image:// protocol
-        const response = await fetch(imageUrl);
-        if (!response.ok) {
-          console.error('Failed to fetch local image');
-          return;
+        const buffer = await window.electronAPI?.loadLocalImage(currentImage.uuid, currentImage.format)
+        if (!buffer) {
+          throw "cannot read file"
         }
-
-        const blob = await response.blob();
+        const blob = new Blob([buffer as unknown as BlobPart], { type: currentImage.mimeType });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -706,19 +706,21 @@ export const ImageViewer: React.FC = () => {
               <div>
                 <div className="text-gray-400">{t('viewer.dimensions')}</div>
                 <div className="font-medium">
-                  {currentImage.width} × {currentImage.height}
+                  {currentImage.tiffDimensions && currentImage.tiffDimensions.length > 0
+                    ? `${currentImage.tiffDimensions[0].width} × ${currentImage.tiffDimensions[0].height} (Page 1/${currentImage.pageCount || 1})`
+                    : `${currentImage.width || 0} × ${currentImage.height || 0}`}
                 </div>
               </div>
               <div>
                 <div className="text-gray-400">{t('viewer.uploaded')}</div>
                 <div className="font-medium">
-                  {format(new Date(currentImage.createdAt), 'yyyy-MM-dd HH:mm')}
+                  {currentImage.createdAt ? format(new Date(currentImage.createdAt), 'yyyy-MM-dd HH:mm') : 'N/A'}
                 </div>
               </div>
               <div>
                 <div className="text-gray-400">{t('viewer.modified')}</div>
                 <div className="font-medium">
-                  {format(new Date(currentImage.updatedAt), 'yyyy-MM-dd HH:mm')}
+                  {currentImage.updatedAt ? format(new Date(currentImage.updatedAt), 'yyyy-MM-dd HH:mm') : 'N/A'}
                 </div>
               </div>
             </div>

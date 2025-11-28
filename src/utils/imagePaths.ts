@@ -3,7 +3,7 @@
  *
  * Local mode:
  * - local-image://{uuid}.{format} - for full-size images
- * - local-thumbnail://{uuid} - for thumbnails (always .jpg)
+ * - local-thumbnail://{uuid} - for thumbnails (always .jpeg)
  *
  * Cloud mode:
  * - Thumbnails: {API_URL}/storage/thumbnails/{uuid}.{ext} - public
@@ -29,9 +29,10 @@ export function getLocalThumbnailUrl(uuid: string): string {
 /**
  * Get the public URL for a cloud thumbnail
  * Cloud thumbnails are publicly accessible from MinIO
+ * Note: Thumbnails are always stored as .jpeg regardless of source image format
  */
 export function getCloudThumbnailUrl(uuid: string, format: string): string {
-  return `${API_BASE_URL}/storage/thumbnails/${uuid}.${format}?t=${new Date().getTime()}}`;
+  return `${API_BASE_URL}/storage/thumbnails/${uuid}.jpeg?t=${new Date().getTime()}}`;
 }
 
 /**

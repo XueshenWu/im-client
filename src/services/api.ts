@@ -149,9 +149,10 @@ export const imageService = {
   /**
    * Get thumbnail URL for cloud images
    * Thumbnails are publicly accessible from MinIO storage
+   * Note: Thumbnails are always stored as .jpeg regardless of source image format
    */
   getThumbnailUrl(uuid: string, format: string): string {
-    return `${API_BASE_URL}/storage/thumbnails/${uuid}.${format}`
+    return `${API_BASE_URL}/storage/thumbnails/${uuid}.jpeg`
   },
 
   /**

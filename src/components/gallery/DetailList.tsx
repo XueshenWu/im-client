@@ -54,7 +54,9 @@ import {
 } from "@/components/ui/tooltip"
 import { imageService } from "@/services/api"
 import { Image, PagePaginationMeta } from "@/types/api"
+import { ImageWithSource } from "@/types/gallery"
 import { format } from 'date-fns'
+import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
 
 // Helper function to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -120,8 +122,8 @@ export const createColumns = (
   sortOrder: 'asc' | 'desc',
   onSort: (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => void,
   t: (key: string) => string,
-  onViewImage: (image: Image) => void
-): ColumnDef<Image>[] => [
+  onViewImage: (image: ImageWithSource) => void
+): ColumnDef<ImageWithSource>[] => [
     {
       id: "select",
       header: ({ table }) => (
@@ -275,7 +277,7 @@ export const createColumns = (
             // First, fetch the presigned URL from the endpoint
             const endpoint = imageService.getImageFileUrl(image.uuid);
             const presignedResponse = await fetch(endpoint);
-         
+
             if (!presignedResponse.ok) {
               console.error('Failed to get presigned URL:', presignedResponse.statusText);
               return;
@@ -318,14 +320,14 @@ export const createColumns = (
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="*:cursor-pointer *:hover:bg-gray-100">
-             
+
               <DropdownMenuItem
                 onClick={() => navigator.clipboard.writeText(image.uuid)}
               >
                 <Copy className="mr-2 h-4 w-4" />
                 {t('contextMenu.copyId')}
               </DropdownMenuItem>
-            
+
               <DropdownMenuItem onClick={() => onViewImage(image)}>
                 <Eye className="mr-2 h-4 w-4" />
                 {t('contextMenu.viewDetails')}
@@ -351,6 +353,7 @@ export const createColumns = (
 export default function DetailList() {
   const { t } = useTranslation()
   const { openViewer } = useImageViewerStore()
+  const { openTiffViewer } = useTiffImageViewerStore()
   const { refreshTrigger } = useGalleryRefreshStore()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -362,7 +365,7 @@ export default function DetailList() {
   const [sortBy, setSortBy] = React.useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('createdAt')
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
 
-  const [data, setData] = React.useState<Image[]>([])
+  const [data, setData] = React.useState<ImageWithSource[]>([])
   const [pagination, setPagination] = React.useState<PagePaginationMeta>({
     page: 1,
     pageSize: 5,
@@ -381,7 +384,15 @@ export default function DetailList() {
         params.sortOrder = order || 'desc';
       }
       const response = await imageService.getPagePaginatedImages(params);
-      setData(response.data);
+
+      // Convert API images to ImageWithSource format
+      const cloudImages: ImageWithSource[] = response.data.map((img: Image) => ({
+        ...img,
+        aspectRatio: img.width && img.height ? img.width / img.height : undefined,
+        source: 'cloud' as const,
+      }));
+
+      setData(cloudImages);
       setPagination(response.pagination);
     } catch (error) {
       console.error("Failed to fetch images:", error);
@@ -456,7 +467,7 @@ export default function DetailList() {
 
           // Extract metadata from the response
           const metadata = presignedData.data.metadata;
-          const originalName = presignedData.data.filename || `image-${uuid}.jpg`;
+          const originalName = presignedData.data.filename || `image-${uuid}.jpeg`;
           const fileSize = metadata.fileSize || 0;
           const format = metadata.format || 'unknown';
 
@@ -554,9 +565,18 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     }
   };
 
-  const handleViewImage = React.useCallback((image: Image) => {
-    openViewer(image, data);
-  }, [openViewer, data]);
+  const handleViewImage = React.useCallback((image: ImageWithSource) => {
+
+    if (image.format === 'tiff') {
+      openTiffViewer(image)
+      return
+    } else {
+
+      openViewer(image, data);
+    }
+
+
+  }, [openViewer, openTiffViewer, data]);
 
   // Create columns with current sort state
   const columns = React.useMemo(
@@ -642,7 +662,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             {t('table.export')} ({Object.keys(rowSelection).length})
           </Button>
           <Button
-              className=" border-gray-200 border hover:bg-gray-100 "
+            className=" border-gray-200 border hover:bg-gray-100 "
             onClick={handleDelete}
             disabled={Object.keys(rowSelection).length === 0 || isLoading}
           >
@@ -652,7 +672,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"
-              className="border-gray-200"
+                className="border-gray-200"
               >
                 {t('table.columns')} <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
@@ -769,7 +789,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           <div className="flex items-center space-x-2">
             <p className="text-sm font-medium">{t('table.rowsPerPage')}</p>
             <Select
-            
+
               value={`${pagination.pageSize}`}
               onValueChange={(value) => handlePageSizeChange(Number(value))}
             >
@@ -779,8 +799,8 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               <SelectContent side="top">
                 {[5, 10, 20, 30, 40, 50].map((pageSize) => (
                   <SelectItem
-                  className="cursor-pointer"
-                  key={pageSize} value={`${pageSize}`}>
+                    className="cursor-pointer"
+                    key={pageSize} value={`${pageSize}`}>
                     {pageSize}
                   </SelectItem>
                 ))}

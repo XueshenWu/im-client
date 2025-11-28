@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, ListFilter, Check, Download, X, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ImageItem, ImageSource } from '@/types/gallery';
+import type { ImageWithSource, ImageSource } from '@/types/gallery';
 import LocalPhotoCard from './LocalPhotoCard';
 import { localDatabase } from '@/services/localDatabase.service';
 import { localImageService } from '@/services/localImage.service';
@@ -24,7 +24,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
 }) => {
   const { t } = useTranslation();
   const { refreshTrigger } = useGalleryRefreshStore();
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [images, setImages] = useState<ImageWithSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
@@ -90,23 +90,30 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
             }
 
             return {
-              name: img.filename,
-              size: img.fileSize,
+              id: img.id || 0,
+              uuid: img.uuid,
+              filename: img.filename,
+              fileSize: img.fileSize,
               format: img.format,
+              width: img.width,
+              height: img.height,
+              hash: img.hash,
+              mimeType: img.mimeType,
+              isCorrupted: img.isCorrupted,
+              createdAt: img.createdAt,
+              updatedAt: img.updatedAt,
+              deletedAt: img.deletedAt,
               aspectRatio: aspectRatio || 1,
               source: 'local' as ImageSource,
-              id: img.uuid,
-              createdAt: img.createdAt,
-              modifiedAt: img.updatedAt,
             };
           })
         );
 
         // Filter out duplicates
         setImages((prevImages) => {
-          const existingIds = new Set(prevImages.map((i) => i.id));
+          const existingUuids = new Set(prevImages.map((i) => i.uuid));
           const newUniqueImages = processedImages.filter(
-            (img) => !existingIds.has(img.id)
+            (img) => !existingUuids.has(img.uuid)
           );
           return [...prevImages, ...newUniqueImages];
         });
@@ -194,16 +201,16 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
     if (selectedIds.size === 0) return;
     setExporting(true);
     try {
-      const selectedImages = images.filter(img => img.id && selectedIds.has(img.id));
+      const selectedImages = images.filter(img => selectedIds.has(img.uuid));
       const destination = await window.electronAPI?.selectDirectory();
       if (!destination) {
         setExporting(false);
         return;
       }
       const imagesToExport = selectedImages.map(img => ({
-        uuid: img.id || '',
-        format: img.format || '',
-        filename: img.name || '',
+        uuid: img.uuid,
+        format: img.format,
+        filename: img.filename,
       }));
       await window.electronAPI?.exportImages(imagesToExport, destination);
       handleClearSelection();
@@ -274,14 +281,21 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
                 }
 
                 return {
-                  name: img.filename,
-                  size: img.fileSize,
+                  id: img.id || 0,
+                  uuid: img.uuid,
+                  filename: img.filename,
+                  fileSize: img.fileSize,
                   format: img.format,
+                  width: img.width,
+                  height: img.height,
+                  hash: img.hash,
+                  mimeType: img.mimeType,
+                  isCorrupted: img.isCorrupted,
+                  createdAt: img.createdAt,
+                  updatedAt: img.updatedAt,
+                  deletedAt: img.deletedAt,
                   aspectRatio: aspectRatio || 1,
                   source: 'local' as ImageSource,
-                  id: img.uuid,
-                  createdAt: img.createdAt,
-                  modifiedAt: img.updatedAt,
                 };
               })
             );
@@ -356,7 +370,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
   }, [columnWidth, gap]);
 
   // Organize images into columns
-  const columns: ImageItem[][] = Array.from({ length: columnCount }, () => []);
+  const columns: ImageWithSource[][] = Array.from({ length: columnCount }, () => []);
   const columnHeights = Array(columnCount).fill(0);
 
   images.forEach((img) => {
@@ -497,10 +511,10 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
             <div key={columnIndex} className="flex-1 flex flex-col gap-3" style={{ minWidth: `${columnWidth}px` }}>
               {column.map((img) => (
                 <LocalPhotoCard
-                  key={img.id}
+                  key={img.uuid}
                   image={img}
                   selectionMode={selectionMode}
-                  isSelected={img.id ? selectedIds.has(img.id) : false}
+                  isSelected={selectedIds.has(img.uuid)}
                   onSelect={handleSelectImage}
                   onStartSelection={handleStartSelection}
                 />

@@ -14,7 +14,7 @@ class LocalImageService {
    */
   async addImages(images: LocalImage[]): Promise<LocalImage[]> {
     try {
-    
+
       const inserted = await localDatabase.insertImages(images);
       console.log(`[LocalImage] Added ${inserted.length} images to local storage`);
       return inserted;
@@ -29,8 +29,12 @@ class LocalImageService {
    */
   async addImage(image: LocalImage): Promise<LocalImage> {
     try {
- 
+
       const inserted = await localDatabase.insertImage(image);
+      const exifData = image.exifData;
+      if (exifData) {
+        await localDatabase.upsertExifData(inserted.uuid, exifData);
+      }
       console.log('[LocalImage] Added image:', inserted.uuid);
       return inserted;
     } catch (error) {

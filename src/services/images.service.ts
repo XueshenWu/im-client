@@ -10,6 +10,7 @@ import type {
   ExifData,
 } from '@/types/api'
 import exifr from 'exifr'
+import { normalizeFormatFromFilename } from '@/utils/formatNormalizer'
 
 /**
  * Extract EXIF data from an image file
@@ -220,8 +221,8 @@ export const replaceImages = async (
   const replacementRequests = await Promise.all(
     replacements.map(async ({ uuid, file }) => {
       const isFile = file instanceof File;
-      const filename = isFile ? file.name : 'image.jpg';
-      const format = filename.split('.').pop()?.toLowerCase() || 'jpg';
+      const filename = isFile ? file.name : 'image.jpeg';
+      const format = normalizeFormatFromFilename(filename);
 
       // Calculate dimensions
       let width = 0, height = 0;

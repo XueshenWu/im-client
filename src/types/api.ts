@@ -17,13 +17,19 @@ export interface ApiError {
   statusCode: number
 }
 
+// TIFF page dimensions
+export interface TiffPageDimensions {
+  width: number
+  height: number
+}
+
 // Image Types
 export interface Image {
   id: number
   uuid: string
   filename: string
   fileSize: number
-  format: 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff'
+  format: 'jpeg' | 'png' | 'tiff' // Standardized: jpeg (not jpg), tiff (not tif)
   width: number
   height: number
   hash: string
@@ -34,6 +40,8 @@ export interface Image {
   deletedAt: string | null
   exifData?: ExifData
   presignedUrl?: string
+  pageCount?: number
+  tiffDimensions?: TiffPageDimensions[]
 }
 
 

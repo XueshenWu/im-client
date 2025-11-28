@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, ArrowUpDown, ArrowUp, ArrowDown, Download, X, Trash2, ListFilter, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ImageItem } from '@/types/gallery';
+import type { ImageWithSource } from '@/types/gallery';
 import type { Image } from '@/types/api';
 import CloudPhotoCard from './CloudPhotoCard';
 import { imageService } from '@/services/api';
@@ -26,7 +26,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
 }) => {
   const { t } = useTranslation();
   const { refreshTrigger } = useGalleryRefreshStore();
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [images, setImages] = useState<ImageWithSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -69,21 +69,18 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
 
       if (result?.success && result.data) {
         if (result.data.length > 0) {
-          // Convert API images to ImageItem format
-          const cloudImages: ImageItem[] = result.data.map((img: Image) => ({
-            id: img.uuid,
-          
+          // Convert API images to ImageWithSource format
+          const cloudImages: ImageWithSource[] = result.data.map((img: Image) => ({
+            ...img,
             aspectRatio: img.width / img.height,
             source: 'cloud' as const,
-            cloudData: img,
-            createdAt: img.createdAt,
           }));
 
           // Filter out duplicates
           setImages((prevImages) => {
-            const existingIds = new Set(prevImages.map((i) => i.id));
+            const existingUuids = new Set(prevImages.map((i) => i.uuid));
             const newUniqueImages = cloudImages.filter(
-              (img) => !existingIds.has(img.id)
+              (img) => !existingUuids.has(img.uuid)
             );
             return [...prevImages, ...newUniqueImages];
           });
@@ -211,12 +208,12 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
       const invoiceItems: Array<{ name: string; format: string; size: string }> = [];
 
       for (const imageId of Array.from(selectedIds)) {
-        const image = images.find((img) => img.id === imageId);
-        if (!image?.cloudData?.uuid) continue;
+        const image = images.find((img) => img.uuid === imageId);
+        if (!image?.uuid) continue;
 
         try {
           // First, fetch the presigned URL and metadata from the endpoint
-          const endpoint = imageService.getImageFileUrl(image.cloudData.uuid);
+          const endpoint = imageService.getImageFileUrl(image.uuid);
           const presignedResponse = await fetch(endpoint);
 
           if (!presignedResponse.ok) {
@@ -232,7 +229,7 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
 
           // Extract metadata from the response
           const metadata = presignedData.data.metadata;
-          const originalName = presignedData.data.filename || `image-${imageId}.jpg`;
+          const originalName = presignedData.data.filename || `image-${imageId}.jpeg`;
           const fileSize = metadata.fileSize || 0;
           const imageFormat = metadata.format || 'unknown';
 
@@ -315,7 +312,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     try {
       // Get UUIDs from selected images
       const uuids = Array.from(selectedIds)
-        .map(id => images.find(img => img.id === id)?.cloudData?.uuid)
+        .map(id => images.find(img => img.uuid === id)?.uuid)
         .filter((uuid): uuid is string => uuid !== undefined);
 
       if (uuids.length === 0) {
@@ -395,7 +392,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
   }, [columnWidth, gap]);
 
   // Organize images into columns for masonry layout
-  const columns: ImageItem[][] = Array.from({ length: columnCount }, () => []);
+  const columns: ImageWithSource[][] = Array.from({ length: columnCount }, () => []);
   const columnHeights = Array(columnCount).fill(0);
 
   images.forEach((img) => {
@@ -592,10 +589,10 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
             >
               {column.map((img) => (
                 <CloudPhotoCard
-                  key={img.id}
+                  key={img.uuid}
                   image={img}
                   selectionMode={selectionMode}
-                  isSelected={selectedIds.has(img.id!)}
+                  isSelected={selectedIds.has(img.uuid)}
                   onSelect={handleSelectImage}
                   onStartSelection={handleStartSelection}
                 />

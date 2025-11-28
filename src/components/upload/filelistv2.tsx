@@ -8,6 +8,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { X, FileText, ArrowUpDown } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -31,6 +32,7 @@ import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { generateThumbnail, generateThumbnailBlob } from '@/utils/thumbnailGenerator';
 import { v4 as uuidv4 } from 'uuid';
 import exifr from 'exifr';
+import { normalizeFormatFromMimeType, normalizeFormatFromFilename } from '@/utils/formatNormalizer';
 
 // Upload configuration
 const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
@@ -136,7 +138,7 @@ const fileToMockImage = (file: FileWithPreview): Image => ({
   uuid: file.preview,
   filename: file.name,
   fileSize: file.size,
-  format: (file.type.split('/')[1] as 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff') || 'jpg',
+  format: normalizeFormatFromMimeType(file.type),
   width: 0,
   height: 0,
   hash: '',
@@ -385,16 +387,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
 
 
   const handleThumbnailClick = (file: FileWithPreview, index: number) => {
-    // Only allow viewing images
-    if (!file.type.startsWith('image/')) return;
-
-    // Convert all image files to mock image objects
-    const imageFiles = files.filter(f => f.type.startsWith('image/'));
-    const mockImages = imageFiles.map(fileToMockImage);
-    const imageIndex = imageFiles.findIndex(f => f.name === file.name);
-
-    // Open viewer in readonly mode (3rd parameter = true)
-    openViewer(mockImages[imageIndex], mockImages, true);
+    
   };
 
   // Update the columns memo to include the handler and files:
@@ -415,45 +408,6 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
     },
   });
 
-  /**
-   * Upload a single file using chunked upload
-   */
-  // const uploadFileChunked = async (file: File): Promise<void> => {
-  //   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-
-  //   // Initialize upload session
-  //   const session = await initChunkedUpload({
-  //     filename: file.name,
-  //     totalSize: file.size,
-  //     chunkSize: CHUNK_SIZE,
-  //     totalChunks,
-  //     mimeType: file.type,
-  //   });
-
-  //   // Upload chunks
-  //   for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
-  //     const start = chunkNumber * CHUNK_SIZE;
-  //     const end = Math.min(start + CHUNK_SIZE, file.size);
-  //     const chunk = file.slice(start, end);
-
-  //     await uploadChunk(session.sessionId, chunk, chunkNumber);
-
-  //     // Update progress
-  //     const progress = Math.round(((chunkNumber + 1) / totalChunks) * 100);
-  //     setUploadStatuses((prev) => {
-  //       const newMap = new Map(prev);
-  //       newMap.set(file.name, {
-  //         fileName: file.name,
-  //         progress,
-  //         status: 'uploading',
-  //       });
-  //       return newMap;
-  //     });
-  //   }
-
-  //   // Complete the upload
-  //   await completeChunkedUpload(session.sessionId);
-  // };
 
   /**
    * Handle form submission - upload all files
@@ -500,7 +454,10 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
 
             // Generate UUID for this image
             const uuid = uuidv4();
-            const format = (file.type.split('/')[1] as any) || 'jpg';
+            // Use sourcePath for more reliable format detection (MIME type can be unreliable for TIFF)
+            const format = file.sourcePath
+              ? normalizeFormatFromFilename(file.sourcePath)
+              : normalizeFormatFromMimeType(file.type);
 
             // Save file to AppData with UUID-based name (if has source path)
             if (file.sourcePath) {
@@ -529,22 +486,51 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               return newMap;
             });
 
-            // Generate thumbnail
+            // Generate thumbnail and extract dimensions
             let imageWidth = 0;
             let imageHeight = 0;
+            let pageCount = 1;
+            let tiffDimensions: Array<{ width: number; height: number }> | undefined = undefined;
+
+            const isTiff = format === 'tiff';
 
             if (file.sourcePath && file.type.startsWith('image/')) {
               try {
                 const thumbnailResult = await generateThumbnail(file.sourcePath, uuid, 300);
                 if (thumbnailResult.success) {
-                  imageWidth = thumbnailResult.width || 0;
-                  imageHeight = thumbnailResult.height || 0;
                   console.log(`[Upload] Generated thumbnail for ${file.name}`);
                 } else {
                   console.warn(`[Upload] Failed to generate thumbnail for ${file.name}:`, thumbnailResult.error);
                 }
               } catch (error) {
                 console.error(`[Upload] Thumbnail generation error for ${file.name}:`, error);
+              }
+
+              // For TIFF files, extract multi-page metadata
+              if (isTiff && file.sourcePath && window.electronAPI?.getImgMetadata) {
+                try {
+                  const tiffMetadata = await window.electronAPI.getImgMetadata(file.sourcePath);
+                  if (tiffMetadata.success) {
+                    pageCount = tiffMetadata.pageCount || 1;
+                    tiffDimensions = tiffMetadata.pages || [];
+                    // For TIFF, leave width and height as 0 (will use tiffDimensions instead)
+                    console.log(`[Upload] TIFF has ${pageCount} page(s)`);
+                  }
+                } catch (error) {
+                  console.error(`[Upload] Failed to extract TIFF metadata for ${file.name}:`, error);
+                }
+              } else if (!isTiff && file.sourcePath) {
+                // For non-TIFF images, get dimensions from Sharp metadata
+                try {
+                  const metadata = await window.electronAPI?.getImgMetadata?.(file.sourcePath);
+                  if (metadata?.success && metadata.pages?.[0]) {
+                    imageWidth = metadata.pages[0].width || 0;
+                    imageHeight = metadata.pages[0].height || 0;
+                  }
+                } catch (error) {
+                  // Fallback: dimensions will be 0
+                  console.warn(`[Upload] Could not extract dimensions for ${file.name}`);
+                }
               }
             }
 
@@ -559,6 +545,23 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               return newMap;
             });
 
+            // Extract EXIF data from the file
+            const exifData = await extractExifData(file);
+
+            // Calculate file hash
+            let fileHash = '';
+            if (file.sourcePath && window.electronAPI?.calculateFileHash) {
+              try {
+                const hashResult = await window.electronAPI.calculateFileHash(file.sourcePath);
+                if (hashResult.success && hashResult.hash) {
+                  fileHash = hashResult.hash;
+                  console.log(`[Upload] Calculated hash for ${file.name}: ${fileHash.substring(0, 16)}...`);
+                }
+              } catch (error) {
+                console.error(`[Upload] Failed to calculate hash for ${file.name}:`, error);
+              }
+            }
+
             // Create LocalImage record
             const localImage: LocalImage = {
               uuid,
@@ -567,13 +570,15 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
               format,
               width: imageWidth,
               height: imageHeight,
-              hash: '',
+              hash: fileHash,
               mimeType: file.type,
               isCorrupted: false,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               deletedAt: null,
-              exifData: undefined,
+              exifData: exifData,
+              pageCount,
+              tiffDimensions,
             };
 
             // Save to local database
@@ -616,7 +621,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         return;
       }
 
-      // CLOUD MODE: Original logic
+    
 
 
 
@@ -635,7 +640,11 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       // STEP 1: Generate UUIDs, calculate hashes, dimensions, extract EXIF, and request presigned URLs
       const fileMetadata = await Promise.all(files.map(async (file) => {
         const uuid = uuidv4();
-        const format = (file.type.split('/')[1] as 'jpg' | 'jpeg' | 'png' | 'tif' | 'tiff') || 'jpg';
+        // Use sourcePath for more reliable format detection (MIME type can be unreliable for TIFF)
+        const format = file.sourcePath
+          ? normalizeFormatFromFilename(file.sourcePath)
+          : normalizeFormatFromMimeType(file.type);
+        const isTiff = format === 'tiff';
 
         // Calculate hash - REQUIRED for cloud upload
         let hash = '';
@@ -657,28 +666,46 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         // Calculate width and height for image files
         let width = 0;
         let height = 0;
+        let pageCount = 1;
+        let tiffDimensions: Array<{ width: number; height: number }> | undefined = undefined;
 
         if (file.type.startsWith('image/')) {
-          try {
-            const imageUrl = URL.createObjectURL(file);
-            const img = new Image();
+          // For TIFF files, extract multi-page metadata using Electron API
+          if (isTiff && file.sourcePath && window.electronAPI?.getImgMetadata) {
+            try {
+              const tiffMetadata = await window.electronAPI.getImgMetadata(file.sourcePath);
+              if (tiffMetadata.success) {
+                pageCount = tiffMetadata.pageCount || 1;
+                tiffDimensions = tiffMetadata.pages || [];
+                // For TIFF, leave width and height as 0 (will use tiffDimensions instead)
+                console.log(`[Cloud Upload] TIFF has ${pageCount} page(s)`);
+              }
+            } catch (error) {
+              console.error(`[Cloud Upload] Failed to extract TIFF metadata for ${file.name}:`, error);
+            }
+          } else if (!isTiff) {
+            // For non-TIFF images, use the browser Image API
+            try {
+              const imageUrl = URL.createObjectURL(file);
+              const img = new Image();
 
-            await new Promise<void>((resolve, reject) => {
-              img.onload = () => {
-                width = img.naturalWidth;
-                height = img.naturalHeight;
-                URL.revokeObjectURL(imageUrl);
-                resolve();
-              };
-              img.onerror = () => {
-                URL.revokeObjectURL(imageUrl);
-                reject(new Error('Failed to load image'));
-              };
-              img.src = imageUrl;
-            });
-          } catch (error) {
-            console.warn(`Failed to get dimensions for ${file.name}:`, error);
-            // Continue with 0x0 dimensions if we can't read them
+              await new Promise<void>((resolve, reject) => {
+                img.onload = () => {
+                  width = img.naturalWidth;
+                  height = img.naturalHeight;
+                  URL.revokeObjectURL(imageUrl);
+                  resolve();
+                };
+                img.onerror = () => {
+                  URL.revokeObjectURL(imageUrl);
+                  reject(new Error('Failed to load image'));
+                };
+                img.src = imageUrl;
+              });
+            } catch (error) {
+              console.warn(`Failed to get dimensions for ${file.name}:`, error);
+              // Continue with 0x0 dimensions if we can't read them
+            }
           }
         }
 
@@ -696,6 +723,8 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           width,
           height,
           exifData,
+          pageCount,
+          tiffDimensions,
         };
       }));
 
@@ -710,6 +739,8 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         mimeType: meta.mimeType,
         isCorrupted: false,
         exifData: meta.exifData,
+        pageCount: meta.pageCount,
+        tiffDimensions: meta.tiffDimensions,
       })))
       files.forEach((file) => {
         setUploadStatuses((prev) => {
@@ -757,7 +788,32 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
             });
 
             // Generate thumbnail blob
-            const thumbnailBlob = await generateThumbnailBlob(file, 300);
+            let thumbnailBlob: Blob;
+
+            // For TIFF files, we need to use Electron API since browser can't render TIFF
+            if (meta.format === 'tiff' && file.sourcePath && window.electronAPI?.generateThumbnail) {
+              try {
+                // Get the first page of the TIFF as a buffer
+                const result = await window.electronAPI.generateThumbnail(file.sourcePath, meta.uuid);
+
+                if (!result.success || !result.imageBuffer) {
+                  throw new Error('Failed to generate TIFF thumbnail');
+                }
+
+                // Convert the buffer to a Blob that can be used with canvas
+                const imageBuffer = new Uint8Array(result.imageBuffer);
+                const tempBlob = new Blob([imageBuffer]);
+
+                // Use generateThumbnailBlob with the converted buffer
+                thumbnailBlob = await generateThumbnailBlob(tempBlob, 300);
+              } catch (error) {
+                console.error(`[Cloud Upload] TIFF thumbnail generation failed for ${file.name}:`, error);
+                throw new Error(`Failed to generate TIFF thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+            } else {
+              // For non-TIFF images, use the standard browser-based method
+              thumbnailBlob = await generateThumbnailBlob(file, 300);
+            }
 
             // Update progress - uploading thumbnail
             setUploadStatuses((prev) => {

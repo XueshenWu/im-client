@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2, Download, Eye, Trash2, Copy, CheckSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ImageItem } from '@/types/gallery';
+import type { ImageWithSource } from '@/types/gallery';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -14,9 +14,11 @@ import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { localImageService } from '@/services/localImage.service';
 import { getImageUrl, getThumbnailUrl } from '@/utils/imagePaths';
+import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
+
 
 interface LocalPhotoCardProps {
-  image: ImageItem;
+  image: ImageWithSource;
   selectionMode?: boolean;
   isSelected?: boolean;
   onSelect?: (imageId: string) => void;
@@ -32,6 +34,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
 }) => {
   const { t } = useTranslation();
   const { openViewer } = useImageViewerStore();
+  const { openTiffViewer } = useTiffImageViewerStore();
   const { triggerRefresh } = useGalleryRefreshStore();
 
   // Ensure this is a local image
@@ -40,19 +43,22 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
     return null;
   }
 
-  const displayName = image.name || 'Unknown';
-  const fileSize = image.size || 0;
+  const displayName = image.filename || 'Unknown';
+  const fileSize = image.fileSize || 0;
 
   const handleDownload = async () => {
-    if (!image.id || !image.format) return;
+    if (!image.uuid || !image.format) return;
 
     try {
       // Construct the local-image URL and fetch it
-      const imageUrl = getImageUrl(image.id, image.format);
-      const response = await fetch(imageUrl);
-      if (!response.ok) throw new Error('Failed to fetch image');
 
-      const blob = await response.blob();
+
+      const buffer = await window.electronAPI?.loadLocalImage(image.uuid, image.format)
+      if (!buffer) {
+        throw "cannot read file"
+      }
+      const blob = new Blob([buffer as unknown as BlobPart], { type: image.mimeType });
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -67,58 +73,73 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   };
 
   const handleCopyId = () => {
-    if (image.id) {
-      navigator.clipboard.writeText(image.id);
+    if (image.uuid) {
+      navigator.clipboard.writeText(image.uuid);
     }
   };
 
 
 
   const handleSelect = () => {
-    if (!selectionMode && onStartSelection && image.id) {
-      onStartSelection(image.id);
-    } else if (selectionMode && onSelect && image.id) {
-      onSelect(image.id);
+    if (!selectionMode && onStartSelection && image.uuid) {
+      onStartSelection(image.uuid);
+    } else if (selectionMode && onSelect && image.uuid) {
+      onSelect(image.uuid);
     }
   };
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (selectionMode && onSelect && image.id) {
+  const handleCardDoubleClick = (e: React.MouseEvent) => {
+    if (selectionMode && onSelect && image.uuid) {
       e.preventDefault();
-      onSelect(image.id);
+      onSelect(image.uuid);
     } else if (!selectionMode) {
       // Open viewer when clicking the card (not in selection mode)
       openViewer({
-        uuid: image.id || '',
-        filename: image.name || '',
-        fileSize: image.size || 0,
+        uuid: image.uuid || '',
+        filename: image.filename || '',
+        fileSize: image.fileSize || 0,
         format: image.format || '',
-        width: 0,
-        height: 0,
+        width: image.width,
+        height: image.height,
         source: 'local'
       } as any);
     }
   };
 
+  const handleCardClick = async (e: React.MouseEvent) => {
+    if (selectionMode && onSelect && image.uuid) {
+      e.preventDefault();
+      onSelect(image.uuid);
+    } else if (!selectionMode) {
+      // Open viewer when clicking the card (not in selection mode)
+      if ( image.format === 'tiff') {
+        await openTiffViewer(image)
+      } else {
+        openViewer(image);
+      }
+
+    }
+  };
+
   const handleViewDetails = () => {
     openViewer({
-      uuid: image.id || '',
-      filename: image.name || '',
-      fileSize: image.size || 0,
+      uuid: image.uuid || '',
+      filename: image.filename || '',
+      fileSize: image.fileSize || 0,
       format: image.format || '',
-      width: 0,
-      height: 0,
+      width: image.width || 0,
+      height: image.height || 0,
       source: 'local'
     } as any);
   };
 
   const handleDelete = async () => {
-    if (!image.id) return;
+    if (!image.uuid) return;
 
     if (!window.confirm(t('viewer.confirmDelete'))) return;
 
     try {
-      await localImageService.deleteImages([image.id]);
+      await localImageService.deleteImages([image.uuid]);
       triggerRefresh();
     } catch (error) {
       console.error('Delete error:', error);
@@ -136,9 +157,9 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
           }}
           onClick={handleCardClick}
         >
-          {image.id ? (
+          {image.uuid ? (
             <img
-              src={getThumbnailUrl(image.id)}
+              src={getThumbnailUrl(image.uuid)}
               alt={displayName}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"
@@ -154,7 +175,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
             <div className="absolute top-2 right-2 z-10">
               <Checkbox
                 checked={isSelected}
-                onCheckedChange={() => onSelect && image.id && onSelect(image.id)}
+                onCheckedChange={() => onSelect && image.uuid && onSelect(image.uuid)}
                 className="bg-white border-2 border-gray-300"
               />
             </div>

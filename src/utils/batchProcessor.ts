@@ -1,20 +1,20 @@
 import JSZip from 'jszip';
 import { ImageManifest } from "@/types/upload";
+import { normalizeFormat } from './formatNormalizer';
 
 // Helper to get correct MIME type based on file extension
 const getMimeType = (ext: string): string => {
+    // Normalize the extension first
+    const normalizedExt = normalizeFormat(ext);
+
     const mimeMap: Record<string, string> = {
-        'jpg': 'image/jpeg',
         'jpeg': 'image/jpeg',
         'png': 'image/png',
-        'gif': 'image/gif',
-        'webp': 'image/webp',
-        'bmp': 'image/bmp',
-        'svg': 'image/svg+xml',
         'zip': 'application/zip',
         'json': 'application/json',
+        'tiff': 'image/tiff'
     };
-    return mimeMap[ext] || `application/${ext}`;
+    return mimeMap[normalizedExt] || `application/${normalizedExt}`;
 };
 
 // --- Helper: Read files from disk using Electron ---
@@ -61,7 +61,7 @@ export const processBatchDrop = async (
     const api = window.electronAPI;
 
     // Regex for allowed image types (Excluding PDF/TXT)
-    const IMAGE_EXT_REGEX = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+    const IMAGE_EXT_REGEX = /\.(jpg|jpeg|png|tif|tiff)$/i;
 
     for (const file of droppedFiles) {
 
@@ -81,7 +81,7 @@ export const processBatchDrop = async (
                     // Extract and write to temp file if Electron API is available
                     const promise = zipEntry.async('arraybuffer').then(async (arrayBuffer) => {
                         const fileName = zipEntry.name.split('/').pop() || zipEntry.name;
-                        const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+                        const ext = fileName.split('.').pop()?.toLowerCase() || 'jpeg';
                         const mimeType = getMimeType(ext);
 
                         const blob = new Blob([arrayBuffer], { type: mimeType });

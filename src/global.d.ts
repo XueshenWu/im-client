@@ -54,7 +54,22 @@ interface ElectronAPI {
     hash?: string
     error?: string
   }>
-
+  getImgMetadata: (filePath: string) => Promise<{
+    success: boolean
+    pageCount?: number
+    pages?: Array<{ width: number; height: number }>
+    format?: string
+    error?: string
+  }>
+  getTiffPage: (filePath: string, pageIndex: number) => Promise<{
+    success: boolean
+    buffer?: number[]
+    width?: number
+    height?: number
+    pageIndex?: number
+    error?: string
+  }>
+  loadLocalImage: (uuid: string, format: string) => Promise<Buffer>
   getRoamPath: () => Promise<string>
   getLocalImages: (options?: { limit?: number; offset?: number }) => Promise<{
     success: boolean
@@ -73,7 +88,17 @@ interface ElectronAPI {
     error?: string
   }>
 
-  deleteImages: (image_names: string[]) => Promise<string[]>
+  deleteImages: (image_names: string[]) => Promise<string[]>,
+  prepareLocalTiffImage: (uuid: string, format: string, pageIndex: number) => Promise<{
+    success: boolean,
+    previewSrc: string,
+    metadata: {
+      width: number,
+      height: number,
+      totalPages: number,
+      currentPage: number
+    }
+  }>
 
 
   // Database operations
@@ -92,6 +117,40 @@ interface ElectronAPI {
     clearAllImages: () => Promise<{ success: boolean }>
     getSyncMetadata: () => Promise<{ lastSyncSequence: number; lastSyncTime: string | null }>
     updateSyncMetadata: (metadata: any) => Promise<{ success: boolean }>
+    upsertExifData: (uuid: string, exif: any) => Promise<{ id: number; changes: number}>
+  },
+  tiff: {
+    loadBuffer: (buffer: Uint8Array) => Promise<{ success: boolean, pageCount?: number, error?: any }>
+    getPreview: (pageIndex: number) => Promise<{
+      success: boolean,
+      previewSrc: string,
+      metadata: {
+        width: number,
+        height: number,
+        totalPages: number,
+        currentPage: number
+      }
+    }>
+    cropPage: (pageIndex: number, crop: { x: number, y: number, width: number, height: number }) => Promise<{
+      success: boolean,
+      buffer?: Buffer,
+      error?: string
+    }>
+    replacePage: (pageIndex: number, newPageBuffer: Buffer) => Promise<{
+      success: boolean,
+      error?: string
+    }>
+    appendPage: (newPageBuffer: Buffer) => Promise<{
+      success: boolean,
+      totalPages?: number,
+      error?: string
+    }>
+    getFinalBuffer: () => Promise<{
+      success: boolean,
+      buffer?: Buffer,
+      error?: string
+    }>
+    cleanup: () => Promise<{ success: boolean, error?: string }>
   }
 }
 

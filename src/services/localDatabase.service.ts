@@ -3,6 +3,7 @@
  * Handles all database operations for local mode
  */
 
+import { ExifData } from '@/types/api';
 import { LocalImage, SyncMetadata } from '../types/local';
 
 
@@ -202,6 +203,19 @@ class LocalDatabaseService {
       await this.initialize();
     }
   }
+
+  upsertExifData = async (uuid: string, exif: ExifData): Promise<boolean> => {
+    await this.ensureInitialized();
+    try {
+      const res = await window.electronAPI?.db.upsertExifData(uuid, exif);
+      if (!res) throw new Error('Failed to upsert EXIF data');
+      return true
+    } catch (error) {
+      console.error('[LocalDB] Failed to upsert EXIF data:', error);
+      throw error;
+    }
+  }
+
 }
 
 // Singleton instance

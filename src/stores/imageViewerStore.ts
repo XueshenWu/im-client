@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Image } from '@/types/api';
+import { ImageWithSource } from '@/types/gallery';
 
 type ViewMode = 'view' | 'crop';
 
@@ -7,11 +8,11 @@ type ViewMode = 'view' | 'crop';
 interface ImageViewerStore {
   isOpen: boolean;
   currentImage: Image | null;
-  images: Image[];
+  images: ImageWithSource[];
   currentIndex: number;
   viewMode: ViewMode;
   readOnly: boolean;
-  openViewer: (image: Image, allImages?: Image[], readOnly?:boolean) => void;
+  openViewer: (image: ImageWithSource, allImages?: ImageWithSource[], readOnly?:boolean) => void;
   closeViewer: () => void;
   nextImage: () => void;
   previousImage: () => void;
@@ -28,7 +29,7 @@ export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
   viewMode: 'view',
   readOnly: false,
 
-  openViewer: (image: Image, allImages?: Image[], readOnly=false) => {
+  openViewer: (image: ImageWithSource, allImages?: ImageWithSource[], readOnly=false) => {
     const images = allImages || [image];
     const currentIndex = allImages
       ? images.findIndex(img => img.uuid === image.uuid)

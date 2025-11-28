@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeWindow: () => ipcRenderer.send('maximize-window'),
   closeWindow: () => ipcRenderer.send('close-window'),
   setWindowTitle: (title: string) => ipcRenderer.send('set-window-title', title),
-  getFilePath: (file:File) => webUtils.getPathForFile(file),
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
   expandPath: (path: string, recursive: boolean) =>
     ipcRenderer.invoke('expand-path', path, recursive),
   openDialog: () => ipcRenderer.invoke('dialog:open'),
@@ -25,7 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLocalImages: (options?: { limit?: number; offset?: number }) =>
     ipcRenderer.invoke('get-local-images', options),
   getDeviceId: () => ipcRenderer.invoke('get-device-id'),
-  exportImages: (images: Array<{uuid: string, format: string, filename: string}>, destination: string) =>
+  prepareLocalTiffImage: (uuid: string, format: string, pageIndex: number) => ipcRenderer.invoke('prepare-local-tiff-image', uuid, format, pageIndex),
+  exportImages: (images: Array<{ uuid: string, format: string, filename: string }>, destination: string) =>
     ipcRenderer.invoke('export-images', images, destination),
   getRoamPath: () => ipcRenderer.invoke('get-roam-path'),
   saveThumbnailsToLocal: (files: Array<{ sourcePath: string; uuid: string }>) =>
@@ -37,8 +38,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   calculateFileHash: (filePath: string) =>
     ipcRenderer.invoke('calculate-file-hash', filePath),
   deleteImages: (image_names: string[]) => ipcRenderer.invoke('delete-images', image_names),
-
-
+  getImgMetadata: (filePath: string) =>
+    ipcRenderer.invoke('get-img-metadata', filePath),
+  getTiffPage: (filePath: string, pageIndex: number) =>
+    ipcRenderer.invoke('get-tiff-page', filePath, pageIndex),
+  loadLocalImage: (uuid: string, format: string) =>
+    ipcRenderer.invoke('load-local-image', uuid, format),
   // Database operations
   db: {
     initialize: () => ipcRenderer.invoke('db:initialize'),
@@ -56,5 +61,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearAllImages: () => ipcRenderer.invoke('db:clearAllImages'),
     getSyncMetadata: () => ipcRenderer.invoke('db:getSyncMetadata'),
     updateSyncMetadata: (metadata: any) => ipcRenderer.invoke('db:updateSyncMetadata', metadata),
+    upsertExifData: (uuid: string, exif: any) => ipcRenderer.invoke('db:upsertExifData', uuid, exif)
+  },
+  tiff: {
+    loadBuffer: (buffer: Uint8Array) => ipcRenderer.invoke('tiff:load-buffer', buffer),
+    getPreview: (pageIndex: number) => ipcRenderer.invoke('tiff:get-preview', pageIndex),
+    cropPage: (pageIndex: number, crop: { x: number, y: number, width: number, height: number }) =>
+      ipcRenderer.invoke('tiff:crop-page', pageIndex, crop),
+    replacePage: (pageIndex: number, newPageBuffer: Buffer) =>
+      ipcRenderer.invoke('tiff:replace-page', pageIndex, newPageBuffer),
+    appendPage: (newPageBuffer: Buffer) => ipcRenderer.invoke('tiff:append-page', newPageBuffer),
+    getFinalBuffer: () => ipcRenderer.invoke('tiff:get-final-buffer'),
+    cleanup: () => ipcRenderer.invoke('tiff:cleanup')
   }
 })

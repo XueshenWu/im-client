@@ -10,6 +10,7 @@ const sqlite3 = require('sqlite3').verbose();
 
 // Use the type from the import for TypeScript, but the runtime value from require
 import type { Database } from 'sqlite3';
+import { ExifData } from '@/types/api';
 
 let db: Database | null = null;
 
@@ -30,7 +31,7 @@ export function getThumbnailPath(uuid: string): string {
     app.getPath('appData'),
     'image-management',
     'thumbnails',
-    `${uuid}.jpg`
+    `${uuid}.jpeg`
   );
 }
 
@@ -100,7 +101,8 @@ async function createTables(database: Database): Promise<void> {
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       deletedAt TEXT,
-      exifData TEXT
+      pageCount INTEGER DEFAULT 1,
+      tiffDimensions TEXT
     );
   `);
 
@@ -118,6 +120,42 @@ async function createTables(database: Database): Promise<void> {
   // Initialize sync metadata
   await run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('lastSyncSequence', '0')`);
   await run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('lastSyncTime', '')`);
+
+  await run(`CREATE TABLE IF NOT EXISTS exif_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
+    -- SQLite does not have a native UUID type; we store it as TEXT.
+    uuid TEXT NOT NULL UNIQUE,
+
+    camera_make TEXT,
+    camera_model TEXT,
+    lens_model TEXT,
+
+    artist TEXT,
+    copyright TEXT,
+    software TEXT,
+
+    iso INTEGER,
+
+    shutter_speed TEXT,
+    aperture TEXT,
+    focal_length TEXT,
+
+    -- SQLite typically stores dates as ISO8601 Strings (TEXT) or Unix Epochs (INTEGER).
+    -- TEXT is recommended for readability and compatibility with ISO strings.
+    date_taken TEXT,
+
+    orientation INTEGER DEFAULT 1,
+
+    -- SQLite uses REAL (Floating Point) or NUMERIC for decimals.
+    gps_latitude NUMERIC,
+    gps_longitude NUMERIC,
+    gps_altitude NUMERIC,
+
+    -- SQLite does not have JSONB. We store JSON as plain TEXT.
+    -- You can still query it using SQLite's json_extract() function if needed.
+    extra TEXT
+);`)
 
   console.log('[DB] Tables created successfully');
 }
@@ -174,15 +212,83 @@ const sql = {
 };
 
 /**
+ * Helper to parse image data from database
+ */
+function parseImageData(row: any): any {
+  if (!row) return row;
+
+  // Parse tiffDimensions from JSON string if present
+  if (row.tiffDimensions && typeof row.tiffDimensions === 'string') {
+    try {
+      row.tiffDimensions = JSON.parse(row.tiffDimensions);
+    } catch (error) {
+      console.error('[DB] Failed to parse tiffDimensions:', error);
+      row.tiffDimensions = null;
+    }
+  }
+
+  return row;
+}
+
+/**
  * Database operations
  */
 export const dbOperations = {
   async getAllImages(): Promise<any[]> {
-    return sql.all('SELECT * FROM images WHERE deletedAt IS NULL ORDER BY createdAt DESC');
+    const images = await sql.all('SELECT * FROM images WHERE deletedAt IS NULL ORDER BY createdAt DESC');
+    return images.map(parseImageData);
   },
 
   async getImageByUuid(uuid: string): Promise<any | undefined> {
-    return sql.get('SELECT * FROM images WHERE uuid = ? AND deletedAt IS NULL', [uuid]);
+    const image = await sql.get('SELECT * FROM images WHERE uuid = ? AND deletedAt IS NULL', [uuid]);
+    return parseImageData(image);
+  },
+
+  async upsertExifData(uuid: string, exifData: ExifData): Promise<{ id: number; changes: number }> {
+    // Helper to convert GPS string values to numbers for NUMERIC fields
+    const parseGpsValue = (value: string | null | undefined): number | null => {
+      if (value === null || value === undefined) return null;
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    };
+
+    const bindData: any = {
+      $uuid: uuid,
+      $camera_make: exifData.cameraMake ?? null,
+      $camera_model: exifData.cameraModel ?? null,
+      $lens_model: exifData.lensModel ?? null,
+      $artist: exifData.artist ?? null,
+      $copyright: exifData.copyright ?? null,
+      $software: exifData.software ?? null,
+      $iso: exifData.iso ?? null,
+      $shutter_speed: exifData.shutterSpeed ?? null,
+      $aperture: exifData.aperture ?? null,
+      $focal_length: exifData.focalLength ?? null,
+      $date_taken: exifData.dateTaken ?? null,
+      $orientation: exifData.orientation ?? null,
+      $gps_latitude: parseGpsValue(exifData.gpsLatitude),
+      $gps_longitude: parseGpsValue(exifData.gpsLongitude),
+      $gps_altitude: parseGpsValue(exifData.gpsAltitude),
+      $extra: exifData.extra ? JSON.stringify(exifData.extra) : null,
+    };
+
+    return await sql.run(`
+      INSERT OR REPLACE INTO exif_data (
+        uuid, camera_make, camera_model, lens_model,
+        artist, copyright, software,
+        iso, shutter_speed, aperture, focal_length,
+        date_taken, orientation,
+        gps_latitude, gps_longitude, gps_altitude,
+        extra
+      ) VALUES (
+        $uuid, $camera_make, $camera_model, $lens_model,
+        $artist, $copyright, $software,
+        $iso, $shutter_speed, $aperture, $focal_length,
+        $date_taken, $orientation,
+        $gps_latitude, $gps_longitude, $gps_altitude,
+        $extra
+      )
+    `, bindData);
   },
 
   async getPaginatedImages(
@@ -206,11 +312,11 @@ export const dbOperations = {
       [pageSize, offset]
     );
 
-    return { images, total };
+    return { images: images.map(parseImageData), total };
   },
 
   async getImageFormatByUUIDs(uuids: string[]): Promise<
-   {
+    {
       uuid: string;
       format: string;
     }[]
@@ -228,19 +334,87 @@ export const dbOperations = {
 
   async insertImage(image: any): Promise<any> {
     const bindData: any = {};
-    Object.keys(image).forEach(k => bindData['$' + k] = image[k]);
+    Object.keys(image).forEach(k => {
+      if (k === 'exifData') {
+        // Skip exifData - it goes to separate table
+        return;
+      }
+      if (k === 'tiffDimensions' && image[k]) {
+        // Serialize tiffDimensions to JSON string
+        bindData['$' + k] = JSON.stringify(image[k]);
+      } else {
+        bindData['$' + k] = image[k];
+      }
+    });
 
     const result = await sql.run(`
       INSERT INTO images (
         uuid, filename, fileSize, format,
-        width, height, hash, mimeType, isCorrupted, createdAt, updatedAt, deletedAt, exifData
+        width, height, hash, mimeType, isCorrupted, createdAt, updatedAt, deletedAt, pageCount, tiffDimensions
       ) VALUES (
         $uuid, $filename, $fileSize, $format,
-        $width, $height, $hash, $mimeType, $isCorrupted, $createdAt, $updatedAt, $deletedAt, $exifData
+        $width, $height, $hash, $mimeType, $isCorrupted, $createdAt, $updatedAt, $deletedAt, $pageCount, $tiffDimensions
       )
     `, bindData);
 
+    // If exifData exists, insert into exif_data table
+    if (image.exifData) {
+      try {
+        await this.insertExifData(image.uuid, image.exifData);
+      } catch (error) {
+        console.error('[DB] Failed to insert EXIF data:', error);
+        // Don't fail the entire operation if EXIF insert fails
+      }
+    }
+
     return { ...image, id: result.id };
+  },
+
+  async insertExifData(uuid: string, exifData: any): Promise<void> {
+    // Helper to convert GPS string values to numbers for NUMERIC fields
+    const parseGpsValue = (value: string | null | undefined): number | null => {
+      if (value === null || value === undefined) return null;
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    };
+
+    const bindData: any = {
+      $uuid: uuid,
+      $camera_make: exifData.cameraMake ?? null,
+      $camera_model: exifData.cameraModel ?? null,
+      $lens_model: exifData.lensModel ?? null,
+      $artist: exifData.artist ?? null,
+      $copyright: exifData.copyright ?? null,
+      $software: exifData.software ?? null,
+      $iso: exifData.iso ?? null,
+      $shutter_speed: exifData.shutterSpeed ?? null,
+      $aperture: exifData.aperture ?? null,
+      $focal_length: exifData.focalLength ?? null,
+      $date_taken: exifData.dateTaken ?? null,
+      $orientation: exifData.orientation ?? null,
+      $gps_latitude: parseGpsValue(exifData.gpsLatitude),
+      $gps_longitude: parseGpsValue(exifData.gpsLongitude),
+      $gps_altitude: parseGpsValue(exifData.gpsAltitude),
+      $extra: exifData.extra ? JSON.stringify(exifData.extra) : null,
+    };
+
+    await sql.run(`
+      INSERT OR REPLACE INTO exif_data (
+        uuid, camera_make, camera_model, lens_model,
+        artist, copyright, software,
+        iso, shutter_speed, aperture, focal_length,
+        date_taken, orientation,
+        gps_latitude, gps_longitude, gps_altitude,
+        extra
+      ) VALUES (
+        $uuid, $camera_make, $camera_model, $lens_model,
+        $artist, $copyright, $software,
+        $iso, $shutter_speed, $aperture, $focal_length,
+        $date_taken, $orientation,
+        $gps_latitude, $gps_longitude, $gps_altitude,
+        $extra
+      )
+    `, bindData);
   },
 
   /**
@@ -254,30 +428,96 @@ export const dbOperations = {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
-        const stmt = db.prepare(`
+        const imageStmt = db.prepare(`
           INSERT INTO images (
             uuid, filename, fileSize, format,
-            width, height, hash, mimeType, isCorrupted, createdAt, updatedAt, deletedAt, exifData
+            width, height, hash, mimeType, isCorrupted, createdAt, updatedAt, deletedAt, pageCount, tiffDimensions
           ) VALUES (
             $uuid, $filename, $fileSize, $format,
-            $width, $height, $hash, $mimeType, $isCorrupted, $createdAt, $updatedAt, $deletedAt, $exifData
+            $width, $height, $hash, $mimeType, $isCorrupted, $createdAt, $updatedAt, $deletedAt, $pageCount, $tiffDimensions
+          )
+        `);
+
+        const exifStmt = db.prepare(`
+          INSERT OR REPLACE INTO exif_data (
+            uuid, camera_make, camera_model, lens_model,
+            artist, copyright, software,
+            iso, shutter_speed, aperture, focal_length,
+            date_taken, orientation,
+            gps_latitude, gps_longitude, gps_altitude,
+            extra
+          ) VALUES (
+            $uuid, $camera_make, $camera_model, $lens_model,
+            $artist, $copyright, $software,
+            $iso, $shutter_speed, $aperture, $focal_length,
+            $date_taken, $orientation,
+            $gps_latitude, $gps_longitude, $gps_altitude,
+            $extra
           )
         `);
 
         images.forEach(img => {
           const bindData: any = {};
-          Object.keys(img).forEach(k => bindData['$' + k] = img[k]);
+          Object.keys(img).forEach(k => {
+            if (k === 'exifData') {
+              // Skip exifData - it goes to separate table
+              return;
+            }
+            if (k === 'tiffDimensions' && img[k]) {
+              // Serialize tiffDimensions to JSON string
+              bindData['$' + k] = JSON.stringify(img[k]);
+            } else {
+              bindData['$' + k] = img[k];
+            }
+          });
 
-          stmt.run(bindData, function(this: any, err: Error | null) {
+          imageStmt.run(bindData, function (this: any, err: Error | null) {
             if (err) {
               console.error('Error inserting image in transaction:', err);
             } else {
               results.push({ ...img, id: this.lastID });
             }
           });
+
+          // Insert EXIF data if available
+          if (img.exifData) {
+            // Helper to convert GPS string values to numbers for NUMERIC fields
+            const parseGpsValue = (value: string | null | undefined): number | null => {
+              if (value === null || value === undefined) return null;
+              const parsed = parseFloat(value);
+              return isNaN(parsed) ? null : parsed;
+            };
+
+            const exifBindData: any = {
+              $uuid: img.uuid,
+              $camera_make: img.exifData.cameraMake ?? null,
+              $camera_model: img.exifData.cameraModel ?? null,
+              $lens_model: img.exifData.lensModel ?? null,
+              $artist: img.exifData.artist ?? null,
+              $copyright: img.exifData.copyright ?? null,
+              $software: img.exifData.software ?? null,
+              $iso: img.exifData.iso ?? null,
+              $shutter_speed: img.exifData.shutterSpeed ?? null,
+              $aperture: img.exifData.aperture ?? null,
+              $focal_length: img.exifData.focalLength ?? null,
+              $date_taken: img.exifData.dateTaken ?? null,
+              $orientation: img.exifData.orientation ?? null,
+              $gps_latitude: parseGpsValue(img.exifData.gpsLatitude),
+              $gps_longitude: parseGpsValue(img.exifData.gpsLongitude),
+              $gps_altitude: parseGpsValue(img.exifData.gpsAltitude),
+              $extra: img.exifData.extra ? JSON.stringify(img.exifData.extra) : null,
+            };
+
+            exifStmt.run(exifBindData, (err: Error | null) => {
+              if (err) {
+                console.error('Error inserting EXIF data in transaction:', err);
+              }
+            });
+          }
         });
 
-        stmt.finalize();
+        imageStmt.finalize();
+        exifStmt.finalize();
 
         db.run('COMMIT', (err: Error | null) => {
           if (err) reject(err);
@@ -289,7 +529,7 @@ export const dbOperations = {
 
   async updateImage(uuid: string, updates: any): Promise<void> {
     const fields = Object.keys(updates).map((key) => `${key} = $${key}`).join(', ');
-    
+
     const bindData: any = { $uuid: uuid };
     Object.keys(updates).forEach(k => bindData['$' + k] = updates[k]);
 
@@ -308,7 +548,7 @@ export const dbOperations = {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
-        
+
         const stmt = db.prepare('DELETE FROM images WHERE uuid = ?');
         uuids.forEach(id => stmt.run(id));
         stmt.finalize();
@@ -355,18 +595,18 @@ export const dbOperations = {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
-        
+
         const stmt = db.prepare('INSERT OR REPLACE INTO sync_metadata (key, value) VALUES (?, ?)');
-        
+
         if (metadata.lastSyncSequence !== undefined) {
           stmt.run('lastSyncSequence', metadata.lastSyncSequence.toString());
         }
         if (metadata.lastSyncTime !== undefined) {
           stmt.run('lastSyncTime', metadata.lastSyncTime);
         }
-        
+
         stmt.finalize();
-        
+
         db.run('COMMIT', (err: Error | null) => {
           if (err) reject(err);
           else resolve();

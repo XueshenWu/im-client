@@ -8,6 +8,7 @@ import Sync from './pages/Sync'
 import Activity from './pages/Activity'
 import Settings from './pages/Settings'
 import { ImageViewer } from './components/viewer/ImageViewer'
+import { TiffImageViewer } from './components/viewer/tiffImageViewer'
 import { useSettingsStore } from './stores/settingsStore'
 
 function App() {
@@ -53,6 +54,7 @@ function App() {
         </Route>
       </Routes>
       <ImageViewer />
+      <TiffImageViewer/>
     </HashRouter>
 
     

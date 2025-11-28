@@ -6,7 +6,6 @@ import { useImageViewerStore } from '@/stores/imageViewerStore'
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
 import { localDatabase } from '@/services/localDatabase.service'
 import { localImageService } from '@/services/localImage.service'
-import { Image } from "@/types/api"
 import { ColumnDef } from "@tanstack/react-table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Download, Trash2, Eye } from "lucide-react"
@@ -58,6 +57,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
+import { ImageWithSource } from "@/types/gallery"
 
 // Helper function to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -109,215 +110,216 @@ const createLocalColumns = (
   sortOrder: 'asc' | 'desc',
   onSort: (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => void,
   t: (key: string) => string,
-  onViewImage: (image: Image) => void
-): ColumnDef<Image>[] => [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-        className="border-gray-300 bg-white rounded-md  hover:border-blue-300 duration-100 "
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-        className="border-gray-300 rounded-md hover:border-blue-300 duration-100 "
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-    size: 60,
-    minSize: 60,
-    maxSize: 60,
-  },
-  {
-    accessorKey: "uuid",
-    header: () => t('table.preview'),
-    cell: ({ row }) => {
-      return <LocalThumbnail uuid={row.original.uuid} />;
+  onViewImage: (image: ImageWithSource) => void
+): ColumnDef<ImageWithSource>[] => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="border-gray-300 bg-white rounded-md  hover:border-blue-300 duration-100 "
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="border-gray-300 rounded-md hover:border-blue-300 duration-100 "
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 60,
+      minSize: 60,
+      maxSize: 60,
     },
-    enableSorting: false,
-    size: 100,
-    minSize: 60,
-    maxSize: 100,
-  },
-  {
-    accessorKey: "filename",
-    header: () => (
-      <SortableHeader
-        label={t('table.name')}
-        column="name"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const name = row.getValue("filename") as string;
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="font-medium truncate max-w-[300px]">{name}</div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{name}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
+    {
+      accessorKey: "uuid",
+      header: () => t('table.preview'),
+      cell: ({ row }) => {
+        return <LocalThumbnail uuid={row.original.uuid} />;
+      },
+      enableSorting: false,
+      size: 100,
+      minSize: 60,
+      maxSize: 100,
     },
-    size: 250,
-    minSize: 200,
-    maxSize: 300,
-  },
-  {
-    accessorKey: "fileSize",
-    header: () => (
-      <SortableHeader
-        label={t('table.size')}
-        column="size"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatBytes(row.getValue("fileSize"))}</div>,
-    size: 100,
-    minSize: 80,
-    maxSize: 120,
-  },
-  {
-    accessorKey: "format",
-    header: () => (
-      <SortableHeader
-        label={t('table.type')}
-        column="type"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => (
-      <div className="uppercase text-sm font-medium text-muted-foreground">{row.getValue("format")}</div>
-    ),
-    size: 80,
-    minSize: 60,
-    maxSize: 100,
-  },
-  {
-    accessorKey: "updatedAt",
-    header: () => (
-      <SortableHeader
-        label={t('table.lastModified')}
-        column="updatedAt"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const dateStr = format(new Date(row.getValue("updatedAt")), "yyyy-MM-dd HH:mm");
-      return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+    {
+      accessorKey: "filename",
+      header: () => (
+        <SortableHeader
+          label={t('table.name')}
+          column="name"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const name = row.getValue("filename") as string;
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="font-medium truncate max-w-[300px]">{name}</div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{name}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+      size: 250,
+      minSize: 200,
+      maxSize: 300,
     },
-    size: 150,
-    minSize: 130,
-    maxSize: 170,
-  },
-  {
-    accessorKey: "createdAt",
-    header: () => (
-      <SortableHeader
-        label={t('table.createdDate')}
-        column="createdAt"
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={onSort}
-      />
-    ),
-    cell: ({ row }) => {
-      const dateStr = format(new Date(row.getValue("createdAt")), "yyyy-MM-dd HH:mm");
-      return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+    {
+      accessorKey: "fileSize",
+      header: () => (
+        <SortableHeader
+          label={t('table.size')}
+          column="size"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatBytes(row.getValue("fileSize"))}</div>,
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
     },
-    size: 150,
-    minSize: 130,
-    maxSize: 170,
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    cell: ({ row }) => {
-      const image = row.original;
+    {
+      accessorKey: "format",
+      header: () => (
+        <SortableHeader
+          label={t('table.type')}
+          column="type"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="uppercase text-sm font-medium text-muted-foreground">{row.getValue("format")}</div>
+      ),
+      size: 80,
+      minSize: 60,
+      maxSize: 100,
+    },
+    {
+      accessorKey: "updatedAt",
+      header: () => (
+        <SortableHeader
+          label={t('table.lastModified')}
+          column="updatedAt"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const dateStr = format(new Date(row.getValue("updatedAt")), "yyyy-MM-dd HH:mm");
+        return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+      },
+      size: 150,
+      minSize: 130,
+      maxSize: 170,
+    },
+    {
+      accessorKey: "createdAt",
+      header: () => (
+        <SortableHeader
+          label={t('table.createdDate')}
+          column="createdAt"
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={onSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const dateStr = format(new Date(row.getValue("createdAt")), "yyyy-MM-dd HH:mm");
+        return <div className="text-sm text-muted-foreground">{dateStr}</div>;
+      },
+      size: 150,
+      minSize: 130,
+      maxSize: 170,
+    },
+    {
+      id: "actions",
+      enableHiding: false,
+      cell: ({ row }) => {
+        const image = row.original;
 
-      const handleDownload = async () => {
-        try {
-          const imageUrl = `local-image://${image.uuid}.${image.format}`;
-          const response = await fetch(imageUrl);
-          if (!response.ok) return;
+        const handleDownload = async () => {
+          try {
+            const buffer = await window.electronAPI?.loadLocalImage(image.uuid, image.format)
+            if (!buffer) {
+              throw "cannot read file"
+            }
+            const blob = new Blob([buffer as unknown as BlobPart], { type: image.mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = image.filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('Download error:', error);
+          }
+        };
 
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = image.filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        } catch (error) {
-          console.error('Download error:', error);
-        }
-      };
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(image.uuid)}
-            >
-              {t('contextMenu.copyId')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onViewImage(image)}>
-              <Eye className="mr-2 h-4 w-4" />
-              {t('contextMenu.viewDetails')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownload}>
-              <Download className="mr-2 h-4 w-4" />
-              {t('contextMenu.download')}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              {t('contextMenu.delete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => navigator.clipboard.writeText(image.uuid)}
+              >
+                {t('contextMenu.copyId')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onViewImage(image)}>
+                <Eye className="mr-2 h-4 w-4" />
+                {t('contextMenu.viewDetails')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownload}>
+                <Download className="mr-2 h-4 w-4" />
+                {t('contextMenu.download')}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                {t('contextMenu.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+      size: 60,
+      minSize: 60,
+      maxSize: 60,
     },
-    size: 60,
-    minSize: 60,
-    maxSize: 60,
-  },
-];
+  ];
 
 export default function LocalDetailList() {
   const { t } = useTranslation()
   const { openViewer } = useImageViewerStore()
+  const { openTiffViewer } = useTiffImageViewerStore()
   const { refreshTrigger } = useGalleryRefreshStore()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -329,7 +331,7 @@ export default function LocalDetailList() {
   const [sortBy, setSortBy] = React.useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('createdAt')
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
 
-  const [data, setData] = React.useState<Image[]>([])
+  const [data, setData] = React.useState<ImageWithSource[]>([])
   const [pagination, setPagination] = React.useState({
     page: 1,
     pageSize: 5,
@@ -354,8 +356,8 @@ export default function LocalDetailList() {
       const dbSortBy = sortBy ? sortByMap[sortBy] : undefined;
       const result = await localDatabase.getPaginatedImages(page, pageSize, dbSortBy, sortOrder);
 
-      // Convert local images to Image format
-      const images: Image[] = result.images.map((localImg: any) => ({
+      // Convert local images to ImageWithSource format
+      const images: ImageWithSource[] = result.images.map((localImg: any) => ({
         id: localImg.id,
         uuid: localImg.uuid,
         filename: localImg.filename,
@@ -370,6 +372,8 @@ export default function LocalDetailList() {
         updatedAt: localImg.updatedAt,
         deletedAt: localImg.deletedAt,
         exifData: localImg.exifData ? JSON.parse(localImg.exifData) : null,
+        source: 'local' as const,
+        aspectRatio: localImg.width && localImg.height ? localImg.width / localImg.height : undefined,
       }));
 
       setData(images);
@@ -483,9 +487,19 @@ export default function LocalDetailList() {
     }
   };
 
-  const handleViewImage = React.useCallback((image: Image) => {
-    openViewer(image, data);
-  }, [openViewer, data]);
+  const handleViewImage = React.useCallback((image: ImageWithSource) => {
+
+
+    if (image.format === 'tiff') {
+      openTiffViewer(image);
+      return;
+    } else {
+
+      openViewer(image, data);
+    }
+
+
+  }, [openViewer, openTiffViewer, data]);
 
   // Create columns with current sort state
   const columns = React.useMemo(
@@ -571,7 +585,7 @@ export default function LocalDetailList() {
             {t('table.export')} ({Object.keys(rowSelection).length})
           </Button>
           <Button
-              className=" border-gray-200 border hover:bg-gray-100 "
+            className=" border-gray-200 border hover:bg-gray-100 "
             onClick={handleDelete}
             disabled={Object.keys(rowSelection).length === 0 || isLoading}
           >
@@ -581,7 +595,7 @@ export default function LocalDetailList() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"
-              className="border-gray-200"
+                className="border-gray-200"
               >
                 {t('table.columns')} <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
@@ -708,8 +722,8 @@ export default function LocalDetailList() {
               <SelectContent side="top">
                 {[5, 10, 20, 30, 40, 50].map((pageSize) => (
                   <SelectItem
-                  className="cursor-pointer"
-                  key={pageSize} value={`${pageSize}`}>
+                    className="cursor-pointer"
+                    key={pageSize} value={`${pageSize}`}>
                     {pageSize}
                   </SelectItem>
                 ))}

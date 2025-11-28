@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2, Download, Eye, Trash2, Copy, CheckSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ImageItem } from '@/types/gallery';
+import type { ImageWithSource } from '@/types/gallery';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -15,9 +15,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { getCloudImagePresignedUrlEndpoint, getCloudThumbnailUrl } from '@/utils/imagePaths';
-
+import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
 interface CloudPhotoCardProps {
-  image: ImageItem;
+  image: ImageWithSource;
   selectionMode?: boolean;
   isSelected?: boolean;
   onSelect?: (imageId: string) => void;
@@ -34,32 +34,33 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   const { t } = useTranslation();
   const { openViewer } = useImageViewerStore();
   const { triggerRefresh } = useGalleryRefreshStore();
+  const { openTiffViewer } = useTiffImageViewerStore();
+
   // Ensure this is a cloud image
   if (image.source !== 'cloud') {
     console.warn('CloudPhotoCard received non-cloud image');
     return null;
   }
 
-  const cloudData = image.cloudData;
-  const displayName = cloudData?.filename || 'Unknown';
-  const fileSize = cloudData?.fileSize;
+  const displayName = image.filename || 'Unknown';
+  const fileSize = image.fileSize;
 
 
-  const handleCardClick = () =>{
-    if (!selectionMode){
+  const handleCardClick = () => {
+    if (!selectionMode) {
       return
-    }else{
+    } else {
       handleSelect()
     }
   }
 
   const handleDownload = async () => {
-    if (!cloudData?.uuid) return;
+    if (!image.uuid) return;
 
     try {
 
 
-      const endpoint = getCloudImagePresignedUrlEndpoint(cloudData.uuid);
+      const endpoint = getCloudImagePresignedUrlEndpoint(image.uuid);
       let response = await fetch(endpoint);
 
       if (!response.ok) {
@@ -80,7 +81,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = cloudData.filename || 'image.jpg';
+      link.download = image.filename || 'image.jpeg';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -91,44 +92,56 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   };
 
   const handleCopyId = () => {
-    if (cloudData?.uuid) {
-      navigator.clipboard.writeText(cloudData.uuid);
+    if (image.uuid) {
+      navigator.clipboard.writeText(image.uuid);
     }
   };
 
   const handleSelect = () => {
-    if (!selectionMode && onStartSelection && image.id) {
-      onStartSelection(image.id);
-    } else if (selectionMode && onSelect && image.id) {
-      onSelect(image.id);
+    if (!selectionMode && onStartSelection && image.uuid) {
+      onStartSelection(image.uuid);
+    } else if (selectionMode && onSelect && image.uuid) {
+      onSelect(image.uuid);
     }
   };
 
   const handleCardDoubleClick = (e: React.MouseEvent) => {
-    if (selectionMode && onSelect && image.id) {
+    if (selectionMode && onSelect && image.uuid) {
       e.preventDefault();
-      onSelect(image.id);
-    } else if (!selectionMode && cloudData) {
+      onSelect(image.uuid);
+    } else if (!selectionMode) {
       // Open viewer when clicking the card (not in selection mode)
-      openViewer(cloudData);
+      if (image.format === 'tiff') {
+        openTiffViewer(image)
+        return
+      } else {
+        openViewer(image);
+      }
+
     }
   };
 
   const handleViewDetails = () => {
-    if (cloudData) {
-      openViewer(cloudData);
+
+    if (image.format === 'tiff') {
+      openTiffViewer(image)
+      return
+    } else {
+      openViewer(image);
     }
+
+
   };
 
- 
+
 
   const handleDelete = async () => {
-    if (!cloudData?.id) return;
+    if (!image.id) return;
 
     if (!window.confirm(t('viewer.confirmDelete'))) return;
 
     try {
-      await deleteImages([cloudData.uuid]);
+      await deleteImages([image.uuid]);
       triggerRefresh();
     } catch (error) {
       console.error('Delete error:', error);
@@ -147,9 +160,9 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           onDoubleClick={handleCardDoubleClick}
           onClick={handleCardClick}
         >
-          {cloudData?.uuid ? (
+          {image.uuid ? (
             <img
-              src={getCloudThumbnailUrl(cloudData.uuid, cloudData.format)}
+              src={getCloudThumbnailUrl(image.uuid, image.format)}
               alt={displayName}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"
@@ -164,11 +177,11 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
           {selectionMode && (
             <div className="absolute top-2 right-2 z-10">
               <Checkbox
-                onClick={(e)=>{
+                onClick={(e) => {
                   e.stopPropagation()
                 }}
                 checked={isSelected}
-                onCheckedChange={() => onSelect && image.id && onSelect(image.id)}
+                onCheckedChange={() => onSelect && image.uuid && onSelect(image.uuid)}
                 className="bg-white border-2 border-gray-300"
               />
             </div>

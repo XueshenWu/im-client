@@ -4,27 +4,47 @@ import { fileURLToPath, pathToFileURL } from 'url'
 import si from 'systeminformation'
 import crypto from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
-
-
+import sharp from 'sharp';
+import * as utif from 'utif';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
 
 const __dirname = path.dirname(__filename)
-
+sharp.cache(false);
 
 import fs from 'fs/promises'
 import { initializeDatabase, dbOperations, closeDatabase } from './database.js'
 
 
+let pageBuffers: Buffer[] = [];
+
+
+// Helper to normalize file format extensions
+const normalizeFormat = (format: string): string => {
+  const normalized = format.toLowerCase().replace(/^\./, '');
+  switch (normalized) {
+    case 'jpg':
+    case 'jpeg':
+      return 'jpeg';
+    case 'tif':
+    case 'tiff':
+      return 'tiff';
+    case 'png':
+      return 'png';
+    default:
+      return normalized;
+  }
+};
+
 // Helper to validate files
 const isImage = (filename: string) => {
-  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
+  return /\.(jpg|jpeg|png|tif|tiff)$/i.test(filename);
 };
 
 // Helper to validate all supported file types (images, zip, json)
 const isValidFile = (filename: string) => {
-  return /\.(jpg|jpeg|png|gif|webp|bmp|svg|zip|json)$/i.test(filename);
+  return /\.(jpg|jpeg|png|tif|tiff|zip|json)$/i.test(filename);
 };
 // Recursive Walker Function
 async function getFilePaths(dirPath: string, recursive: boolean): Promise<string[]> {
@@ -65,7 +85,7 @@ function createWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self'; " +
-          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; " +
+          "connect-src 'self' http://localhost:* local-image: local-thumbnail: http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; " +
           "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
           "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
@@ -98,6 +118,274 @@ function createWindow() {
     mainWindow.setTitle(title)
   })
 
+
+  ipcMain.handle('tiff:load-buffer', async (_, buffer: Uint8Array) => {
+    try {
+      // A. Get metadata to find total pages
+      // Sharp reads the header efficiently without decoding all pixels
+      const metadata = await sharp(buffer).metadata();
+      const pageCount = metadata.pages || 1;
+
+      // B. Split the multi-page TIFF into individual TIFF buffers using Sharp
+      // We use Promise.all to process pages in parallel for speed
+      const splitPromises = [];
+      for (let i = 0; i < pageCount; i++) {
+        splitPromises.push(
+          sharp(buffer, { page: i })
+            .tiff({ compression: 'lzw' }) // Save as high-quality TIFF in RAM
+            .toBuffer()
+        );
+      }
+
+      pageBuffers = await Promise.all(splitPromises);
+
+      console.log(`Loaded ${pageBuffers.length} pages via Sharp.`);
+      return { success: true, pageCount: pageBuffers.length };
+
+    } catch (error: any) {
+      console.error("Load Error:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('tiff:get-preview', async (_, pageIndex: number) => {
+    // Bounds check
+    if (!pageBuffers[pageIndex]) {
+      return { success: false, error: `Page ${pageIndex} out of bounds` };
+    }
+
+    try {
+      const currentBuffer = pageBuffers[pageIndex];
+
+      // A. Read metadata from the specific page buffer
+      const metadata = await sharp(currentBuffer).metadata();
+
+      // B. Apply the exact logic from your snippet
+      // Note: We don't need { page: pageIndex } here because currentBuffer
+      // is ALREADY a single page we extracted during load.
+      const previewBuffer = await sharp(currentBuffer)
+        .rotate() // Auto-rotate based on EXIF
+        .resize({
+          width: 2000,
+          height: 2000,
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .toFormat('png')
+        .toBuffer();
+
+      return {
+        success: true,
+        previewSrc: `data:image/png;base64,${previewBuffer.toString('base64')}`,
+        metadata: {
+          width: metadata.width,
+          height: metadata.height,
+          // The individual buffer thinks it has 1 page, so we use the global array length
+          totalPages: pageBuffers.length,
+          currentPage: pageIndex
+        }
+      };
+
+    } catch (error: any) {
+      console.error(`Error processing page ${pageIndex}:`, error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('tiff:crop-page', async (_, pageIndex: number, crop: { x: number, y: number, width: number, height: number }) => {
+    if (!pageBuffers[pageIndex]) {
+      return { success: false, error: `Page ${pageIndex} out of bounds` };
+    }
+
+    try {
+      const currentBuffer = pageBuffers[pageIndex];
+
+      // First, create the preview PNG (same logic as getPreview)
+      const previewPngBuffer = await sharp(currentBuffer)
+        .rotate() // Auto-rotate based on EXIF
+        .resize({
+          width: 2000,
+          height: 2000,
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .png()
+        .toBuffer();
+
+      const previewMetadata = await sharp(previewPngBuffer).metadata();
+      const previewWidth = previewMetadata.width || 0;
+      const previewHeight = previewMetadata.height || 0;
+
+      // Validate and clamp crop coordinates to prevent extraction errors
+      let x = Math.max(0, Math.min(Math.round(crop.x), previewWidth - 1));
+      let y = Math.max(0, Math.min(Math.round(crop.y), previewHeight - 1));
+      let width = Math.max(1, Math.min(Math.round(crop.width), previewWidth - x));
+      let height = Math.max(1, Math.min(Math.round(crop.height), previewHeight - y));
+
+      console.log('Cropping from preview PNG:', {
+        pageIndex,
+        previewDimensions: { width: previewWidth, height: previewHeight },
+        cropDataReceived: crop,
+        cropDataClamped: { x, y, width, height }
+      });
+
+      // Crop the preview PNG, then convert back to TIFF
+      const croppedBuffer = await sharp(previewPngBuffer)
+        .extract({
+          left: x,
+          top: y,
+          width: width,
+          height: height
+        })
+        .tiff({ compression: 'lzw' })
+        .toBuffer();
+
+      const croppedMetadata = await sharp(croppedBuffer).metadata();
+      console.log('Cropped result:', { width: croppedMetadata.width, height: croppedMetadata.height });
+
+      return { success: true, buffer: croppedBuffer };
+    } catch (error: any) {
+      console.error(`Error cropping page ${pageIndex}:`, error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('tiff:replace-page', async (_, pageIndex: number, newPageBuffer: Buffer) => {
+    if (pageIndex < 0 || pageIndex >= pageBuffers.length) {
+      return { success: false, error: `Page ${pageIndex} out of bounds` };
+    }
+
+    try {
+      // Replace the page in the buffer array
+      pageBuffers[pageIndex] = newPageBuffer;
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Error replacing page ${pageIndex}:`, error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('tiff:append-page', async (_, newPageBuffer: Buffer) => {
+    try {
+      // Append the new page to the buffer array
+      pageBuffers.push(newPageBuffer);
+      return { success: true, totalPages: pageBuffers.length };
+    } catch (error: any) {
+      console.error('Error appending page:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('tiff:get-final-buffer', async () => {
+    try {
+      if (pageBuffers.length === 0) {
+        return { success: false, error: 'No pages loaded' };
+      }
+
+      console.log(`Processing ${pageBuffers.length} pages for multi-page TIFF`);
+
+      const pages = [];
+
+      // 1. Decode and prepare raw IFDs
+      for (let i = 0; i < pageBuffers.length; i++) {
+        const buffer = pageBuffers[i];
+        const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+
+        const decoded = utif.decode(arrayBuffer);
+        const rawIfd = decoded[0];
+        utif.decodeImage(arrayBuffer, rawIfd);
+
+        const cleanIfd = Object.create(null);
+
+        // Copy standard tags
+        cleanIfd.t256 = rawIfd.t256; // Width
+        cleanIfd.t257 = rawIfd.t257; // Height
+        cleanIfd.t258 = rawIfd.t258; // BitsPerSample
+        cleanIfd.t259 = [1];         // Compression (1 = None)
+        cleanIfd.t262 = rawIfd.t262; // Photometric
+        cleanIfd.t277 = rawIfd.t277; // SamplesPerPixel
+        cleanIfd.t278 = rawIfd.t257; // RowsPerStrip
+
+        pages.push({
+          ifd: cleanIfd,
+          data: Buffer.from(rawIfd.data)
+        });
+      }
+
+      // --- HELPER: Sort Keys Numerically ---
+      // TIFF spec requires tags to be written in ascending order (256 < 257 < ... < 273)
+      const getSortedIfd = (unsortedIfd: any) => {
+        const sorted = Object.create(null);
+        const keys = Object.keys(unsortedIfd).sort((a, b) => {
+          // "t256" -> 256
+          return parseInt(a.slice(1)) - parseInt(b.slice(1));
+        });
+
+        keys.forEach(key => {
+          sorted[key] = unsortedIfd[key];
+        });
+        return sorted;
+      };
+
+      // 2. Calculate Offsets
+
+      // Set fixed ByteCounts (t279)
+      pages.forEach(p => {
+        p.ifd.t279 = [p.data.length];
+      });
+
+      // Set dummy Offsets (t273) for header size calculation
+      pages.forEach(p => p.ifd.t273 = [0]);
+
+      // SORT BEFORE DUMMY ENCODE
+      // We must sort here so the dummy header size matches the final header size
+      let ifdList = pages.map(p => getSortedIfd(p.ifd));
+
+      const dummyHeader = utif.encode(ifdList);
+      const headerSize = dummyHeader.byteLength;
+
+      console.log(`Metadata Header Size: ${headerSize} bytes`);
+
+      // 3. Update Real Offsets
+      let currentOffset = headerSize;
+      pages.forEach(p => {
+        p.ifd.t273 = [currentOffset];
+        currentOffset += p.data.length;
+      });
+
+      // 4. Final Sort and Encode
+      // Re-sort because we modified t273, and we want to be absolutely sure of the order
+      ifdList = pages.map(p => getSortedIfd(p.ifd));
+
+      const finalHeaderBuffer = Buffer.from(utif.encode(ifdList));
+
+      // 5. Stitch
+      const parts = [finalHeaderBuffer];
+      pages.forEach(p => {
+        parts.push(p.data);
+      });
+
+      const finalBuffer = Buffer.concat(parts);
+
+      console.log(`Multi-page TIFF created successfully. Total size: ${finalBuffer.length}`);
+      return { success: true, buffer: finalBuffer };
+
+    } catch (error: any) {
+      console.error('Error getting final buffer:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('tiff:cleanup', async () => {
+    try {
+      // Clear the page buffers to free memory
+      pageBuffers = [];
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error cleaning up TIFF buffers:', error);
+      return { success: false, error: error.message };
+    }
+  });
   // Updated Handler
   ipcMain.handle('expand-path', async (event, targetPath, recursive = false) => {
     try {
@@ -134,6 +422,62 @@ function createWindow() {
     }
   });
 
+
+
+
+
+
+  ipcMain.handle('tiff:prepare-local-tiff-image', async (_, uuid: string, format: string, pageIndex: number) => {
+
+    try {
+      const filePath = path.join(app.getPath('appData'), 'image-management', 'images', `${uuid}.${format}`);
+      const metadata = await sharp(filePath).metadata();
+
+      const totalPages = metadata.pages || 1;
+      if (pageIndex >= totalPages) {
+        throw new Error(`Page ${pageIndex} out of bounds. Total pages: ${totalPages}`);
+      }
+
+      const image = sharp(filePath, { page: pageIndex })
+      const previewBuffer = await image
+        .rotate()
+        .resize({
+          width: 2000,
+          height: 2000,
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .toFormat('png')
+        .toBuffer();
+
+      return {
+        success: true,
+        previewSrc: `data:image/png;base64,${previewBuffer.toString('base64')}`,
+        metadata: {
+          width: metadata.width,
+          height: metadata.height,
+          totalPages: totalPages,
+          currentPage: pageIndex
+        }
+      };
+
+
+    } catch (error: any) {
+
+      console.error('Error processing TIFF:', error);
+      return { success: false, error: error.message };
+    }
+
+
+  })
+
+  ipcMain.handle('load-local-image', async (_, uuid: string, format: string) => {
+    const filePath = path.join(app.getPath('appData'), 'image-management', 'images', `${uuid}.${format}`);
+    return await fs.readFile(filePath)
+
+  })
+
+
   ipcMain.handle('get-roam-path', () => {
     return path.join(app.getPath('appData'), 'image-management');
   });
@@ -150,9 +494,8 @@ function createWindow() {
 
       for (const file of files) {
         try {
-          const destPath = path.join(appDataPath, `${file.uuid}.jpg`);
+          const destPath = path.join(appDataPath, `${file.uuid}.jpeg`);
 
-          // Copy file to AppData with UUID-based name (always .jpg for thumbnails)
           await fs.copyFile(file.sourcePath, destPath);
           savedFiles.push(destPath);
         } catch (error) {
@@ -177,8 +520,6 @@ function createWindow() {
 
 
 
-
-
   ipcMain.handle('save-files-to-local', async (event, files: Array<{ sourcePath: string; uuid: string; format: string }>) => {
     try {
       // Get AppData directory for this app
@@ -191,7 +532,9 @@ function createWindow() {
 
       for (const file of files) {
         try {
-          const destPath = path.join(appDataPath, `${file.uuid}.${file.format}`);
+          // Normalize the format to ensure consistency (jpeg not jpg, tiff not tif)
+          const normalizedFormat = normalizeFormat(file.format);
+          const destPath = path.join(appDataPath, `${file.uuid}.${normalizedFormat}`);
 
           // Copy file to AppData with UUID-based name
           await fs.copyFile(file.sourcePath, destPath);
@@ -299,38 +642,37 @@ function createWindow() {
 
 
 
-ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, buffer: ArrayBuffer) => {
-  try {
-    const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
-    await fs.mkdir(appDataPath, { recursive: true });
-
-    // 1. Construct path using RAW UUID (No trim/sanitize) to match DB
-    // We only remove a leading dot from format to prevent "uuid..png"
-    const cleanFormat = format.replace(/^\./, ''); 
-    const filePath = path.join(appDataPath, `${uuid}.${cleanFormat}`);
-
-    // 2. EXPLICITLY DELETE (UNLINK) IF EXISTS
-    // This releases the file handle if Windows has locked it "pending deletion"
+  ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, buffer: ArrayBuffer) => {
     try {
-      await fs.unlink(filePath);
-    } catch (error: any) {
-      // Ignore if file doesn't exist (ENOENT)
-      // Throw if strictly locked/permission error (EBUSY/EPERM)
-      if (error.code !== 'ENOENT') {
-        console.error('Error deleting old image:', error);
-        throw error;
+      const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
+      await fs.mkdir(appDataPath, { recursive: true });
+
+      // 1. Normalize and clean the format (jpeg not jpg, tiff not tif)
+      const normalizedFormat = normalizeFormat(format);
+      const filePath = path.join(appDataPath, `${uuid}.${normalizedFormat}`);
+
+      // 2. EXPLICITLY DELETE (UNLINK) IF EXISTS
+      // This releases the file handle if Windows has locked it "pending deletion"
+      try {
+        await fs.unlink(filePath);
+      } catch (error: any) {
+        // Ignore if file doesn't exist (ENOENT)
+        // Throw if strictly locked/permission error (EBUSY/EPERM)
+        if (error.code !== 'ENOENT') {
+          console.error('Error deleting old image:', error);
+          throw error;
+        }
       }
+
+      // 3. Write the new image file
+      await fs.writeFile(filePath, Buffer.from(buffer));
+
+      return filePath;
+    } catch (error) {
+      console.error('Failed to save image buffer:', error);
+      return null;
     }
-
-    // 3. Write the new image file
-    await fs.writeFile(filePath, Buffer.from(buffer));
-
-    return filePath;
-  } catch (error) {
-    console.error('Failed to save image buffer:', error);
-    return null;
-  }
-});
+  });
 
   // Save downloaded thumbnail buffer to AppData
   ipcMain.handle('save-thumbnail-buffer', async (event, uuid: string, buffer: ArrayBuffer) => {
@@ -338,7 +680,7 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
       await fs.mkdir(appDataPath, { recursive: true });
 
-      const filePath = path.join(appDataPath, `${uuid}.jpg`);
+      const filePath = path.join(appDataPath, `${uuid}.jpeg`);
       await fs.writeFile(filePath, Buffer.from(buffer));
 
       return filePath;
@@ -349,7 +691,6 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
   });
 
 
-  
 
 
   ipcMain.handle('dialog:open', async () => {
@@ -362,7 +703,7 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
         // 'openDirectory' // ❌ REMOVE THIS to make files visible again on Windows
       ],
       filters: [
-        { name: 'Supported Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'zip', 'json'] }
+        { name: 'Supported Files', extensions: ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'zip', 'json'] }
       ]
     });
 
@@ -443,6 +784,16 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
     }
   });
 
+  ipcMain.handle('db:upsertExifData', async (event, uuid: string, exif: any) => {
+    try {
+      const result = await dbOperations.upsertExifData(uuid, exif);
+      return result;
+    } catch (error) {
+      console.error('Failed to upsert exif:', error);
+      throw error;
+    }
+  })
+
   ipcMain.handle('db:updateImage', async (event, uuid: string, updates: any) => {
     try {
       await dbOperations.updateImage(uuid, updates);
@@ -514,6 +865,8 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
       return [];
     }
   });
+
+
 
   ipcMain.handle('db:clearAllImages', async () => {
     try {
@@ -590,11 +943,26 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
       // Use canvas-based thumbnail generation instead of sharp
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
       await fs.mkdir(appDataPath, { recursive: true });
+      const metadata = await sharp(sourcePath).metadata();
 
-      const thumbnailPath = path.join(appDataPath, `${uuid}.jpg`);
-
+      const thumbnailPath = path.join(appDataPath, `${uuid}.jpeg`);
+      let imageBuffer: Buffer;
       // Read the original image
-      const imageBuffer = await fs.readFile(sourcePath);
+
+
+
+      if (metadata.format === 'tiff') {
+
+
+        imageBuffer = await sharp(sourcePath, { page: 0 })
+          .resize({ width: 300 })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+
+      } else {
+        imageBuffer = await fs.readFile(sourcePath);
+      }
+
 
       // Return the path and buffer for renderer to generate thumbnail
       return {
@@ -619,6 +987,83 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
       return { success: true, thumbnailPath };
     } catch (error) {
       console.error('Failed to save thumbnail:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
+  // Get TIFF metadata (page count, dimensions for all pages)
+  ipcMain.handle('get-img-metadata', async (_event, filePath: string) => {
+    try {
+      const metadata = await sharp(filePath).metadata();
+
+
+
+      const pageCount = metadata.pages || 1;
+      const pages: Array<{ width: number; height: number }> = [];
+
+      // Extract dimensions for each page
+      for (let i = 0; i < pageCount; i++) {
+        const pageMetadata = await sharp(filePath, { page: i }).metadata();
+        pages.push({
+          width: pageMetadata.width || 0,
+          height: pageMetadata.height || 0,
+        });
+      }
+
+      return {
+        success: true,
+        pageCount,
+        pages,
+        format: metadata.format,
+      };
+    } catch (error) {
+      console.error('Failed to get TIFF metadata:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
+  // Get specific TIFF page as image buffer
+  ipcMain.handle('get-tiff-page', async (_event, filePath: string, pageIndex: number) => {
+    try {
+      const metadata = await sharp(filePath).metadata();
+
+      if (metadata.format !== 'tiff' && metadata.format !== 'tif') {
+        return {
+          success: false,
+          error: 'File is not a TIFF image',
+        };
+      }
+
+      const pageCount = metadata.pages || 1;
+      if (pageIndex < 0 || pageIndex >= pageCount) {
+        return {
+          success: false,
+          error: `Invalid page index. File has ${pageCount} page(s).`,
+        };
+      }
+
+      // Extract the specific page and convert to PNG for browser display
+      const pageBuffer = await sharp(filePath, { page: pageIndex })
+        .png()
+        .toBuffer();
+
+      const pageMetadata = await sharp(filePath, { page: pageIndex }).metadata();
+
+      return {
+        success: true,
+        buffer: Array.from(pageBuffer),
+        width: pageMetadata.width || 0,
+        height: pageMetadata.height || 0,
+        pageIndex,
+      };
+    } catch (error) {
+      console.error('Failed to get TIFF page:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -653,6 +1098,30 @@ ipcMain.handle('save-image-buffer', async (event, uuid: string, format: string, 
   }
 }
 
+
+// protocol.registerSchemesAsPrivileged([
+//   {
+//     scheme:'local-image',
+//     privileges: {
+//       standard: true,
+//       secure: true,
+//       supportFetchAPI: true, // <--- THIS FIXES YOUR ERROR
+//       corsEnabled: true,     // <--- Often needed to prevent CORS errors later
+//       stream: true           // <--- Good for performance with images
+//     }
+//   },
+//   {
+//     scheme:'local-thumbnail',
+//     privileges: {
+//       standard: true,
+//       secure: true,
+//       supportFetchAPI: true, // <--- THIS FIXES YOUR ERROR
+//       corsEnabled: true,     // <--- Often needed to prevent CORS errors later
+//       stream: true           // <--- Good for performance with images
+//     }
+//   },
+// ])
+
 app.whenReady().then(async () => {
 
 
@@ -673,7 +1142,9 @@ app.whenReady().then(async () => {
         fileName
       );
 
-      return net.fetch(pathToFileURL(filePath).toString());
+      return net.fetch(pathToFileURL(filePath).toString(), {
+        bypassCustomProtocolHandlers: true,
+      });
     } catch (error) {
       console.error('Local Image Protocol Error:', error);
       return new Response('Failed to load image', { status: 500 });
@@ -692,10 +1163,12 @@ app.whenReady().then(async () => {
         app.getPath('appData'),
         'image-management',
         'thumbnails',
-        `${decodedUuid}.jpg`
+        `${decodedUuid}.jpeg`
       );
 
-      return net.fetch(pathToFileURL(filePath).toString());
+      return net.fetch(pathToFileURL(filePath).toString(), {
+        bypassCustomProtocolHandlers: true,
+      });
     } catch (error) {
       console.error('Local Thumbnail Protocol Error:', error);
       return new Response('Failed to load thumbnail', { status: 500 });
