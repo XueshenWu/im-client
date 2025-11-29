@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Download, Eye, Trash2, Copy, CheckSquare } from 'lucide-react';
+import { Loader2, Download, Eye, Trash2, Copy, CheckSquare, Edit } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageWithSource } from '@/types/gallery';
 import {
@@ -16,6 +16,7 @@ import { useImageViewerStore } from '@/stores/imageViewerStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { getCloudImagePresignedUrlEndpoint, getCloudThumbnailUrl } from '@/utils/imagePaths';
 import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
+import { useExifEditorStore } from '@/stores/exifEditorStore';
 interface CloudPhotoCardProps {
   image: ImageWithSource;
   selectionMode?: boolean;
@@ -35,7 +36,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   const { openViewer } = useImageViewerStore();
   const { triggerRefresh } = useGalleryRefreshStore();
   const { openTiffViewer } = useTiffImageViewerStore();
-
+  const { openEditor } = useExifEditorStore()
   // Ensure this is a cloud image
   if (image.source !== 'cloud') {
     console.warn('CloudPhotoCard received non-cloud image');
@@ -44,7 +45,10 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
 
   const displayName = image.filename || 'Unknown';
   const fileSize = image.fileSize;
-
+  const handleEditExif = () => {
+    if (!image) return;
+    openEditor(image);
+  };
 
   const handleCardClick = () => {
     if (!selectionMode) {
@@ -173,6 +177,13 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
             </div>
           )}
 
+          {/* TIFF page count indicator - shown for multi-page TIFF files */}
+          {image.format === 'tiff' && image.pageCount && image.pageCount > 1 && (
+            <div className="absolute top-2 left-2 z-10 bg-black/50 text-white text-xs font-semibold px-2 py-1 rounded backdrop-blur-sm">
+              {image.pageCount} pages
+            </div>
+          )}
+
           {/* Checkbox overlay - shown when in selection mode */}
           {selectionMode && (
             <div className="absolute top-2 right-2 z-10">
@@ -213,6 +224,10 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
         <ContextMenuItem onClick={handleCopyId}>
           <Copy className="mr-2 h-4 w-4" />
           {t('contextMenu.copyId')}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleEditExif}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit EXIF
         </ContextMenuItem>
         <ContextMenuItem onClick={handleViewDetails}>
           <Eye className="mr-2 h-4 w-4" />

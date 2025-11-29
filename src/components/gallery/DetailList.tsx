@@ -14,7 +14,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive, Copy } from "lucide-react"
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive, Copy, Edit } from "lucide-react"
 import JSZip from 'jszip'
 import { useImageViewerStore } from '@/stores/imageViewerStore'
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
@@ -57,6 +57,7 @@ import { Image, PagePaginationMeta } from "@/types/api"
 import { ImageWithSource } from "@/types/gallery"
 import { format } from 'date-fns'
 import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
+import { useExifEditorStore } from "@/stores/exifEditorStore"
 
 // Helper function to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -122,7 +123,8 @@ export const createColumns = (
   sortOrder: 'asc' | 'desc',
   onSort: (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => void,
   t: (key: string) => string,
-  onViewImage: (image: ImageWithSource) => void
+  onViewImage: (image: ImageWithSource) => void,
+  onEditExif: (image: ImageWithSource) => void
 ): ColumnDef<ImageWithSource>[] => [
     {
       id: "select",
@@ -327,6 +329,10 @@ export const createColumns = (
                 <Copy className="mr-2 h-4 w-4" />
                 {t('contextMenu.copyId')}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEditExif(image)}>
+                <Edit className="mr-2 h-4 w-4" />
+                {"Edit EXIF"}
+              </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => onViewImage(image)}>
                 <Eye className="mr-2 h-4 w-4" />
@@ -374,6 +380,13 @@ export default function DetailList() {
     hasNext: false,
     hasPrev: false,
   })
+
+  const { openEditor } = useExifEditorStore()
+
+  const handleEditExif = (image: ImageWithSource) => {
+    openEditor(image)
+  }
+
 
   const fetchData = async (page: number, pageSize: number, sort?: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt', order?: 'asc' | 'desc') => {
     setIsLoading(true)
@@ -580,7 +593,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
 
   // Create columns with current sort state
   const columns = React.useMemo(
-    () => createColumns(sortBy, sortOrder, handleSort, t, handleViewImage),
+    () => createColumns(sortBy, sortOrder, handleSort, t, handleViewImage, handleEditExif),
     [sortBy, sortOrder, t, handleSort, handleViewImage]
   );
 

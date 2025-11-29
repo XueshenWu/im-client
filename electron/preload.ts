@@ -61,7 +61,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearAllImages: () => ipcRenderer.invoke('db:clearAllImages'),
     getSyncMetadata: () => ipcRenderer.invoke('db:getSyncMetadata'),
     updateSyncMetadata: (metadata: any) => ipcRenderer.invoke('db:updateSyncMetadata', metadata),
-    upsertExifData: (uuid: string, exif: any) => ipcRenderer.invoke('db:upsertExifData', uuid, exif)
+    getExifData: (uuid: string) => ipcRenderer.invoke('db:getExifData', uuid),
+    upsertExifData: (uuid: string, exif: any) => ipcRenderer.invoke('db:upsertExifData', uuid, exif),
+    getAllImagesWithExif: () => ipcRenderer.invoke('db:getAllImagesWithExif')
   },
   tiff: {
     loadBuffer: (buffer: Uint8Array) => ipcRenderer.invoke('tiff:load-buffer', buffer),

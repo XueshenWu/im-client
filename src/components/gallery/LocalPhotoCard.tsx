@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Download, Eye, Trash2, Copy, CheckSquare } from 'lucide-react';
+import { Loader2, Download, Eye, Trash2, Copy, CheckSquare, Edit } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ImageWithSource } from '@/types/gallery';
 import {
@@ -15,6 +15,7 @@ import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { localImageService } from '@/services/localImage.service';
 import { getImageUrl, getThumbnailUrl } from '@/utils/imagePaths';
 import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
+import { useExifEditorStore } from '@/stores/exifEditorStore';
 
 
 interface LocalPhotoCardProps {
@@ -36,6 +37,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   const { openViewer } = useImageViewerStore();
   const { openTiffViewer } = useTiffImageViewerStore();
   const { triggerRefresh } = useGalleryRefreshStore();
+  const { openEditor } = useExifEditorStore();
 
   // Ensure this is a local image
   if (image.source !== 'local') {
@@ -112,7 +114,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
       onSelect(image.uuid);
     } else if (!selectionMode) {
       // Open viewer when clicking the card (not in selection mode)
-      if ( image.format === 'tiff') {
+      if (image.format === 'tiff') {
         await openTiffViewer(image)
       } else {
         openViewer(image);
@@ -122,15 +124,21 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   };
 
   const handleViewDetails = () => {
-    openViewer({
-      uuid: image.uuid || '',
-      filename: image.filename || '',
-      fileSize: image.fileSize || 0,
-      format: image.format || '',
-      width: image.width || 0,
-      height: image.height || 0,
-      source: 'local'
-    } as any);
+
+
+    if (image.format === 'tiff') {
+      openTiffViewer(image)
+      return
+    } else {
+
+      openViewer(image);
+    }
+  
+  };
+
+  const handleEditExif = () => {
+    if (!image) return;
+    openEditor(image);
   };
 
   const handleDelete = async () => {
@@ -158,17 +166,28 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
           onClick={handleCardClick}
         >
           {image.uuid ? (
+
             <img
               src={getThumbnailUrl(image.uuid)}
               alt={displayName}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"
             />
+
+
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-200">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
           )}
+          {/* TIFF page count indicator - shown for multi-page TIFF files */}
+          {image.format === 'tiff' && image.pageCount && image.pageCount > 1 && (
+            <div className="absolute bottom-1 right-1 z-10 bg-black/50 text-white text-xs font-semibold px-2 py-1 rounded backdrop-blur-sm">
+              {image.pageCount}
+            </div>
+          )}
+
+
 
           {/* Checkbox overlay - shown when in selection mode */}
           {selectionMode && (
@@ -210,6 +229,10 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
         <ContextMenuItem onClick={handleViewDetails}>
           <Eye className="mr-2 h-4 w-4" />
           {t('contextMenu.viewDetails')}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={handleEditExif}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit EXIF
         </ContextMenuItem>
         <ContextMenuItem onClick={handleDownload}>
           <Download className="mr-2 h-4 w-4" />

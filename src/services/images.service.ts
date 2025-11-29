@@ -11,7 +11,7 @@ import type {
 } from '@/types/api'
 import exifr from 'exifr'
 import { normalizeFormatFromFilename } from '@/utils/formatNormalizer'
-
+import type { TiffPageDimensions } from '@/types/api'
 /**
  * Extract EXIF data from an image file
  */
@@ -137,6 +137,13 @@ export const getImagesByUuid = async (uuids: string[], withExif?: boolean): Prom
   return response.data.data
 }
 
+export const getExifByUuid = async (uuid: string): Promise<ExifData | null> => {
+  const response = await api.get<ApiResponse<ExifData>>(`/api/images/exif/uuid/${uuid}`)
+  return response.data.data
+}
+
+
+
 /**
  * Update image EXIF data (single or batch)
  * Uses unified endpoint - array length determines if it's single or batch operation
@@ -211,6 +218,17 @@ export const replaceImages = async (
   replacements: Array<{
     uuid: string;
     file: File | Blob;
+    thumbnailBlob?: Blob;
+    metadata?: {
+      width: number;
+      height: number;
+      filename?: string;
+      format?: string;
+      mimeType?: string;
+      exifData?: ExifData;
+      pageCount?: number;
+      tiffDimensions?: TiffPageDimensions[];
+    };
   }>
 ): Promise<{
   replaced: Image[];
@@ -219,28 +237,33 @@ export const replaceImages = async (
 }> => {
   // Process all files to extract metadata
   const replacementRequests = await Promise.all(
-    replacements.map(async ({ uuid, file }) => {
+    replacements.map(async ({ uuid, file, metadata }) => {
       const isFile = file instanceof File;
-      const filename = isFile ? file.name : 'image.jpeg';
-      const format = normalizeFormatFromFilename(filename);
+      const filename = metadata?.filename || (isFile ? file.name : 'image.jpeg');
+      const format = metadata?.format || normalizeFormatFromFilename(filename);
 
-      // Calculate dimensions
-      let width = 0, height = 0;
-      const imageUrl = URL.createObjectURL(file);
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => {
-          width = img.naturalWidth;
-          height = img.naturalHeight;
-          URL.revokeObjectURL(imageUrl);
-          resolve();
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(imageUrl);
-          reject(new Error('Failed to load image'));
-        };
-        img.src = imageUrl;
-      });
+      // Calculate dimensions (use provided metadata if available, especially for TIFF)
+      let width = metadata?.width || 0;
+      let height = metadata?.height || 0;
+
+      // Only try to load in browser if metadata not provided and format is browser-compatible
+      if (!metadata && format !== 'tiff') {
+        const imageUrl = URL.createObjectURL(file);
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => {
+            width = img.naturalWidth;
+            height = img.naturalHeight;
+            URL.revokeObjectURL(imageUrl);
+            resolve();
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(imageUrl);
+            reject(new Error('Failed to load image'));
+          };
+          img.src = imageUrl;
+        });
+      }
 
       // Calculate file hash using Web Crypto API
       const arrayBuffer = await file.arrayBuffer();
@@ -255,12 +278,14 @@ export const replaceImages = async (
         uuid,
         filename,
         format,
-        mimeType: file.type || 'image/jpeg',
+        mimeType: metadata?.mimeType || file.type || 'image/jpeg',
         width,
         height,
         fileSize: file.size,
         hash,
         exifData,
+        pageCount: metadata?.pageCount,
+        tiffDimensions: metadata?.tiffDimensions,
       };
     })
   );
@@ -293,10 +318,11 @@ export const replaceImages = async (
   for (let i = 0; i < result.replaced.length; i++) {
     const replacement = result.replaced[i];
     const originalFile = replacements[i].file;
+    const providedThumbnail = replacements[i].thumbnailBlob;
 
     try {
-      // Generate and upload thumbnail first
-      const thumbnailBlob = await generateThumbnailBlob(originalFile, 300);
+      // Use provided thumbnail or generate one
+      const thumbnailBlob = providedThumbnail || await generateThumbnailBlob(originalFile, 300);
       const thumbnailSuccess = await uploadToPresignedURL(
         replacement.uploadUrls.thumbnailUrl,
         thumbnailBlob,
@@ -407,5 +433,16 @@ export const getImagesMetadata = async (
     currentSequence: response.data.currentSequence,
     count: response.data.count,
   }
+}
+
+/**
+ * Update cloud image metadata (for TIFF edits, dimension changes, etc.)
+ */
+export const updateCloudImageMetadata = async (
+  uuid: string,
+  updates: Partial<Pick<Image, 'fileSize' | 'pageCount' | 'tiffDimensions' | 'width' | 'height'>>
+): Promise<Image> => {
+  const response = await api.put<ApiResponse<Image>>(`/api/images/uuid/${uuid}`, updates)
+  return response.data.data
 }
 

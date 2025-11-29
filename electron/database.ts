@@ -10,7 +10,7 @@ const sqlite3 = require('sqlite3').verbose();
 
 // Use the type from the import for TypeScript, but the runtime value from require
 import type { Database } from 'sqlite3';
-import { ExifData } from '@/types/api';
+import { ExifData, ExifExtra } from '@/types/api';
 
 let db: Database | null = null;
 
@@ -242,6 +242,41 @@ export const dbOperations = {
   async getImageByUuid(uuid: string): Promise<any | undefined> {
     const image = await sql.get('SELECT * FROM images WHERE uuid = ? AND deletedAt IS NULL', [uuid]);
     return parseImageData(image);
+  },
+
+  async getExifDataByUuid(uuid: string): Promise<ExifData | null> {
+    const row = await sql.get('SELECT * FROM exif_data WHERE uuid = ?', [uuid]);
+
+    if (!row) return null;
+
+    // Parse extra field if it exists
+    let extra: ExifExtra | undefined = undefined;
+    if (row.extra && typeof row.extra === 'string') {
+      try {
+        extra = JSON.parse(row.extra);
+      } catch (error) {
+        console.error('[DB] Failed to parse EXIF extra data:', error);
+      }
+    }
+
+    return {
+      cameraMake: row.camera_make || undefined,
+      cameraModel: row.camera_model || undefined,
+      lensModel: row.lens_model || undefined,
+      artist: row.artist || undefined,
+      copyright: row.copyright || undefined,
+      software: row.software || undefined,
+      iso: row.iso || undefined,
+      shutterSpeed: row.shutter_speed || undefined,
+      aperture: row.aperture || undefined,
+      focalLength: row.focal_length || undefined,
+      dateTaken: row.date_taken || undefined,
+      orientation: row.orientation || undefined,
+      gpsLatitude: row.gps_latitude?.toString() || undefined,
+      gpsLongitude: row.gps_longitude?.toString() || undefined,
+      gpsAltitude: row.gps_altitude?.toString() || undefined,
+      extra,
+    };
   },
 
   async upsertExifData(uuid: string, exifData: ExifData): Promise<{ id: number; changes: number }> {
@@ -612,6 +647,80 @@ export const dbOperations = {
           else resolve();
         });
       });
+    });
+  },
+
+  /**
+   * Get all images with their EXIF data for LWW sync diff calculation
+   * Joins images and exif_data tables
+   */
+  async getAllImagesWithExif(): Promise<any[]> {
+    const images = await sql.all(`
+      SELECT
+        i.*,
+        e.camera_make,
+        e.camera_model,
+        e.lens_model,
+        e.artist,
+        e.copyright,
+        e.software,
+        e.iso,
+        e.shutter_speed,
+        e.aperture,
+        e.focal_length,
+        e.date_taken,
+        e.orientation,
+        e.gps_latitude,
+        e.gps_longitude,
+        e.gps_altitude,
+        e.extra
+      FROM images i
+      LEFT JOIN exif_data e ON i.uuid = e.uuid
+      ORDER BY i.createdAt DESC
+    `);
+
+    return images.map((row: any) => {
+      const image = parseImageData(row);
+
+      // Build exifData object if any EXIF fields exist
+      const hasExifData = row.camera_make || row.camera_model || row.lens_model ||
+                         row.artist || row.copyright || row.software || row.iso ||
+                         row.shutter_speed || row.aperture || row.focal_length ||
+                         row.date_taken || row.orientation || row.gps_latitude ||
+                         row.gps_longitude || row.gps_altitude || row.extra;
+
+      if (hasExifData) {
+        // Parse extra field if it exists
+        let extra: ExifExtra | undefined = undefined;
+        if (row.extra && typeof row.extra === 'string') {
+          try {
+            extra = JSON.parse(row.extra);
+          } catch (error) {
+            console.error('[DB] Failed to parse EXIF extra data:', error);
+          }
+        }
+
+        image.exifData = {
+          cameraMake: row.camera_make || undefined,
+          cameraModel: row.camera_model || undefined,
+          lensModel: row.lens_model || undefined,
+          artist: row.artist || undefined,
+          copyright: row.copyright || undefined,
+          software: row.software || undefined,
+          iso: row.iso || undefined,
+          shutterSpeed: row.shutter_speed || undefined,
+          aperture: row.aperture || undefined,
+          focalLength: row.focal_length || undefined,
+          dateTaken: row.date_taken || undefined,
+          orientation: row.orientation || undefined,
+          gpsLatitude: row.gps_latitude?.toString() || undefined,
+          gpsLongitude: row.gps_longitude?.toString() || undefined,
+          gpsAltitude: row.gps_altitude?.toString() || undefined,
+          extra,
+        };
+      }
+
+      return image;
     });
   },
 };

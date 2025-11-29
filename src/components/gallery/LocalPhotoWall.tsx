@@ -69,24 +69,24 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
         // Process images to add aspect ratio (NO MORE BLOBS HERE)
         const processedImages = await Promise.all(
           result.images.map(async (img: LocalImage) => {
-            
+
             // 1. Try to get aspect ratio from DB first (fastest)
             let aspectRatio = img.width && img.height ? img.width / img.height : 0;
 
             // 2. If DB misses dimensions, calculate them using the custom protocol (slower fallback)
             //    This replaces the old blob logic.
             if (!aspectRatio) {
-               try {
-                 const tempUrl = `local-image://${img.uuid}.${img.format}`;
-                 aspectRatio = await new Promise<number>((resolve) => {
-                   const image = new Image();
-                   image.onload = () => resolve(image.width / image.height);
-                   image.onerror = () => resolve(1); // Default to square on error
-                   image.src = tempUrl;
-                 });
-               } catch (e) {
-                 aspectRatio = 1;
-               }
+              try {
+                const tempUrl = `local-image://${img.uuid}.${img.format}`;
+                aspectRatio = await new Promise<number>((resolve) => {
+                  const image = new Image();
+                  image.onload = () => resolve(image.width / image.height);
+                  image.onerror = () => resolve(1); // Default to square on error
+                  image.src = tempUrl;
+                });
+              } catch (e) {
+                aspectRatio = 1;
+              }
             }
 
             return {
@@ -105,6 +105,8 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
               deletedAt: img.deletedAt,
               aspectRatio: aspectRatio || 1,
               source: 'local' as ImageSource,
+              pageCount: img.pageCount || 1,
+              tiffDimensions: img.tiffDimensions
             };
           })
         );
@@ -426,33 +428,10 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
     );
   }
 
-  // ... (Return JSX mostly unchanged, just ensure passed props match) ...
+
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Selection Toolbar */}
-      {selectionMode && (
-        <div className="flex items-center justify-between px-6 py-3 bg-blue-50 border-b border-blue-200">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={handleClearSelection} className="text-gray-700 hover:text-gray-900">
-              <X className="h-4 w-4 mr-1" />
-              {t('common.cancel')}
-            </Button>
-            <span className="text-sm font-medium text-gray-700">
-              {t('gallery.selectedCount', { count: selectedIds.size })}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleExport} disabled={selectedIds.size === 0 || exporting} className="bg-blue-600 text-white hover:bg-blue-700">
-              {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
-              {t('gallery.export')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleDelete} disabled={selectedIds.size === 0 || exporting} className="bg-red-600 text-white hover:bg-red-700">
-              <Trash2 className="h-4 w-4 mr-1" />
-              {t('gallery.delete')}
-            </Button>
-          </div>
-        </div>
-      )}
+
 
       {/* Controls Bar */}
       <div className="flex items-center justify-between px-6 py-3 border-gray-200">
@@ -470,6 +449,30 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
             {sortBy ? <span className="text-sm">Sort</span> : t('gallery.sortBy')}
           </Button>
         </div>
+        {/* Selection Toolbar */}
+        {selectionMode && (
+          <div className="flex items-center justify-between px-6 py-3">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={handleClearSelection} className="text-gray-700 hover:text-gray-900">
+                <X className="h-4 w-4 mr-1" />
+                {t('common.cancel')}
+              </Button>
+              <span className="text-sm font-medium text-gray-700">
+                {t('gallery.selected', { count: selectedIds.size })}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={handleExport} disabled={selectedIds.size === 0 || exporting} className="bg-blue-600 text-white hover:bg-blue-700">
+                {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                {t('gallery.export')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDelete} disabled={selectedIds.size === 0 || exporting} className="bg-red-600 text-white hover:bg-red-700">
+                <Trash2 className="h-4 w-4 mr-1" />
+                {t('gallery.delete')}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>

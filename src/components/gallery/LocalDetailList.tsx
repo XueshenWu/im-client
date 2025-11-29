@@ -8,7 +8,7 @@ import { localDatabase } from '@/services/localDatabase.service'
 import { localImageService } from '@/services/localImage.service'
 import { ColumnDef } from "@tanstack/react-table"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Download, Trash2, Eye } from "lucide-react"
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Download, Trash2, Eye, Edit } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select"
 import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
 import { ImageWithSource } from "@/types/gallery"
+import { useExifEditorStore } from "@/stores/exifEditorStore"
 
 // Helper function to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -99,10 +100,13 @@ const SortableHeader = ({
   );
 };
 
+
+
 // Local Thumbnail component for local files (using UUID-based protocol)
 const LocalThumbnail = ({ uuid }: { uuid: string }) => {
   return <img src={`local-thumbnail://${uuid}`} alt="thumbnail" className="h-14 w-14 rounded object-cover" />;
 };
+
 
 // Create columns for local detail list (similar to DetailList but with LocalThumbnail)
 const createLocalColumns = (
@@ -110,7 +114,8 @@ const createLocalColumns = (
   sortOrder: 'asc' | 'desc',
   onSort: (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => void,
   t: (key: string) => string,
-  onViewImage: (image: ImageWithSource) => void
+  onViewImage: (image: ImageWithSource) => void,
+  onEditExif: (image: ImageWithSource) => void
 ): ColumnDef<ImageWithSource>[] => [
     {
       id: "select",
@@ -294,6 +299,10 @@ const createLocalColumns = (
                 {t('contextMenu.copyId')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onEditExif(image)}>
+                <Edit className="mr-2 h-4 w-4" />
+                {'Edit EXIF'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewImage(image)}>
                 <Eye className="mr-2 h-4 w-4" />
                 {t('contextMenu.viewDetails')}
@@ -326,7 +335,7 @@ export default function LocalDetailList() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [isLoading, setIsLoading] = React.useState(false)
-
+  const { openEditor } = useExifEditorStore()
   // Backend sorting state
   const [sortBy, setSortBy] = React.useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('createdAt')
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc')
@@ -501,9 +510,14 @@ export default function LocalDetailList() {
 
   }, [openViewer, openTiffViewer, data]);
 
+  const handleEditExif = (image: ImageWithSource) => {
+    openEditor(image);
+  };
+
+
   // Create columns with current sort state
   const columns = React.useMemo(
-    () => createLocalColumns(sortBy, sortOrder, handleSort, t, handleViewImage),
+    () => createLocalColumns(sortBy, sortOrder, handleSort, t, handleViewImage, handleEditExif),
     [sortBy, sortOrder, t, handleSort, handleViewImage]
   );
 

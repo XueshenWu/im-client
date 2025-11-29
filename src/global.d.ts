@@ -117,7 +117,9 @@ interface ElectronAPI {
     clearAllImages: () => Promise<{ success: boolean }>
     getSyncMetadata: () => Promise<{ lastSyncSequence: number; lastSyncTime: string | null }>
     updateSyncMetadata: (metadata: any) => Promise<{ success: boolean }>
+    getExifData: (uuid: string) => Promise<ExifData | null>
     upsertExifData: (uuid: string, exif: any) => Promise<{ id: number; changes: number}>
+    getAllImagesWithExif: () => Promise<any[]>
   },
   tiff: {
     loadBuffer: (buffer: Uint8Array) => Promise<{ success: boolean, pageCount?: number, error?: any }>
@@ -148,6 +150,11 @@ interface ElectronAPI {
     getFinalBuffer: () => Promise<{
       success: boolean,
       buffer?: Buffer,
+      metadata?: {
+        totalPages: number,
+        pageDimensions: Array<{ width: number, height: number }>,
+        fileSize: number
+      },
       error?: string
     }>
     cleanup: () => Promise<{ success: boolean, error?: string }>

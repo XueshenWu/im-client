@@ -5,7 +5,8 @@
 
 import { localDatabase } from './localDatabase.service';
 import { LocalImage } from '../types/local';
-import { Image } from '../types/api';
+import { Image, ExifData } from '../types/api';
+
 
 class LocalImageService {
   /**
@@ -236,6 +237,59 @@ class LocalImageService {
       mimeType: localImage.mimeType,
     };
   }
+
+
+  /**
+   * Get EXIF data for a local image by UUID
+   * Loads EXIF data from the database separately (useful when image object doesn't include it)
+   */
+  async getLocalImageExifData(uuid: string): Promise<ExifData | null> {
+    try {
+      const exifData = await localDatabase.getExifData(uuid);
+      return exifData;
+    } catch (error) {
+      console.error('[LocalImage] Failed to get EXIF data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all local images with EXIF data for LWW sync diff calculation
+   * Queries both images and exif_data tables via JOIN
+   */
+  async getLocalLWWMetadata(): Promise<Image[]> {
+    try {
+      const localImages = await localDatabase.getAllImagesWithExif();
+
+      // Convert LocalImage[] to Image[] format
+      const images: Image[] = localImages.map((localImage) => ({
+        id: 0, // Local images don't have server ID
+        uuid: localImage.uuid,
+        filename: localImage.filename,
+        fileSize: localImage.fileSize,
+        format: localImage.format,
+        width: localImage.width,
+        height: localImage.height,
+        hash: localImage.hash,
+        mimeType: localImage.mimeType,
+        isCorrupted: localImage.isCorrupted,
+        createdAt: localImage.createdAt,
+        updatedAt: localImage.updatedAt,
+        deletedAt: localImage.deletedAt,
+        exifData: localImage.exifData,
+        pageCount: localImage.pageCount,
+        tiffDimensions: localImage.tiffDimensions,
+      }));
+
+      console.log(`[LocalImage] Retrieved ${images.length} images with EXIF data for LWW sync`);
+      return images;
+    } catch (error) {
+      console.error('[LocalImage] Failed to get local LWW metadata:', error);
+      return [];
+    }
+  }
+
+
 }
 
 // Singleton instance

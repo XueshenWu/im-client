@@ -85,7 +85,7 @@ function createWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self'; " +
-          "connect-src 'self' http://localhost:* local-image: local-thumbnail: http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; " +
+          "connect-src 'self' data: http://localhost:* local-image: local-thumbnail: http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; " +
           "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
           "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
@@ -367,8 +367,22 @@ function createWindow() {
 
       const finalBuffer = Buffer.concat(parts);
 
+      // 6. Extract metadata for all pages
+      const pageDimensions = pages.map(p => ({
+        width: p.ifd.t256[0],
+        height: p.ifd.t257[0]
+      }));
+
       console.log(`Multi-page TIFF created successfully. Total size: ${finalBuffer.length}`);
-      return { success: true, buffer: finalBuffer };
+      return {
+        success: true,
+        buffer: finalBuffer,
+        metadata: {
+          totalPages: pages.length,
+          pageDimensions: pageDimensions,
+          fileSize: finalBuffer.length
+        }
+      };
 
     } catch (error: any) {
       console.error('Error getting final buffer:', error);
@@ -784,6 +798,16 @@ function createWindow() {
     }
   });
 
+  ipcMain.handle('db:getExifData', async (event, uuid: string) => {
+    try {
+      const exifData = await dbOperations.getExifDataByUuid(uuid);
+      return exifData;
+    } catch (error) {
+      console.error('Failed to get exif data:', error);
+      return null;
+    }
+  });
+
   ipcMain.handle('db:upsertExifData', async (event, uuid: string, exif: any) => {
     try {
       const result = await dbOperations.upsertExifData(uuid, exif);
@@ -894,6 +918,16 @@ function createWindow() {
     } catch (error) {
       console.error('Failed to update sync metadata:', error);
       throw error;
+    }
+  });
+
+  ipcMain.handle('db:getAllImagesWithExif', async () => {
+    try {
+      const images = await dbOperations.getAllImagesWithExif();
+      return images;
+    } catch (error) {
+      console.error('Failed to get all images with EXIF:', error);
+      return [];
     }
   });
 

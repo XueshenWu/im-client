@@ -2,7 +2,7 @@
  * State diff service for comparing local and remote image states
  */
 
-import { LocalImage, StateDiff, UpdatePair, ReplacePair } from '../types/local';
+import { LocalImage, StateDiff } from '../types/local';
 import { Image } from '../types/api';
 
 class StateDiffService {
@@ -53,8 +53,7 @@ class StateDiffService {
             diff.toReplaceRemote.push(local);
           } else {
             // Only metadata might have changed
-            const changes = this.findMetadataChanges(local, remote);
-            if (Object.keys(changes).length > 0) {
+            if (this.hasMetadataChanges(local, remote)) {
               diff.toUpdateRemote.push(local);
             }
           }
@@ -70,8 +69,7 @@ class StateDiffService {
             diff.toReplaceLocal.push(remote);
           } else {
             // Only metadata might have changed
-            const changes = this.findMetadataChanges(local, remote);
-            if (Object.keys(changes).length > 0) {
+            if (this.hasMetadataChanges(local, remote)) {
               diff.toUpdateLocal.push(remote);
             }
           }
@@ -84,54 +82,33 @@ class StateDiffService {
 
     return diff;
   }
-  /**
-   * Find metadata differences between local and remote images
-   */
-  private findMetadataChanges(local: LocalImage, remote: Image): Partial<Image> {
-    const changes: Partial<Image> = {};
 
-    // Compare metadata fields
-    if (local.filename !== remote.filename) {
-      changes.filename = remote.filename;
-    }
-    if (local.originalName !== remote.originalName) {
-      changes.originalName = remote.originalName;
-    }
-    if (local.fileSize !== remote.fileSize) {
-      changes.fileSize = remote.fileSize;
-    }
-    if (local.width !== remote.width) {
-      changes.width = remote.width;
-    }
-    if (local.height !== remote.height) {
-      changes.height = remote.height;
+  private hasMetadataChanges(local: LocalImage, remote: Image): boolean {
+    // Compare simple metadata fields
+    if (local.filename !== remote.filename) return true;
+    if (local.fileSize !== remote.fileSize) return true;
+    if (local.width !== remote.width) return true;
+    if (local.height !== remote.height) return true;
+    if (local.isCorrupted !== remote.isCorrupted) return true;
+    if (local.mimeType !== remote.mimeType) return true;
+
+    // Compare TIFF-specific fields
+    if (local.pageCount !== remote.pageCount) return true;
+
+    // Compare tiffDimensions (array of objects)
+    if (JSON.stringify(local.tiffDimensions) !== JSON.stringify(remote.tiffDimensions)) {
+      return true;
     }
 
-
-    // Compare JSON fields (tags, exifData)
-
+    // Compare EXIF data (complex object)
     if (JSON.stringify(local.exifData) !== JSON.stringify(remote.exifData)) {
-      changes.exifData = remote.exifData;
+      return true;
     }
 
-    return changes;
+    return false;
   }
 
-  /**
-   * Check if diff contains operations that require pull first
-   * Returns true if diff has replacements or deletions
-   */
-  // requiresPullFirst(diff: StateDiff): boolean {
-  //   return diff.toReplace.length > 0 || diff.toDeleteRemote.length > 0;
-  // }
-
-  /**
-   * Check if diff is safe for fast-forward push
-   * Only additions and metadata updates are safe
-   */
-  // canFastForwardPush(diff: StateDiff): boolean {
-  //   return !this.requiresPullFirst(diff);
-  // }
+ 
 
   /**
    * Get summary of diff for display
@@ -172,22 +149,7 @@ class StateDiffService {
     return summary;
   }
 
-  /**
-   * Get images that will be affected by pull (replaced or deleted)
-   */
-  // getAffectedImages(diff: StateDiff): LocalImage[] {
-  //   const affected: LocalImage[] = [];
-
-  //   // Images that will be replaced
-  //   for (const pair of diff.toReplace) {
-  //     affected.push(pair.localImage);
-  //   }
-
-  //   // Images that will be deleted
-  //   // (Note: toDeleteLocal contains UUIDs, need to get full images elsewhere)
-
-  //   return affected;
-  // }
+ 
 }
 
 // Singleton instance

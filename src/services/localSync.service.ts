@@ -5,11 +5,11 @@
 import { localImageService } from './localImage.service';
 import { localDatabase } from './localDatabase.service';
 import { stateDiffService } from './stateDiff.service';
-import { getImages, } from './images.service';
+import { getImages, deleteImages, updateImageExif, replaceImages, requestPresignedURLs, uploadToPresignedURL } from './images.service';
 import { getSyncStatus } from './sync.service';
 import { LocalImage, StateDiff } from '../types/local';
-import { Image } from '../types/api';
-import api, { imageService } from './api';
+import { ExifData, Image } from '../types/api';
+import api from './api';
 
 class LocalSyncService {
   /**
@@ -40,6 +40,35 @@ class LocalSyncService {
   }
 
 
+  async getLWWSyncMetaData(): Promise<Image[]> {
+    try {
+      const res = await api.get<{
+        images: Image[],
+        exifData: ExifData[]
+      }>("/api/sync/lwwSyncMetadata")
+
+      if (res.data.images.length !== res.data.exifData.length) {
+        console.log('images and exifData array length not matched')
+        throw new Error('images and exifData array length not matched')
+      }
+
+      const { images, exifData } = res.data
+
+      const zipped = images.map((image, index) => {
+        return {
+          ...image,
+          exifData: exifData[index]
+        }
+      })
+
+
+      return zipped
+    } catch (error: any) {
+      console.log(error)
+      throw error
+    }
+  }
+
 
   async syncLWW(): Promise<{
     success: boolean;
@@ -59,7 +88,7 @@ class LocalSyncService {
       }
 
       // step2: get local and remote images
-      const localImages = await localImageService.getAllImages();
+      const localImages = await localImageService.getLocalLWWMetadata();
       const remoteImages = await getImages();
 
       // step3: calculate bi-directional diff
@@ -76,232 +105,84 @@ class LocalSyncService {
         toReplaceLocal: diff.toReplaceLocal.length,
       });
 
-      // step4: excute sync plan
+      // step4: execute sync plan - PULL operations first (remote -> local)
+      console.log('[LocalSync] Starting PULL operations...');
 
-      //  delete local
+      // Pull: Delete local
       if (diff.toDeleteLocal.length > 0) {
+        console.log(`[LocalSync] Deleting ${diff.toDeleteLocal.length} local images`);
         await localImageService.deleteImages(diff.toDeleteLocal);
       }
 
-      //  download
+      // Pull: Download new images
       if (diff.toDownload.length > 0) {
+        console.log(`[LocalSync] Downloading ${diff.toDownload.length} new images`);
         await this.downloadImagesFromCloud(diff.toDownload);
       }
 
-      //  update local
+      // Pull: Update local metadata
       if (diff.toUpdateLocal.length > 0) {
+        console.log(`[LocalSync] Updating ${diff.toUpdateLocal.length} local metadata`);
         await this.updateLocalMetadata(diff.toUpdateLocal);
       }
 
-
-      // replace local
+      // Pull: Replace local images
       if (diff.toReplaceLocal.length > 0) {
+        console.log(`[LocalSync] Replacing ${diff.toReplaceLocal.length} local images`);
         await this.replaceLocalImages(diff.toReplaceLocal);
       }
 
+      // step5: execute sync plan - PUSH operations (local -> remote)
+      console.log('[LocalSync] Starting PUSH operations...');
 
+      // Push: Delete remote
+      if (diff.toDeleteRemote.length > 0) {
+        console.log(`[LocalSync] Deleting ${diff.toDeleteRemote.length} remote images`);
+        await this.deleteRemoteImages(diff.toDeleteRemote);
+      }
 
+      // Push: Upload new images
+      if (diff.toUpload.length > 0) {
+        console.log(`[LocalSync] Uploading ${diff.toUpload.length} new images`);
+        await this.uploadImagesToCloud(diff.toUpload);
+      }
+
+      // Push: Update remote metadata
+      if (diff.toUpdateRemote.length > 0) {
+        console.log(`[LocalSync] Updating ${diff.toUpdateRemote.length} remote metadata`);
+        await this.updateRemoteMetadata(diff.toUpdateRemote);
+      }
+
+      // Push: Replace remote images
+      if (diff.toReplaceRemote.length > 0) {
+        console.log(`[LocalSync] Replacing ${diff.toReplaceRemote.length} remote images`);
+        await this.replaceRemoteImages(diff.toReplaceRemote);
+      }
+
+      // step6: update sync metadata
+      const finalStatus = await getSyncStatus();
+      await localDatabase.updateSyncMetadata({
+        lastSyncSequence: finalStatus.currentSequence,
+        lastSyncTime: new Date().toISOString(),
+      });
+
+      console.log('[LocalSync] LWW sync completed successfully');
+      return {
+        success: true,
+        message: 'LWW sync completed successfully',
+        newSeq: finalStatus.currentSequence,
+        diff,
+      };
 
     } catch (error) {
-      console.error('[LocalSync] Sync failed:', error)
-      throw error
-    } finally {
-
+      console.error('[LocalSync] Sync failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   }
 
-  /**
-   * Push local changes to cloud
-   * Returns success status and updated sequence
-   */
-  // async push(forcePush: boolean = false): Promise<{
-  //   success: boolean;
-  //   message: string;
-  //   newSeq?: number;
-  //   diff?: StateDiff;
-  // }> {
-  //   try {
-  //     // Step 1: Check sequence numbers
-  //     const status = await this.checkSyncStatus();
-
-  //     if (!forcePush && !status.inSync) {
-  //       return {
-  //         success: false,
-  //         message: `Local is behind server (local: ${status.localSeq}, server: ${status.serverSeq}). Please pull first.`,
-  //       };
-  //     }
-
-  //     // Step 2: Get local and remote images
-  //     const localImages = await localImageService.getAllImages();
-  //     const remoteImages = await getImages();
-
-  //     // Step 3: Calculate diff
-  //     const diff = stateDiffService.calculateDiff(localImages, remoteImages);
-
-  //     console.log('[LocalSync] Diff calculated:', {
-  //       toUpload: diff.toUpload.length,
-  //       toUpdate: diff.toUpdate.length,
-  //       toDeleteRemote: diff.toDeleteRemote.length,
-  //       toReplace: diff.toReplace.length,
-  //       localCount: localImages.length,
-  //       remoteCount: remoteImages.length,
-  //     });
-
-  //     // Step 4: Check if push is safe (no replaces/deletes)
-  //     if (!forcePush && stateDiffService.requiresPullFirst(diff)) {
-  //       return {
-  //         success: false,
-  //         message: `Cannot push: diff contains ${diff.toReplace.length} replacements and ${diff.toDeleteRemote.length} deletions. Pull first to resolve conflicts.`,
-  //         diff,
-  //       };
-  //     }
-
-  //     // Step 5: Upload new images
-  //     if (diff.toUpload.length > 0) {
-  //       console.log(`[LocalSync] Uploading ${diff.toUpload.length} new images...`);
-  //       await this.uploadImagesToCloud(diff.toUpload);
-  //     }
-
-  //     // Step 6: Update metadata for changed images
-  //     if (diff.toUpdate.length > 0) {
-  //       console.log(`[LocalSync] Updating ${diff.toUpdate.length} images...`);
-  //       await this.updateRemoteMetadata(diff.toUpdate);
-  //     }
-
-  //     // Step 7: Delete remote images not in local (only if force push)
-  //     if (forcePush && diff.toDeleteRemote.length > 0) {
-  //       console.log(`[LocalSync] Force deleting ${diff.toDeleteRemote.length} remote images...`);
-  //       // TODO: Implement batch delete remote images
-  //     }
-
-  //     // Step 8: Get new server sequence and update local
-  //     const newStatus = await getSyncStatus();
-  //     await localDatabase.updateSyncMetadata({
-  //       lastSyncSequence: newStatus.currentSequence,
-  //       lastSyncTime: new Date().toISOString(),
-  //     });
-
-  //     return {
-  //       success: true,
-  //       message: `Successfully pushed ${diff.toUpload.length} new images and ${diff.toUpdate.length} updates`,
-  //       newSeq: newStatus.currentSequence,
-  //       diff,
-  //     };
-  //   } catch (error) {
-  //     console.error('[LocalSync] Push failed:', error);
-  //     return {
-  //       success: false,
-  //       message: error instanceof Error ? error.message : 'Push failed',
-  //     };
-  //   }
-  // }
-
-  /**
-   * Pull remote changes to local
-   * Returns affected images that will be replaced/deleted
-   */
-  // async pull(): Promise<{
-  //   success: boolean;
-  //   message: string;
-  //   affectedImages: LocalImage[];
-  //   diff?: StateDiff;
-  // }> {
-  //   try {
-  //     // Step 1: Get local and remote images
-  //     const localImages = await localImageService.getAllImages();
-  //     const remoteImages = await getImages();
-
-  //     // Step 2: Calculate diff
-  //     const diff = stateDiffService.calculateDiff(localImages, remoteImages);
-
-  //     // Step 3: Get affected images (will be replaced or deleted)
-  //     const affectedImages = stateDiffService.getAffectedImages(diff);
-
-  //     // Step 4: Download new images from server
-  //     if (diff.toDownload.length > 0) {
-  //       console.log(`[LocalSync] Downloading ${diff.toDownload.length} new images...`);
-  //       await this.downloadImagesFromCloud(diff.toDownload);
-  //     }
-
-  //     // Step 5: Replace images with different content
-  //     if (diff.toReplace.length > 0) {
-  //       console.log(`[LocalSync] Replacing ${diff.toReplace.length} images...`);
-  //       await this.replaceLocalImages(diff.toReplace);
-  //     }
-
-  //     // Step 6: Update metadata for changed images
-  //     if (diff.toUpdate.length > 0) {
-  //       console.log(`[LocalSync] Updating ${diff.toUpdate.length} images...`);
-  //       await this.updateLocalMetadata(diff.toUpdate);
-  //     }
-
-  //     // Step 7: Delete local images not in remote
-  //     if (diff.toDeleteLocal.length > 0) {
-  //       console.log(`[LocalSync] Deleting ${diff.toDeleteLocal.length} local images...`);
-  //       await localImageService.deleteImages(diff.toDeleteLocal);
-  //     }
-
-  //     // Step 8: Update local sequence
-  //     const newStatus = await getSyncStatus();
-  //     await localDatabase.updateSyncMetadata({
-  //       lastSyncSequence: newStatus.currentSequence,
-  //       lastSyncTime: new Date().toISOString(),
-  //     });
-
-  //     const summary = stateDiffService.getDiffSummary(diff);
-  //     return {
-  //       success: true,
-  //       message: `Successfully pulled: ${summary.toDownload} new, ${summary.toReplace} replaced, ${summary.toUpdate} updated, ${summary.toDeleteLocal} deleted`,
-  //       affectedImages,
-  //       diff,
-  //     };
-  //   } catch (error) {
-  //     console.error('[LocalSync] Pull failed:', error);
-  //     return {
-  //       success: false,
-  //       message: error instanceof Error ? error.message : 'Pull failed',
-  //       affectedImages: [],
-  //     };
-  //   }
-  // }
-
-  /**
-   * Auto-sync: try push first, if fails then pull and push
-   */
-  // async autoSync(): Promise<{ success: boolean; message: string }> {
-  //   try {
-  //     // Try push first
-  //     const pushResult = await this.push(false);
-
-  //     if (pushResult.success) {
-  //       return pushResult;
-  //     }
-
-  //     // Push failed, try pull then push
-  //     console.log('[LocalSync] Push failed, pulling first...');
-  //     const pullResult = await this.pull();
-
-  //     if (!pullResult.success) {
-  //       return {
-  //         success: false,
-  //         message: `Auto-sync failed: ${pullResult.message}`,
-  //       };
-  //     }
-
-  //     // Try push again after pull
-  //     const retryPushResult = await this.push(false);
-  //     return {
-  //       success: retryPushResult.success,
-  //       message: `Auto-sync: ${pullResult.message}, then ${retryPushResult.message}`,
-  //     };
-  //   } catch (error) {
-  //     console.error('[LocalSync] Auto-sync failed:', error);
-  //     return {
-  //       success: false,
-  //       message: error instanceof Error ? error.message : 'Auto-sync failed',
-  //     };
-  //   }
-  // }
 
   /**
    * Upload local images to cloud
@@ -310,58 +191,68 @@ class LocalSyncService {
     if (localImages.length === 0) return;
 
     try {
-      console.log(`[LocalSync] Preparing to upload ${localImages.length} images with UUIDs...`);
+      console.log(`[LocalSync] Preparing to upload ${localImages.length} images...`);
 
-      // Read all files in parallel
-      const fileReadPromises = localImages.map(async (localImage) => {
-        const buffer = await window.electronAPI?.readLocalFile(localImage.filePath);
-        if (!buffer) {
-          console.error(`[LocalSync] Failed to read file: ${localImage.filePath}`);
-          return null;
-        }
-        return {
-          file: new File([buffer], localImage.filename, {
-            type: `image/${localImage.format}`,
-          }),
-          uuid: localImage.uuid,
-          filename: localImage.filename,
-        };
-      });
+      // Prepare image metadata for presigned URL request
+      const imageMetadata = localImages.map(img => ({
+        uuid: img.uuid,
+        filename: img.filename,
+        fileSize: img.fileSize,
+        format: img.format,
+        width: img.width,
+        height: img.height,
+        hash: img.hash,
+        mimeType: img.mimeType,
+        isCorrupted: img.isCorrupted,
+        createdAt: img.createdAt,
+        updatedAt: img.updatedAt,
+        deletedAt: img.deletedAt,
+        exifData: img.exifData,
+        pageCount: img.pageCount,
+        tiffDimensions: img.tiffDimensions,
+      }));
 
-      const fileData = (await Promise.all(fileReadPromises)).filter((f) => f !== null);
+      // Request presigned URLs
+      const presignedData = await requestPresignedURLs(imageMetadata);
 
-      if (fileData.length === 0) {
-        console.error('[LocalSync] No files could be read');
-        return;
-      }
+      // Upload each image and thumbnail
+      const { generateThumbnailBlob } = await import('@/utils/thumbnailGenerator');
 
-      const files = fileData.map((f) => f.file);
-      const uuids = fileData.map((f) => f.uuid);
+      for (let i = 0; i < localImages.length; i++) {
+        const localImage = localImages[i];
+        const presigned = presignedData[i];
 
-      console.log(`[LocalSync] Uploading ${files.length} files with UUIDs:`, uuids);
-
-      // Upload all files in a single batch with their UUIDs
-      const response = await uploadImages(files, uuids);
-
-      console.log(`[LocalSync] Batch upload response:`, {
-        success: response.success,
-        message: response.message,
-        uploadedCount: response.data?.length,
-      });
-
-      // Verify UUIDs were preserved
-      if (response.success && response.data) {
-        response.data.forEach((serverImage, index) => {
-          const localUuid = uuids[index];
-          if (serverImage.uuid === localUuid) {
-            console.log(`[LocalSync] ✓ UUID preserved: ${fileData[index].filename} (${localUuid})`);
-          } else {
-            console.warn(
-              `[LocalSync] ⚠ UUID mismatch: ${fileData[index].filename} - local=${localUuid}, server=${serverImage.uuid}`
-            );
+        try {
+          // Read image file
+          const imageBuffer = await window.electronAPI?.loadLocalImage(localImage.uuid, localImage.format);
+          if (!imageBuffer) {
+            console.error(`[LocalSync] Failed to read image: ${localImage.filename}`);
+            continue;
           }
-        });
+
+          // Convert Buffer to ArrayBuffer
+          const arrayBuffer = imageBuffer.buffer.slice(
+            imageBuffer.byteOffset,
+            imageBuffer.byteOffset + imageBuffer.byteLength
+          ) as ArrayBuffer;
+          const imageBlob = new Blob([arrayBuffer], { type: localImage.mimeType });
+
+          // Generate thumbnail
+          const thumbnailBlob = await generateThumbnailBlob(imageBlob, 300);
+
+          // Upload thumbnail
+          await uploadToPresignedURL(presigned.thumbnailUrl, thumbnailBlob, true);
+
+          // Upload image
+          await uploadToPresignedURL(presigned.imageUrl, imageBlob, false);
+
+          console.log(`[LocalSync] ✓ Uploaded: ${localImage.filename}`);
+        } catch (error) {
+          console.error(`[LocalSync] Failed to upload ${localImage.filename}:`, error);
+        }
       }
+
+      console.log(`[LocalSync] Upload completed: ${localImages.length} images`);
     } catch (error) {
       console.error('[LocalSync] Batch upload failed:', error);
       throw error;
@@ -372,82 +263,103 @@ class LocalSyncService {
    * Download images from cloud to local storage
    */
   private async downloadImagesFromCloud(remoteImages: Image[]): Promise<void> {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    if (remoteImages.length === 0) return;
 
+    try {
+      console.log(`[LocalSync] Downloading ${remoteImages.length} images from cloud...`);
 
-    for (const remoteImage of remoteImages) {
-      try {
+      for (const remoteImage of remoteImages) {
+        try {
+          // Download image using presignedUrl if available, otherwise construct URL
+          let imageUrl: string;
+          let thumbnailUrl: string;
 
-        // Download image
-        const imageUrl = `${API_URL}${remoteImage.filePath}`;
-        const imageResponse = await fetch(imageUrl);
-        const imageBlob = await imageResponse.blob();
+          if (remoteImage.presignedUrl) {
+            // Use presigned URL directly
+            imageUrl = remoteImage.presignedUrl;
+            // For thumbnail, we'll need to construct it or get it separately
+            thumbnailUrl = remoteImage.presignedUrl.replace('/images/', '/thumbnails/');
+          } else {
+            // Construct URLs from API base
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            imageUrl = `${API_URL}/api/images/${remoteImage.uuid}/download`;
+            thumbnailUrl = `${API_URL}/api/images/${remoteImage.uuid}/thumbnail`;
+          }
 
-        // Downlaod thumbnail
-        const thumbnailUrl = `${API_URL}${remoteImage.thumbnailPath}`;
-        const thumbnailResponse = await fetch(thumbnailUrl);
-        const thumbnailBlob = await thumbnailResponse.blob();
+          // Download image
+          const imageResponse = await fetch(imageUrl);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to download image: ${imageResponse.statusText}`);
+          }
+          const imageBlob = await imageResponse.blob();
 
+          // Download thumbnail
+          const thumbnailResponse = await fetch(thumbnailUrl);
+          if (!thumbnailResponse.ok) {
+            console.warn(`Failed to download thumbnail for ${remoteImage.filename}, will generate locally`);
+          }
+          const thumbnailBlob = thumbnailResponse.ok ? await thumbnailResponse.blob() : null;
 
+          // Save to local storage via Electron
+          const imageBuffer = await imageBlob.arrayBuffer();
+          await window.electronAPI?.saveImageBuffer(remoteImage.uuid, remoteImage.format, imageBuffer);
 
-        // Save to local storage via Electron
-        const imageBuffer = await imageBlob.arrayBuffer();
-        const thumbnailBuffer = await thumbnailBlob.arrayBuffer();
+          if (thumbnailBlob) {
+            const thumbnailBuffer = await thumbnailBlob.arrayBuffer();
+            await window.electronAPI?.saveThumbnailBuffer(remoteImage.uuid, thumbnailBuffer);
+          }
 
-        // save files to AppData and get local path
+          // Add to local database
+          await localImageService.addImage({
+            uuid: remoteImage.uuid,
+            filename: remoteImage.filename,
+            format: remoteImage.format,
+            fileSize: remoteImage.fileSize,
+            width: remoteImage.width,
+            height: remoteImage.height,
+            hash: remoteImage.hash,
+            mimeType: remoteImage.mimeType,
+            isCorrupted: remoteImage.isCorrupted,
+            createdAt: remoteImage.createdAt,
+            updatedAt: remoteImage.updatedAt,
+            deletedAt: remoteImage.deletedAt,
+            exifData: remoteImage.exifData,
+            pageCount: remoteImage.pageCount,
+            tiffDimensions: remoteImage.tiffDimensions,
+          });
 
-        const localImagePath = await window.electronAPI?.saveImageBuffer(remoteImage.filename, imageBuffer);
-        const localThumbnailPath = await window.electronAPI?.saveThumbnailBuffer(remoteImage.filename, thumbnailBuffer);
-
-        if (!localImagePath || !localThumbnailPath) {
-          console.error(`Failed to save files for ${remoteImage.filename}`);
-          continue
+          console.log(`[LocalSync] ✓ Downloaded: ${remoteImage.filename}`);
+        } catch (error) {
+          console.error(`[LocalSync] Failed to download ${remoteImage.filename}:`, error);
         }
-
-        await localImageService.addImage({
-          uuid: remoteImage.uuid,
-          filename: remoteImage.filename,
-          format: remoteImage.format,
-          filePath: localImagePath,
-          thumbnailPath: localThumbnailPath,
-          fileSize: remoteImage.fileSize,
-          width: remoteImage.width,
-          height: remoteImage.height,
-          hash: remoteImage.hash,
-          mimeType: remoteImage.mimeType,
-          isCorrupted: remoteImage.isCorrupted,
-          createdAt: remoteImage.createdAt,
-          updatedAt: remoteImage.updatedAt,
-          deletedAt: remoteImage.deletedAt,
-          exifData: remoteImage.exifData,
-          originalName: remoteImage.originalName,
-        })
-        console.log(`[LocalSync] Downloaded: ${remoteImage.filename}`);
-      } catch (error) {
-        console.error(`[LocalSync] Failed to download ${remoteImage.filename}:`, error);
       }
 
+      console.log(`[LocalSync] Download completed: ${remoteImages.length} images`);
+    } catch (error) {
+      console.error('[LocalSync] Download failed:', error);
+      throw error;
     }
   }
 
   /**
    * Replace local images with remote versions
    */
+  private async replaceLocalImages(remoteImages: Image[]): Promise<void> {
+    if (remoteImages.length === 0) return;
 
+    try {
+      // First delete the old local versions
+      const uuids = remoteImages.map(img => img.uuid);
+      await localImageService.deleteImages(uuids);
 
-  // Working on syncLWW, now refactor replaceLocalImages
-  private async replaceLocalImages(replacePairs: Array<{ localImage: LocalImage; remoteImage: Image }>): Promise<void> {
-    const replacePromises = replacePairs.map(async (pair) => {
-      try {
-        // Download new version from cloud
-        await this.downloadImagesFromCloud([pair.remoteImage]);
-        console.log(`[LocalSync] Replaced: ${pair.localImage.filename}`);
-      } catch (error) {
-        console.error(`[LocalSync] Failed to replace ${pair.localImage.filename}:`, error);
-      }
-    });
+      // Then download the new versions
+      await this.downloadImagesFromCloud(remoteImages);
 
-    await Promise.all(replacePromises);
+      console.log(`[LocalSync] Replaced ${remoteImages.length} local images`);
+    } catch (error) {
+      console.error('[LocalSync] Failed to replace local images:', error);
+      throw error;
+    }
   }
 
   /**
@@ -467,9 +379,11 @@ class LocalSyncService {
           mimeType: image.mimeType,
           isCorrupted: image.isCorrupted,
           createdAt: image.createdAt,
+          updatedAt: image.updatedAt,
           deletedAt: image.deletedAt,
           exifData: image.exifData,
-          originalName: image.originalName,
+          pageCount: image.pageCount,
+          tiffDimensions: image.tiffDimensions,
         })
         console.log(`[LocalSync] Updated local metadata: ${image.filename}`);
       } catch (error) {
@@ -484,23 +398,127 @@ class LocalSyncService {
   /**
    * Update remote metadata from local
    */
-  private async updateRemoteMetadata(updatePairs: Array<{ localImage: LocalImage; remoteImage: Image; changes: Partial<Image> }>): Promise<void> {
-    const updatePromises = updatePairs.map(async (pair) => {
-      try {
-        // Use the existing update API
-        await api.put(`/api/images/uuid/${pair.localImage.uuid}`, pair.changes);
-        console.log(`[LocalSync] Updated remote metadata: ${pair.localImage.filename}`);
-      } catch (error: any) {
-        // Handle 404 errors specifically - image doesn't exist on server
-        if (error?.statusCode === 404 || error?.response?.status === 404) {
-          console.warn(`[LocalSync] Image ${pair.localImage.filename} (UUID: ${pair.localImage.uuid}) not found on server. It may have been created locally and needs to be uploaded instead.`);
-        } else {
-          console.error(`[LocalSync] Failed to update remote ${pair.localImage.filename}:`, error);
-        }
-      }
-    });
+  private async updateRemoteMetadata(localImages: LocalImage[]): Promise<void> {
+    if (localImages.length === 0) return;
 
-    await Promise.all(updatePromises);
+    try {
+      // Update EXIF data for images that have it
+      const exifUpdates = localImages
+        .filter(img => img.exifData)
+        .map(img => ({
+          uuid: img.uuid,
+          exifData: img.exifData!,
+        }));
+
+      if (exifUpdates.length > 0) {
+        await updateImageExif(exifUpdates);
+        console.log(`[LocalSync] Updated EXIF for ${exifUpdates.length} remote images`);
+      }
+
+      // Update other metadata fields
+      const metadataPromises = localImages.map(async (img) => {
+        try {
+          await api.put(`/api/images/uuid/${img.uuid}`, {
+            filename: img.filename,
+            fileSize: img.fileSize,
+            width: img.width,
+            height: img.height,
+            mimeType: img.mimeType,
+            isCorrupted: img.isCorrupted,
+            pageCount: img.pageCount,
+            tiffDimensions: img.tiffDimensions,
+            updatedAt: img.updatedAt,
+          });
+          console.log(`[LocalSync] Updated remote metadata: ${img.filename}`);
+        } catch (error: any) {
+          console.error(`[LocalSync] Failed to update remote ${img.filename}:`, error);
+        }
+      });
+
+      await Promise.all(metadataPromises);
+    } catch (error) {
+      console.error('[LocalSync] Failed to update remote metadata:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete remote images
+   */
+  private async deleteRemoteImages(uuids: string[]): Promise<void> {
+    if (uuids.length === 0) return;
+
+    try {
+      const result = await deleteImages(uuids);
+      console.log(`[LocalSync] Deleted ${result.stats.successful} remote images`);
+
+      if (result.stats.failed > 0) {
+        console.warn(`[LocalSync] Failed to delete ${result.stats.failed} remote images`);
+      }
+    } catch (error) {
+      console.error('[LocalSync] Failed to delete remote images:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Replace remote images with local versions
+   */
+  private async replaceRemoteImages(localImages: LocalImage[]): Promise<void> {
+    if (localImages.length === 0) return;
+
+    try {
+      console.log(`[LocalSync] Preparing to replace ${localImages.length} remote images...`);
+
+      // Prepare replacement data
+      const replacements = await Promise.all(
+        localImages.map(async (localImage) => {
+          // Read image file
+          const imageBuffer = await window.electronAPI?.loadLocalImage(localImage.uuid, localImage.format);
+          if (!imageBuffer) {
+            throw new Error(`Failed to read image: ${localImage.filename}`);
+          }
+
+          // Convert Buffer to ArrayBuffer
+          const arrayBuffer = imageBuffer.buffer.slice(
+            imageBuffer.byteOffset,
+            imageBuffer.byteOffset + imageBuffer.byteLength
+          ) as ArrayBuffer;
+
+          const file = new Blob([arrayBuffer], { type: localImage.mimeType });
+
+          return {
+            uuid: localImage.uuid,
+            file,
+            metadata: {
+              width: localImage.width,
+              height: localImage.height,
+              filename: localImage.filename,
+              format: localImage.format,
+              mimeType: localImage.mimeType,
+              exifData: localImage.exifData,
+              pageCount: localImage.pageCount,
+              tiffDimensions: localImage.tiffDimensions,
+            },
+          };
+        })
+      );
+
+      // Replace images using the API
+      const result = await replaceImages(replacements);
+
+      console.log(`[LocalSync] Replaced ${result.stats.successful} remote images`);
+
+      if (result.stats.failed > 0) {
+        console.warn(`[LocalSync] Failed to replace ${result.stats.failed} remote images`);
+        result.errors.forEach(err => {
+          console.error(`[LocalSync] Replace error for ${err.uuid}: ${err.error}`);
+        });
+      }
+    } catch (error) {
+      console.error('[LocalSync] Failed to replace remote images:', error);
+      throw error;
+    }
   }
 }
 

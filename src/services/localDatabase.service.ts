@@ -198,6 +198,20 @@ class LocalDatabaseService {
     }
   }
 
+  /**
+   * Get EXIF data for an image by UUID
+   */
+  async getExifData(uuid: string): Promise<ExifData | null> {
+    await this.ensureInitialized();
+    try {
+      const exifData = await window.electronAPI?.db.getExifData(uuid);
+      return exifData || null;
+    } catch (error) {
+      console.error('[LocalDB] Failed to get EXIF data:', error);
+      return null;
+    }
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
@@ -213,6 +227,20 @@ class LocalDatabaseService {
     } catch (error) {
       console.error('[LocalDB] Failed to upsert EXIF data:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get all images with EXIF data for LWW sync diff calculation
+   */
+  async getAllImagesWithExif(): Promise<LocalImage[]> {
+    await this.ensureInitialized();
+    try {
+      const images = await window.electronAPI?.db.getAllImagesWithExif();
+      return images || [];
+    } catch (error) {
+      console.error('[LocalDB] Failed to get all images with EXIF:', error);
+      return [];
     }
   }
 
