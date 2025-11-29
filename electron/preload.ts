@@ -77,3 +77,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cleanup: () => ipcRenderer.invoke('tiff:cleanup')
   }
 })
+
+// Also expose a simpler electron namespace for dashboard features
+contextBridge.exposeInMainWorld('electron', {
+  invoke: (channel: string, ...args: any[]) => {
+    // Whitelist allowed channels
+    const allowedChannels = [
+      'get-upload-summary',
+      'get-format-stats',
+      'get-image-stats',
+      'get-sync-status'
+    ];
+    if (allowedChannels.includes(channel)) {
+      return ipcRenderer.invoke(channel, ...args);
+    }
+    throw new Error(`Channel ${channel} is not allowed`);
+  }
+})

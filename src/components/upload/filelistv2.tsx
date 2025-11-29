@@ -741,6 +741,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         exifData: meta.exifData,
         pageCount: meta.pageCount,
         tiffDimensions: meta.tiffDimensions,
+        createdAt:new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null
       })))
       files.forEach((file) => {
         setUploadStatuses((prev) => {

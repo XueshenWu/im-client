@@ -75,8 +75,19 @@ class StateDiffService {
           }
         }
 
-        // >>> SUB-CASE C: Synced (Timestamps Equal) <<<
-        // Do nothing.
+        // >>> SUB-CASE C: Timestamps Equal (Tie-Breaker) <<<
+        else {
+          // Timestamps are equal, check if content differs
+          if (local.hash !== remote.hash) {
+            // Content differs but timestamps match - use server as source of truth
+            console.warn(`[StateDiff] Timestamp tie for ${uuid}, hash mismatch. Preferring server version.`);
+            diff.toReplaceLocal.push(remote);
+          } else if (this.hasMetadataChanges(local, remote)) {
+            // Content matches, but metadata differs - use server metadata
+            diff.toUpdateLocal.push(remote);
+          }
+          // If both hash and metadata match, they are truly in sync - do nothing
+        }
       }
     }
 

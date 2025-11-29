@@ -7,6 +7,32 @@ import { syncClient } from './syncClient'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.24.nip.io:9999'
 const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'http://s3.192.168.0.24.nip.io:9999'
 
+/**
+ * Lock manager for LWW sync operations
+ * Stores the current lock UUID to be sent with protected write operations
+ */
+class LockManager {
+  private lockUuid: string | null = null
+
+  setLockUuid(uuid: string | null): void {
+    this.lockUuid = uuid
+  }
+
+  getLockUuid(): string | null {
+    return this.lockUuid
+  }
+
+  hasLock(): boolean {
+    return this.lockUuid !== null
+  }
+
+  clearLock(): void {
+    this.lockUuid = null
+  }
+}
+
+export const lockManager = new LockManager()
+
 // Create axios instance with default configuration
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -31,6 +57,13 @@ api.interceptors.request.use(
           config.headers['X-Client-ID'] = clientId
           config.headers['X-Last-Sync-Sequence'] = lastSyncSequence.toString()
           console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url} - Sending seq: ${lastSyncSequence}`)
+        }
+
+        // Add lock UUID header if we have an active lock
+        const lockUuid = lockManager.getLockUuid()
+        if (lockUuid) {
+          config.headers['X-Lock-UUID'] = lockUuid
+          console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url} - Sending lock UUID: ${lockUuid}`)
         }
       } catch (error) {
         console.warn('[API] Failed to add sync headers:', error)
@@ -89,6 +122,19 @@ api.interceptors.response.use(
       ;(conflictError as any).requiresSync = true
 
       return Promise.reject(conflictError)
+    }
+
+    // Handle 423 Locked - Resource is locked by another sync operation
+    if (error.response?.status === 423) {
+      console.warn('[API] Resource locked (423). Another sync operation is in progress.')
+
+      const lockedError: ApiError = {
+        error: 'Resource Locked',
+        message: error.response.data?.message || 'Another sync operation is in progress. Please wait and retry.',
+        statusCode: 423,
+      }
+
+      return Promise.reject(lockedError)
     }
 
     // Handle different error scenarios

@@ -563,15 +563,123 @@ export const dbOperations = {
   },
 
   async updateImage(uuid: string, updates: any): Promise<void> {
-    const fields = Object.keys(updates).map((key) => `${key} = $${key}`).join(', ');
+    const db = getDatabase();
 
-    const bindData: any = { $uuid: uuid };
-    Object.keys(updates).forEach(k => bindData['$' + k] = updates[k]);
+    // Helper to parse GPS values (same logic as your insert function)
+    const parseGpsValue = (value: string | number | null | undefined): number | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number') return value;
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    };
 
-    await sql.run(
-      `UPDATE images SET ${fields}, updatedAt = datetime('now') WHERE uuid = $uuid`,
-      bindData
-    );
+    // Map JS properties to DB columns for Exif
+    const exifColumnMapping: { [key: string]: string } = {
+      cameraMake: 'camera_make',
+      cameraModel: 'camera_model',
+      lensModel: 'lens_model',
+      artist: 'artist',
+      copyright: 'copyright',
+      software: 'software',
+      iso: 'iso',
+      shutterSpeed: 'shutter_speed',
+      aperture: 'aperture',
+      focalLength: 'focal_length',
+      dateTaken: 'date_taken',
+      orientation: 'orientation',
+      gpsLatitude: 'gps_latitude',
+      gpsLongitude: 'gps_longitude',
+      gpsAltitude: 'gps_altitude',
+      extra: 'extra'
+    };
+
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        // --- 1. PREPARE IMAGE UPDATES ---
+        const imageBindData: any = { $uuid: uuid };
+        const imageSetClauses: string[] = [];
+
+        // Always update the 'updatedAt' timestamp
+        imageSetClauses.push("updatedAt = datetime('now')");
+
+        // Separate Exif data from Image data
+        const exifUpdates = updates.exifData;
+
+        Object.keys(updates).forEach((k) => {
+          // Skip exifData (handled separately) and 'uuid' (used for WHERE clause)
+          if (k === 'exifData' || k === 'uuid') return;
+
+          // Special handling for tiffDimensions
+          if (k === 'tiffDimensions' && updates[k]) {
+            imageSetClauses.push(`${k} = $${k}`);
+            imageBindData['$' + k] = JSON.stringify(updates[k]);
+          }
+          // Handle standard fields
+          else {
+            imageSetClauses.push(`${k} = $${k}`);
+            imageBindData['$' + k] = updates[k];
+          }
+        });
+
+        // Run Image Update
+        const imageSql = `UPDATE images SET ${imageSetClauses.join(', ')} WHERE uuid = $uuid`;
+        db.run(imageSql, imageBindData, (err: Error | null) => {
+          if (err) {
+            console.error('Error updating image table:', err);
+            db.run('ROLLBACK');
+            return reject(err);
+          }
+        });
+
+        // --- 2. PREPARE EXIF UPDATES ---
+        if (exifUpdates && Object.keys(exifUpdates).length > 0) {
+          const exifBindData: any = { $uuid: uuid };
+          const exifSetClauses: string[] = [];
+
+          Object.keys(exifUpdates).forEach((k) => {
+            const dbColumn = exifColumnMapping[k];
+
+            // Only proceed if we map to a valid DB column
+            if (dbColumn) {
+              exifSetClauses.push(`${dbColumn} = $${dbColumn}`);
+
+              // Handle specific data types
+              if (k.startsWith('gps')) {
+                exifBindData['$' + dbColumn] = parseGpsValue(exifUpdates[k]);
+              } else if (k === 'extra') {
+                exifBindData['$' + dbColumn] = exifUpdates[k] ? JSON.stringify(exifUpdates[k]) : null;
+              } else {
+                exifBindData['$' + dbColumn] = exifUpdates[k];
+              }
+            }
+          });
+
+          if (exifSetClauses.length > 0) {
+            // Note: We use UPDATE here. If the image previously had NO exif data, 
+            // this will return 0 changes. If you need to create new exif data 
+            // for an existing image, you would need to check existing row or use UPSERT logic.
+            // Assuming here we are modifying existing records.
+            const exifSql = `UPDATE exif_data SET ${exifSetClauses.join(', ')} WHERE uuid = $uuid`;
+
+            db.run(exifSql, exifBindData, (err: Error | null) => {
+              if (err) {
+                console.error('Error updating exif_data table:', err);
+                db.run('ROLLBACK');
+                return reject(err);
+              }
+            });
+          }
+        }
+
+        // --- 3. COMMIT ---
+        db.run('COMMIT', (err: Error | null) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
   },
 
   async deleteImage(uuid: string): Promise<void> {
@@ -684,10 +792,10 @@ export const dbOperations = {
 
       // Build exifData object if any EXIF fields exist
       const hasExifData = row.camera_make || row.camera_model || row.lens_model ||
-                         row.artist || row.copyright || row.software || row.iso ||
-                         row.shutter_speed || row.aperture || row.focal_length ||
-                         row.date_taken || row.orientation || row.gps_latitude ||
-                         row.gps_longitude || row.gps_altitude || row.extra;
+        row.artist || row.copyright || row.software || row.iso ||
+        row.shutter_speed || row.aperture || row.focal_length ||
+        row.date_taken || row.orientation || row.gps_latitude ||
+        row.gps_longitude || row.gps_altitude || row.extra;
 
       if (hasExifData) {
         // Parse extra field if it exists

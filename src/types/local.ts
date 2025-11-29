@@ -78,3 +78,37 @@ export interface AppSettings {
   syncPolicy: SyncPolicy;
   exportOnConflict: boolean; // Show export dialog on pull conflicts
 }
+
+/**
+ * Sync progress phases
+ */
+export type SyncPhase =
+  | 'initializing'      // Acquiring lock, checking status
+  | 'calculating_diff'  // Calculating differences
+  | 'pull_deleting'     // Deleting local files
+  | 'pull_downloading'  // Downloading new files
+  | 'pull_updating'     // Updating local metadata
+  | 'pull_replacing'    // Replacing local files
+  | 'push_deleting'     // Deleting remote files
+  | 'push_uploading'    // Uploading new files
+  | 'push_updating'     // Updating remote metadata
+  | 'push_replacing'    // Replacing remote files
+  | 'finalizing'        // Updating sync metadata
+  | 'completed'         // Sync completed
+  | 'failed'            // Sync failed
+
+/**
+ * Progress update for sync operations
+ */
+export interface SyncProgress {
+  phase: SyncPhase;
+  current: number;      // Current item being processed
+  total: number;        // Total items in this phase
+  message: string;      // Human-readable message
+  percentage: number;   // Overall percentage (0-100)
+}
+
+/**
+ * Progress callback for sync operations
+ */
+export type SyncProgressCallback = (progress: SyncProgress) => void;

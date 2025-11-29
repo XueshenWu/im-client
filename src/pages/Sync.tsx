@@ -13,10 +13,8 @@ import {
 } from '@/components/ui/accordion'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { localSyncService } from '@/services/localSync.service'
-import { localImageService } from '@/services/localImage.service'
-import ExportDialog from '@/components/sync/ExportDialog'
-import { LocalImage } from '@/types/local'
-import { Upload, Download, AlertTriangle, Cloud, HardDrive } from 'lucide-react'
+import { SyncProgress } from '@/types/local'
+import { Upload, AlertTriangle, Cloud, HardDrive, RefreshCw } from 'lucide-react'
 
 export default function Sync() {
   const [isLoading, setIsLoading] = useState(false)
@@ -41,9 +39,7 @@ export default function Sync() {
     serverSeq: number
     inSync: boolean
   } | null>(null)
-  const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [affectedImages, setAffectedImages] = useState<LocalImage[]>([])
-  const [pendingPullContinue, setPendingPullContinue] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
 
   // Cloud mode: Load sync status and operations
   useEffect(() => {
@@ -76,10 +72,20 @@ export default function Sync() {
     }
   }, [sourceMode])
 
-  // Local mode: Load sync status
+  // Local mode: Load sync status and set up progress callback
   useEffect(() => {
     if (sourceMode === 'local') {
       loadLocalSyncStatus()
+
+      // Set up progress callback
+      localSyncService.setProgressCallback((progress: SyncProgress) => {
+        setSyncProgress(progress)
+      })
+
+      return () => {
+        // Clean up progress callback
+        localSyncService.setProgressCallback(null)
+      }
     }
   }, [sourceMode])
 
@@ -191,93 +197,44 @@ export default function Sync() {
     }
   }
 
-  const handleLocalPush = async (forcePush: boolean = false) => {
+  const handleLocalSync = async () => {
     if (sourceMode !== 'local') return
     setIsSyncing(true)
+    setSyncProgress(null)
     try {
-      const result = await localSyncService.push(forcePush)
+      const result = await localSyncService.syncLWW()
       if (result.success) {
-        alert(`Push successful! ${result.message}`)
+        alert(`Sync successful! ${result.message}`)
         await loadLocalSyncStatus()
       } else {
-        alert(`Push failed: ${result.message}`)
+        alert(`Sync failed: ${result.message}`)
       }
     } catch (error) {
-      console.error('Push failed:', error)
-      alert('Push failed. Check console for details.')
+      console.error('Sync failed:', error)
+      alert('Sync failed. Check console for details.')
     } finally {
       setIsSyncing(false)
+      setSyncProgress(null)
     }
   }
 
-  const handleLocalPull = async () => {
-    if (sourceMode !== 'local') return
-    setIsSyncing(true)
-    try {
-      const result = await localSyncService.pull()
-      if (result.success) {
-        // Check if there are affected images
-        if (result.affectedImages && result.affectedImages.length > 0) {
-          setAffectedImages(result.affectedImages)
-          setExportDialogOpen(true)
-          setPendingPullContinue(true)
-        } else {
-          alert(`Pull successful! ${result.message}`)
-          await loadLocalSyncStatus()
-        }
-      } else {
-        alert(`Pull failed: ${result.message}`)
-      }
-    } catch (error) {
-      console.error('Pull failed:', error)
-      alert('Pull failed. Check console for details.')
-    } finally {
-      setIsSyncing(false)
+  const getPhaseDisplayName = (phase: SyncProgress['phase']): string => {
+    const phaseNames: Record<SyncProgress['phase'], string> = {
+      initializing: 'Initializing',
+      calculating_diff: 'Calculating Differences',
+      pull_deleting: 'Deleting Local Files',
+      pull_downloading: 'Downloading from Cloud',
+      pull_updating: 'Updating Local Metadata',
+      pull_replacing: 'Replacing Local Files',
+      push_deleting: 'Deleting Remote Files',
+      push_uploading: 'Uploading to Cloud',
+      push_updating: 'Updating Remote Metadata',
+      push_replacing: 'Replacing Remote Files',
+      finalizing: 'Finalizing',
+      completed: 'Completed',
+      failed: 'Failed',
     }
-  }
-
-  const handleExportAndContinuePull = async (imagesToExport: LocalImage[], destination: string) => {
-    try {
-      // Export images
-      const result = await localImageService.exportImages(
-        imagesToExport.map(img => img.uuid),
-        destination
-      )
-
-      if (result.success) {
-        alert(`Exported ${imagesToExport.length} images successfully!`)
-        // Continue with pull
-        await loadLocalSyncStatus()
-      } else {
-        alert('Failed to export some images. Check console.')
-      }
-    } catch (error) {
-      console.error('Export failed:', error)
-      alert('Export failed. Check console for details.')
-    }
-    setPendingPullContinue(false)
-  }
-
-  const handleSkipExportAndContinue = async () => {
-    await loadLocalSyncStatus()
-    setPendingPullContinue(false)
-  }
-
-  const handleCancelPull = () => {
-    setPendingPullContinue(false)
-    setAffectedImages([])
-  }
-
-  const handleForcePush = async () => {
-    if (!confirm('⚠️ FORCE PUSH will overwrite the server with your local state. This is dangerous and may cause data loss for other clients. Are you sure?')) {
-      return
-    }
-    if (!confirm('Please confirm to proceed with force push.')) {
-      return
-    }
-   
-   
-    await handleLocalPush(true)
+    return phaseNames[phase] || phase
   }
 
   return (
@@ -638,44 +595,69 @@ export default function Sync() {
                   )}
                 </div>
 
-                {/* Push/Pull Controls */}
+                {/* Sync Controls */}
                 <div className="space-y-4">
+                  {/* Sync Button */}
                   <div className="flex flex-wrap gap-3">
                     <Button
-                      onClick={() => handleLocalPush(false)}
+                      onClick={handleLocalSync}
                       disabled={isSyncing}
+                      size="lg"
                       className="bg-blue-600 hover:bg-blue-700"
                     >
-                      <Upload className="mr-2 h-4 w-4" />
-                      {isSyncing ? 'Pushing...' : 'Push to Cloud'}
-                    </Button>
-                    <Button
-                      onClick={handleLocalPull}
-                      disabled={isSyncing}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      {isSyncing ? 'Pulling...' : 'Pull from Cloud'}
-                    </Button>
-                    <Button
-                      onClick={handleForcePush}
-                      disabled={isSyncing}
-                      variant="destructive"
-                    >
-                      <AlertTriangle className="mr-2 h-4 w-4" />
-                      Force Push
+                      <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                      {isSyncing ? 'Syncing...' : 'Sync with Cloud'}
                     </Button>
                   </div>
 
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h3 className="font-semibold mb-2 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      Local Mode Sync Guide
+                  {/* Progress Display */}
+                  {syncProgress && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                          <span className="font-medium text-blue-900">
+                            {getPhaseDisplayName(syncProgress.phase)}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold text-blue-700">
+                          {syncProgress.percentage}%
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${syncProgress.percentage}%` }}
+                        />
+                      </div>
+
+                      {/* Progress Message */}
+                      <p className="text-sm text-blue-800">
+                        {syncProgress.message}
+                      </p>
+
+                      {/* Item Progress */}
+                      {syncProgress.total > 0 && (
+                        <p className="text-xs text-blue-600">
+                          Processing: {syncProgress.current} / {syncProgress.total}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Info Box */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2 flex items-center gap-2 text-blue-900">
+                      <AlertTriangle className="h-4 w-4 text-blue-600" />
+                      Local Mode Sync
                     </h3>
                     <ul className="text-sm space-y-1 text-gray-700">
-                      <li>• <strong>Push</strong>: Upload local changes to cloud (requires local seq = server seq)</li>
-                      <li>• <strong>Pull</strong>: Download cloud changes to local (shows export dialog if conflicts)</li>
-                      <li>• <strong>Force Push</strong>: Overwrite server with local state (⚠️ DANGEROUS)</li>
+                      <li>• Syncs local storage with cloud using Last-Write-Wins strategy</li>
+                      <li>• Automatically handles uploads, downloads, and conflict resolution</li>
+                      <li>• Progress shows real-time status of sync operations</li>
+                      <li>• Server lock prevents concurrent modifications during sync</li>
                     </ul>
                   </div>
                 </div>
@@ -684,16 +666,6 @@ export default function Sync() {
           </Accordion>
         )}
       </ScrollArea>
-
-      {/* Export Dialog */}
-      <ExportDialog
-        open={exportDialogOpen}
-        onOpenChange={setExportDialogOpen}
-        affectedImages={affectedImages}
-        onExport={handleExportAndContinuePull}
-        onSkipExport={handleSkipExportAndContinue}
-        onCancel={handleCancelPull}
-      />
     </div>
   )
 }

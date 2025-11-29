@@ -49,6 +49,27 @@ export const getMyOperations = async (limit?: number): Promise<MyOperationsRespo
 }
 
 /**
+ * Acquire LWW sync lock
+ * @returns Lock UUID to be used in subsequent requests
+ */
+export const acquireLwwLock = async (): Promise<string> => {
+  const response = await api.post<{
+    success: boolean
+    lockUuid: string
+    message: string
+  }>('/api/sync/lock/acquire')
+  return response.data.lockUuid
+}
+
+/**
+ * Release LWW sync lock
+ * @param lockUuid - The lock UUID to release
+ */
+export const releaseLwwLock = async (lockUuid: string): Promise<void> => {
+  await api.post('/api/sync/lock/release', { lockUuid })
+}
+
+/**
  * Sync service object - provides all sync functions as methods
  * This allows importing either individual functions or the entire service object
  */
@@ -57,4 +78,6 @@ export const syncService = {
   getSyncOperations,
   getSyncStatus,
   getMyOperations,
+  acquireLwwLock,
+  releaseLwwLock,
 }

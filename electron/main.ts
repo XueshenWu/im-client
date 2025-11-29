@@ -1147,6 +1147,156 @@ function createWindow() {
     }
   });
 
+  // Dashboard IPC handlers
+  ipcMain.handle('get-upload-summary', async (_, { days }: { days: number }) => {
+    try {
+      const db = await initializeDatabase();
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const result: Array<{ date: string; uploaded: number; deleted: number }> = [];
+
+      // Generate array of dates
+      for (let i = 0; i < days; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        const dateStr = currentDate.toISOString().split('T')[0];
+
+        // Count uploads (createdAt matches this date)
+        const uploadCount = await new Promise<number>((resolve, reject) => {
+          db.get(
+            `SELECT COUNT(*) as count FROM images
+             WHERE date(createdAt) = ? AND deletedAt IS NULL`,
+            [dateStr],
+            (err: Error | null, row: any) => {
+              if (err) reject(err);
+              else resolve(row?.count || 0);
+            }
+          );
+        });
+
+        // Count deletes (deletedAt matches this date)
+        const deleteCount = await new Promise<number>((resolve, reject) => {
+          db.get(
+            `SELECT COUNT(*) as count FROM images
+             WHERE date(deletedAt) = ?`,
+            [dateStr],
+            (err: Error | null, row: any) => {
+              if (err) reject(err);
+              else resolve(row?.count || 0);
+            }
+          );
+        });
+
+        result.push({
+          date: currentDate.toISOString(),
+          uploaded: uploadCount,
+          deleted: deleteCount,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Failed to get upload summary:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('get-format-stats', async () => {
+    try {
+      const db = await initializeDatabase();
+
+      const rows = await new Promise<Array<{ format: string; count: number }>>((resolve, reject) => {
+        db.all(
+          `SELECT format, COUNT(*) as count
+           FROM images
+           WHERE deletedAt IS NULL
+           GROUP BY format`,
+          (err: Error | null, rows: any[]) => {
+            if (err) reject(err);
+            else resolve(rows || []);
+          }
+        );
+      });
+
+      return rows;
+    } catch (error) {
+      console.error('Failed to get format stats:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('get-image-stats', async () => {
+    try {
+      const db = await initializeDatabase();
+
+      const stats = await new Promise<{ totalCount: number; totalSize: number }>((resolve, reject) => {
+        db.get(
+          `SELECT COUNT(*) as totalCount, COALESCE(SUM(fileSize), 0) as totalSize
+           FROM images
+           WHERE deletedAt IS NULL`,
+          (err: Error | null, row: any) => {
+            if (err) reject(err);
+            else resolve({
+              totalCount: row?.totalCount || 0,
+              totalSize: row?.totalSize || 0,
+            });
+          }
+        );
+      });
+
+      return stats;
+    } catch (error) {
+      console.error('Failed to get image stats:', error);
+      return { totalCount: 0, totalSize: 0 };
+    }
+  });
+
+  ipcMain.handle('get-sync-status', async () => {
+    try {
+      const db = await initializeDatabase();
+
+      // Get sync metadata
+      const metadata = await new Promise<{ lastSyncSequence: number; lastSyncTime: string | null }>((resolve, reject) => {
+        db.all(
+          `SELECT key, value FROM sync_metadata WHERE key IN ('lastSyncSequence', 'lastSyncTime')`,
+          (err: Error | null, rows: any[]) => {
+            if (err) reject(err);
+            else {
+              const result: any = {};
+              rows.forEach((row) => {
+                if (row.key === 'lastSyncSequence') {
+                  result.lastSyncSequence = parseInt(row.value) || 0;
+                } else if (row.key === 'lastSyncTime') {
+                  result.lastSyncTime = row.value || null;
+                }
+              });
+              resolve(result);
+            }
+          }
+        );
+      });
+
+      // For now, we'll assume remoteSequence needs to be fetched from the sync service
+      // This is a placeholder - you'll need to implement actual remote sequence fetching
+      return {
+        localSequence: metadata.lastSyncSequence || 0,
+        remoteSequence: metadata.lastSyncSequence || 0, // TODO: Fetch from server
+        isInSync: true, // TODO: Compare with actual remote sequence
+        lastSyncTime: metadata.lastSyncTime,
+      };
+    } catch (error) {
+      console.error('Failed to get sync status:', error);
+      return {
+        localSequence: 0,
+        remoteSequence: 0,
+        isInSync: false,
+        lastSyncTime: null,
+      };
+    }
+  });
+
   // In development mode, load from Vite dev server
   // In production, load from built files
   if (process.env.VITE_DEV_SERVER_URL) {

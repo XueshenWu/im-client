@@ -174,6 +174,9 @@ interface ImportMeta {
 declare global {
   interface Window {
     electronAPI?: ElectronAPI
+    electron: {
+      invoke: (channel: string, ...args: any[]) => Promise<any>
+    }
   }
 
   interface LocalImageFile {

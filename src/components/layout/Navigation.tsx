@@ -88,12 +88,12 @@ export default function Navigation() {
 
               className={cn(
                 'relative h-12 rounded-2xl transition-all duration-200 cursor-pointer ',
-                isExpanded ? 'w-full justify-start ' : 'w-12',
+                isExpanded ? 'w-full justify-start ' : 'w-12 flex items-center justify-center',
                 isActive
                   ? 'bg-linear-to-br from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30 hover:from-blue-700 hover:to-purple-700'
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               )}
-              style={{ paddingLeft: isExpanded ? '12px' : '12px'}}
+              style={{ paddingLeft: isExpanded ? '12px' : undefined}}
               title={!isExpanded ? t(item.labelKey) : undefined}
             >
 

@@ -185,8 +185,19 @@ export const deleteImages = async (uuids: string[]): Promise<{ deleted: Image[];
  * Request presigned URLs for upload
  * Insert metadata into db with status:pending
  */
-export const requestPresignedURLs = async (images: Omit<Image, "status" | "createdAt" | "updatedAt" | "deletedAt" | "id">[]): Promise<PreSignURLsResponse['data']> => {
-  const response = await api.post<PreSignURLsResponse>('/api/images/presignUrls', { images })
+export const requestPresignedURLs = async (
+  images: Omit<Image, 'status' | 'id'>[]
+): Promise<PreSignURLsResponse['data']> => {
+  const mappedImages = images.map((img) => ({
+    ...img,
+    createdAt: img.createdAt ? new Date(img.createdAt) : undefined,
+    updatedAt: img.updatedAt ? new Date(img.updatedAt) : undefined,
+    deletedAt: img.deletedAt ? new Date(img.deletedAt) : undefined,
+  }));
+
+  const response = await api.post<PreSignURLsResponse>('/api/images/presignUrls', {
+    images: mappedImages,
+  });
   return response.data.data
 }
 
@@ -445,4 +456,3 @@ export const updateCloudImageMetadata = async (
   const response = await api.put<ApiResponse<Image>>(`/api/images/uuid/${uuid}`, updates)
   return response.data.data
 }
-
