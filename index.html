@@ -5,17 +5,20 @@
   <meta charset="UTF-8" />
   <script src="http://localhost:8097"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CSP DISABLED - Uncomment meta tag below to re-enable -->
+
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
              connect-src 'self' data: http://localhost:* local-image: local-thumbnail: http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*;
              script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097;
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src 'self' data: https://fonts.gstatic.com;
-             img-src 'self' data: blob: local-image: local-thumbnail: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*;"
-/>
-   <link rel="preconnect" href="https://fonts.googleapis.com">
+             img-src 'self' data: blob: local-image: local-thumbnail: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*;" -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&family=Quicksand:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
   <title>Image Management</title>
 </head>
 

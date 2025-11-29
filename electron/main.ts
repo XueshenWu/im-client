@@ -18,7 +18,28 @@ import { initializeDatabase, dbOperations, closeDatabase } from './database.js'
 
 
 let pageBuffers: Buffer[] = [];
-
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local-image',
+    privileges: {
+      secure: true,           // Treats as HTTPS (secure context)
+      standard: true,         // Handles URL resolution like http://
+      supportFetchAPI: true,  // Allows fetch() calls
+      bypassCSP: true,        // Helps avoid some CSP headers issues
+      stream: true            // Efficient streaming
+    }
+  },
+  {
+    scheme: 'local-thumbnail',
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+]);
 
 // Helper to normalize file format extensions
 const normalizeFormat = (format: string): string => {
@@ -75,10 +96,13 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: true
     },
   })
 
   // Set Content Security Policy to allow API connections
+  // CSP DISABLED - Uncomment block below to re-enable
+  
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -95,6 +119,7 @@ function createWindow() {
       }
     })
   })
+ 
 
   // Window control handlers
   ipcMain.on('minimize-window', () => {
@@ -1133,31 +1158,9 @@ function createWindow() {
 }
 
 
-// protocol.registerSchemesAsPrivileged([
-//   {
-//     scheme:'local-image',
-//     privileges: {
-//       standard: true,
-//       secure: true,
-//       supportFetchAPI: true, // <--- THIS FIXES YOUR ERROR
-//       corsEnabled: true,     // <--- Often needed to prevent CORS errors later
-//       stream: true           // <--- Good for performance with images
-//     }
-//   },
-//   {
-//     scheme:'local-thumbnail',
-//     privileges: {
-//       standard: true,
-//       secure: true,
-//       supportFetchAPI: true, // <--- THIS FIXES YOUR ERROR
-//       corsEnabled: true,     // <--- Often needed to prevent CORS errors later
-//       stream: true           // <--- Good for performance with images
-//     }
-//   },
-// ])
+
 
 app.whenReady().then(async () => {
-
 
 
 
@@ -1165,7 +1168,13 @@ app.whenReady().then(async () => {
   protocol.handle('local-image', (request) => {
     try {
       // request.url will look like: "local-image://{uuid}.{format}"
-      const fileNameWithExt = request.url.slice('local-image://'.length);
+      let fileNameWithExt = request.url.slice('local-image://'.length);
+      if (fileNameWithExt.endsWith('/')) {
+        fileNameWithExt = fileNameWithExt.slice(0, -1);
+      }
+
+
+
       const fileName = decodeURIComponent(fileNameWithExt);
 
       // Build path: {AppData}/image-management/images/{uuid}.{format}
@@ -1189,7 +1198,10 @@ app.whenReady().then(async () => {
   protocol.handle('local-thumbnail', (request) => {
     try {
       // request.url will look like: "local-thumbnail://{uuid}"
-      const uuid = request.url.slice('local-thumbnail://'.length);
+      let uuid = request.url.slice('local-thumbnail://'.length);
+      if (uuid.endsWith('/')) {
+        uuid = uuid.slice(0, -1);
+      }
       const decodedUuid = decodeURIComponent(uuid);
 
       // Build path: {AppData}/image-management/thumbnails/{uuid}.jpg
@@ -1208,6 +1220,7 @@ app.whenReady().then(async () => {
       return new Response('Failed to load thumbnail', { status: 500 });
     }
   });
+
 
 
   createWindow()

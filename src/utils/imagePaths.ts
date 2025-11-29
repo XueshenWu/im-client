@@ -10,7 +10,8 @@
  * - Images: Request presigned URL from server
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Hardcoded for production - TODO: Move to settings
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.24:9999';
 
 /**
  * Get the display URL for a full-size local image
