@@ -4,7 +4,8 @@ import { syncClient } from './syncClient'
 
 // Get API URL from environment variables
 // Hardcoded for production - TODO: Move to settings
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.24:9999'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.24.nip.io:9999'
+const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'http://s3.192.168.0.24.nip.io:9999'
 
 // Create axios instance with default configuration
 const api: AxiosInstance = axios.create({
@@ -152,8 +153,8 @@ export const imageService = {
    * Thumbnails are publicly accessible from MinIO storage
    * Note: Thumbnails are always stored as .jpeg regardless of source image format
    */
-  getThumbnailUrl(uuid: string, format: string): string {
-    return `${API_BASE_URL}/storage/thumbnails/${uuid}.jpeg`
+  getThumbnailUrl(uuid: string, _: string): string {
+    return `${STORAGE_BASE_URL}/thumbnails/${uuid}.jpeg`
   },
 
   /**

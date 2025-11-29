@@ -109,11 +109,11 @@ function createWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self'; " +
-          "connect-src 'self' data: http://localhost:* local-image: local-thumbnail: http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24:*; " +
+          "connect-src 'self' data: http://localhost:* local-image: local-thumbnail: http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* http://192.168.0.24.nip.io:9999 http://s3.192.168.0.24.nip.io:9999; " +
           "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8097; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
           "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-          "img-src 'self' data: blob: local-image: local-thumbnail: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24:*; " +
+          "img-src 'self' data: blob: local-image: local-thumbnail: http://localhost:* http://127.0.0.1:* https: http://192.168.0.24.nip.io:9999 http://s3.192.168.0.24.nip.io:9999; " +
           "font-src 'self' data: https://fonts.gstatic.com;"
         ]
       }
