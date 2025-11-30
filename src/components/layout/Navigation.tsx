@@ -63,11 +63,11 @@ export default function Navigation() {
       {/* Logo */}
       <div className={`${isExpanded ? 'w-full flex items-center gap-3 px-3' : 'w-12 h-12'} mb-8 transition-all duration-300`}>
         <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-          <span className="text-white font-bold text-lg">V</span>
+          <span className="text-white font-bold text-lg">E</span>
         </div>
         {isExpanded && (
-          <span className="text-gray-900 dark:text-white font-semibold text-sm whitespace-nowrap overflow-hidden">
-            Voyis
+          <span className="text-gray-900 dark:text-white font-semibold text-xs whitespace-nowrap overflow-hidden">
+            Editor
           </span>
         )}
       </div>
@@ -91,7 +91,7 @@ export default function Navigation() {
                 isExpanded ? 'w-full justify-start ' : 'w-12 flex items-center justify-center',
                 isActive
                   ? 'bg-linear-to-br from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30 hover:from-blue-700 hover:to-purple-700'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                  : 'hover:bg-gray-200 dark:hover:bg-gray-800'
               )}
               style={{ paddingLeft: isExpanded ? '12px' : undefined}}
               title={!isExpanded ? t(item.labelKey) : undefined}
@@ -125,7 +125,7 @@ export default function Navigation() {
         onClick={() => handleNavigate('settings')}
         variant="ghost"
         className={cn(
-          'relative h-12 rounded-2xl transition-all duration-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800',
+          'relative h-12 rounded-2xl transition-all duration-200 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800',
           isExpanded ? 'w-full justify-start' : 'w-12'
         )}
         style={{ paddingLeft: isExpanded ? '12px' : '12px', paddingRight: isExpanded ? '12px' : '12px' }}

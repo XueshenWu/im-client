@@ -120,6 +120,7 @@ async function createTables(database: Database): Promise<void> {
   // Initialize sync metadata
   await run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('lastSyncSequence', '0')`);
   await run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('lastSyncTime', '')`);
+  await run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('lastSyncUUID', '')`);
 
   await run(`CREATE TABLE IF NOT EXISTS exif_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -683,7 +684,7 @@ export const dbOperations = {
   },
 
   async deleteImage(uuid: string): Promise<void> {
-    await sql.run('DELETE FROM images WHERE uuid = ?', [uuid]);
+    await sql.run('UPDATE images SET deletedAt = datetime(\'now\') WHERE uuid = ?', [uuid]);
   },
 
   async deleteImages(uuids: string[]): Promise<void> {
@@ -692,7 +693,7 @@ export const dbOperations = {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
-        const stmt = db.prepare('DELETE FROM images WHERE uuid = ?');
+        const stmt = db.prepare('UPDATE images SET deletedAt = datetime(\'now\') WHERE uuid = ?');
         uuids.forEach(id => stmt.run(id));
         stmt.finalize();
 
@@ -715,7 +716,7 @@ export const dbOperations = {
     await sql.run('DELETE FROM images');
   },
 
-  async getSyncMetadata(): Promise<{ lastSyncSequence: number; lastSyncTime: string | null }> {
+  async getSyncMetadata(): Promise<{ lastSyncSequence: number; lastSyncTime: string | null; lastSyncUUID: string | null }> {
     const rows = await sql.all('SELECT key, value FROM sync_metadata');
 
     const metadata: any = {};
@@ -730,10 +731,11 @@ export const dbOperations = {
     return {
       lastSyncSequence: metadata.lastSyncSequence || 0,
       lastSyncTime: metadata.lastSyncTime || null,
+      lastSyncUUID: metadata.lastSyncUUID || null,
     };
   },
 
-  async updateSyncMetadata(metadata: { lastSyncSequence?: number; lastSyncTime?: string }): Promise<void> {
+  async updateSyncMetadata(metadata: { lastSyncSequence?: number; lastSyncTime?: string; lastSyncUUID?: string | null }): Promise<void> {
     const db = getDatabase();
     return new Promise((resolve, reject) => {
       db.serialize(() => {
@@ -746,6 +748,9 @@ export const dbOperations = {
         }
         if (metadata.lastSyncTime !== undefined) {
           stmt.run('lastSyncTime', metadata.lastSyncTime);
+        }
+        if (metadata.lastSyncUUID !== undefined) {
+          stmt.run('lastSyncUUID', metadata.lastSyncUUID || '');
         }
 
         stmt.finalize();
@@ -761,6 +766,7 @@ export const dbOperations = {
   /**
    * Get all images with their EXIF data for LWW sync diff calculation
    * Joins images and exif_data tables
+   * NOTE: Includes deleted records (deletedAt IS NOT NULL) for tombstone sync
    */
   async getAllImagesWithExif(): Promise<any[]> {
     const images = await sql.all(`

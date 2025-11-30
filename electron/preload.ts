@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('save-image-buffer', uuid, format, buffer),
   saveThumbnailBuffer: (uuid: string, buffer: ArrayBuffer) =>
     ipcRenderer.invoke('save-thumbnail-buffer', uuid, buffer),
+  deleteLocalFiles: (uuids: Array<{ uuid: string; format: string }>) =>
+    ipcRenderer.invoke('delete-local-files', uuids),
   saveFilesToLocal: (files: Array<{ sourcePath: string; uuid: string; format: string }>) =>
     ipcRenderer.invoke('save-files-to-local', files),
   getLocalImages: (options?: { limit?: number; offset?: number }) =>

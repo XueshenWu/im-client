@@ -46,6 +46,7 @@ export interface ReplacePair {
 export interface SyncMetadata {
   lastSyncSequence: number;
   lastSyncTime: string | null;
+  lastSyncUUID: string | null;  // For local mode: UUID-based sync tracking
 }
 
 /**

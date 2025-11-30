@@ -66,9 +66,8 @@ const SourceModeSettings: React.FC = () => {
   const handleSyncIntervalChange = (intervalSeconds: number) => {
     setSyncPolicy({ intervalSeconds });
   };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 *:border-gray-200">
       {/* Source Mode Selection */}
       <Card>
         <CardHeader>
@@ -79,9 +78,9 @@ const SourceModeSettings: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <RadioGroup value={sourceMode} onValueChange={handleSourceModeChange as any}>
-            <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
+            <div className={"flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors "+`${sourceMode==='cloud'?"border-blue-400":"border-gray-200"}`}>
               <RadioGroupItem value="cloud" id="cloud-mode" />
-              <Label htmlFor="cloud-mode" className="flex items-center gap-2 flex-1 cursor-pointer">
+              <Label htmlFor="cloud-mode" className={"flex items-center gap-2 flex-1 cursor-pointer " } >
                 <Cloud className="h-5 w-5 text-blue-500" />
                 <div>
                   <p className="font-medium">{t('settings.cloudMode', 'Cloud Mode')}</p>
@@ -92,7 +91,7 @@ const SourceModeSettings: React.FC = () => {
               </Label>
             </div>
 
-            <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
+            <div className={"flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors "+`${sourceMode==='local'?"border-blue-400":"border-gray-200"}`}>
               <RadioGroupItem value="local" id="local-mode" />
               <Label htmlFor="local-mode" className="flex items-center gap-2 flex-1 cursor-pointer">
                 <HardDrive className="h-5 w-5 text-green-500" />
@@ -127,7 +126,7 @@ const SourceModeSettings: React.FC = () => {
       </Card>
 
       {/* Sync Policy (only shown in local mode) */}
-      {sourceMode === 'local' && (
+      {sourceMode === 'local' && false&& (
         <Card>
           <CardHeader>
             <CardTitle>{t('settings.syncPolicy', 'Sync Policy')}</CardTitle>
@@ -137,7 +136,7 @@ const SourceModeSettings: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Manual/Auto Sync Toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between ">
               <div className="space-y-0.5">
                 <Label htmlFor="auto-sync">
                   {t('settings.autoSync', 'Automatic Sync')}

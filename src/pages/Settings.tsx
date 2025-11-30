@@ -1,21 +1,30 @@
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from "@/components/common/LanguageSwitcher"
+import ThemeSwitcher from "@/components/common/ThemeSwitcher"
 import SourceModeSettings from "@/components/settings/SourceModeSettings"
 import { Separator } from "@/components/ui/separator"
+import HomeLink from '@/components/common/home-link'
 
 
 export default function Settings() {
   const { t } = useTranslation()
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">{t('navigation.settings')}</h1>
-          <p className="text-muted-foreground mt-2">
-            {t('settings.description', 'Manage your application preferences and sync settings')}
-          </p>
+    <div className="h-full w-full overflow-y-auto bg-white dark:bg-gray-900">
+      <div className="p-6 space-y-6 w-full">
+        <div className='space-y-3 shrink-0'>
+          <HomeLink />
+          <div className='flex items-center justify-between gap-3'>
+
+            <h1 className='text-4xl font-bold font-sans text-gray-900 dark:text-white'>
+              {t('navigation.settings')}
+            </h1>
+
+           
+          </div>
+
         </div>
+
 
         <Separator />
 
@@ -26,12 +35,27 @@ export default function Settings() {
 
         <Separator />
 
-        {/* Language Settings */}
+        {/* Theme Settings */}
         <section>
           <div className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold">{t('settings.language', 'Language')}</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('settings.theme', 'Theme')}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {t('settings.themeDescription', 'Customize your own theme pages')}
+              </p>
+            </div>
+            <ThemeSwitcher />
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* Language Settings */}
+        <section>
+          <div className=" flex items-center justify-start gap-x-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('settings.language', 'Language')}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 {t('settings.languageDescription', 'Choose your preferred language')}
               </p>
             </div>

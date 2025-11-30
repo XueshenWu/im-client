@@ -15,8 +15,8 @@ class LocalImageService {
    */
   async addImages(images: LocalImage[]): Promise<LocalImage[]> {
     try {
-
       const inserted = await localDatabase.insertImages(images);
+      await localDatabase.markLocalStateModified(); // Mark local state as changed
       console.log(`[LocalImage] Added ${inserted.length} images to local storage`);
       return inserted;
     } catch (error) {
@@ -30,12 +30,12 @@ class LocalImageService {
    */
   async addImage(image: LocalImage): Promise<LocalImage> {
     try {
-
       const inserted = await localDatabase.insertImage(image);
       const exifData = image.exifData;
       if (exifData) {
         await localDatabase.upsertExifData(inserted.uuid, exifData);
       }
+      await localDatabase.markLocalStateModified(); // Mark local state as changed
       console.log('[LocalImage] Added image:', inserted.uuid);
       return inserted;
     } catch (error) {
@@ -89,6 +89,7 @@ class LocalImageService {
   async updateImage(uuid: string, updates: Partial<LocalImage>): Promise<void> {
     try {
       await localDatabase.updateImage(uuid, updates);
+      await localDatabase.markLocalStateModified(); // Mark local state as changed
       console.log('[LocalImage] Updated image:', uuid);
     } catch (error) {
       console.error('[LocalImage] Failed to update image:', error);
@@ -98,12 +99,29 @@ class LocalImageService {
 
   /**
    * Delete image
-   * Removes from database but keeps file in AppData
+   *
+   * - Set deletedAt in database (tombstone)
+   * - Delete actual file from disk
    */
   async deleteImage(uuid: string): Promise<void> {
     try {
+      // First, get the image format from the database
+      const image = await localDatabase.getImageByUuid(uuid);
+
+      // Update database to set deletedAt (tombstone)
       await localDatabase.deleteImage(uuid);
-      console.log('[LocalImage] Deleted image:', uuid);
+      await localDatabase.markLocalStateModified(); // Mark local state as changed
+
+      // Delete the actual file from disk
+      if (image) {
+        await window.electronAPI?.deleteLocalFiles([{
+          uuid: image.uuid,
+          format: image.format
+        }]);
+        console.log(`[LocalImage] Deleted file from disk: ${uuid}`);
+      }
+
+      console.log('[LocalImage] Deleted image (tombstoned in DB, file removed):', uuid);
     } catch (error) {
       console.error('[LocalImage] Failed to delete image:', error);
       throw error;
@@ -112,14 +130,31 @@ class LocalImageService {
 
   /**
    * Delete multiple images
-   * 
-   * - Delete db records
-   * - Delete files
+   *
+   * - Set deletedAt in database (tombstone)
+   * - Delete actual files from disk
    */
   async deleteImages(uuids: string[]): Promise<void> {
     try {
+      // First, get the image formats from the database
+      const imageFormats = await window.electronAPI?.db.getImageFormatByUUIDs(uuids);
+
+      // Update database to set deletedAt (tombstone)
       await localDatabase.deleteImages(uuids);
-      console.log(`[LocalImage] Deleted ${uuids.length} images`);
+      await localDatabase.markLocalStateModified(); // Mark local state as changed
+
+      // Delete the actual files from disk
+      if (imageFormats && imageFormats.length > 0) {
+        const filesToDelete = imageFormats.map(img => ({
+          uuid: img.uuid,
+          format: img.format
+        }));
+
+        await window.electronAPI?.deleteLocalFiles(filesToDelete);
+        console.log(`[LocalImage] Deleted ${filesToDelete.length} files from disk`);
+      }
+
+      console.log(`[LocalImage] Deleted ${uuids.length} images (tombstoned in DB, files removed)`);
     } catch (error) {
       console.error('[LocalImage] Failed to delete images:', error);
       throw error;

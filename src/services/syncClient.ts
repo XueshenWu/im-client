@@ -137,6 +137,8 @@ export class ImageSyncClient {
     return this.lastSyncSequence
   }
 
+
+
   /**
    * Update the last sync sequence
    */

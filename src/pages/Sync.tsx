@@ -21,6 +21,9 @@ export default function Sync() {
   const [isSyncing, setIsSyncing] = useState(false)
   const { sourceMode } = useSettingsStore()
 
+  const [syncInterval, setSyncInterval] = useState<'never' | '30s' | '1m' | '5m'>('never');
+
+
   // Cloud mode state
   const [syncStatus, setSyncStatus] = useState<{
     currentSequence: number
@@ -37,9 +40,37 @@ export default function Sync() {
   const [localSyncStatus, setLocalSyncStatus] = useState<{
     localSeq: number
     serverSeq: number
+    localUUID: string | null
+    serverUUID: string | null
     inSync: boolean
   } | null>(null)
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
+  const [localSyncLogs, setLocalSyncLogs] = useState<string[]>([])
+
+  const getPhaseDisplayName = (phase: SyncProgress['phase']): string => {
+    const phaseNames: Record<SyncProgress['phase'], string> = {
+      initializing: 'Initializing',
+      calculating_diff: 'Calculating Differences',
+      pull_deleting: 'Deleting Local Files',
+      pull_downloading: 'Downloading from Cloud',
+      pull_updating: 'Updating Local Metadata',
+      pull_replacing: 'Replacing Local Files',
+      push_deleting: 'Deleting Remote Files',
+      push_uploading: 'Uploading to Cloud',
+      push_updating: 'Updating Remote Metadata',
+      push_replacing: 'Replacing Remote Files',
+      finalizing: 'Finalizing',
+      completed: 'Completed',
+      failed: 'Failed',
+    }
+    return phaseNames[phase] || phase
+  }
+
+  const addLocalSyncLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logMsg = `[${timestamp}] ${message}`
+    setLocalSyncLogs((prev) => [logMsg, ...prev].slice(0, 100)) // Keep last 100 logs
+  }
 
   // Cloud mode: Load sync status and operations
   useEffect(() => {
@@ -78,8 +109,17 @@ export default function Sync() {
       loadLocalSyncStatus()
 
       // Set up progress callback
+      let lastPhase: SyncProgress['phase'] | null = null
       localSyncService.setProgressCallback((progress: SyncProgress) => {
         setSyncProgress(progress)
+
+        // Log phase changes only (not every progress update)
+        if (progress.phase !== lastPhase) {
+          lastPhase = progress.phase
+          if (progress.phase !== 'initializing') {
+            addLocalSyncLog(`${getPhaseDisplayName(progress.phase)}: ${progress.message}`)
+          }
+        }
       })
 
       return () => {
@@ -201,15 +241,44 @@ export default function Sync() {
     if (sourceMode !== 'local') return
     setIsSyncing(true)
     setSyncProgress(null)
+    addLocalSyncLog('Starting sync with cloud...')
     try {
       const result = await localSyncService.syncLWW()
       if (result.success) {
+        // Add diff summary if available
+        if (result.diff) {
+          const diff = result.diff
+          const totalChanges =
+            diff.toUpload.length +
+            diff.toDownload.length +
+            diff.toDeleteLocal.length +
+            diff.toDeleteRemote.length +
+            diff.toUpdateLocal.length +
+            diff.toUpdateRemote.length +
+            diff.toReplaceLocal.length +
+            diff.toReplaceRemote.length
+
+          addLocalSyncLog(`📊 Diff Summary: ${totalChanges} total changes`)
+          addLocalSyncLog(`  ⬆️ Upload: ${diff.toUpload.length} images`)
+          addLocalSyncLog(`  ⬇️ Download: ${diff.toDownload.length} images`)
+          addLocalSyncLog(`  🗑️ Delete local: ${diff.toDeleteLocal.length} images`)
+          addLocalSyncLog(`  🗑️ Delete remote: ${diff.toDeleteRemote.length} images`)
+          addLocalSyncLog(`  ✏️ Update local metadata: ${diff.toUpdateLocal.length} images`)
+          addLocalSyncLog(`  ✏️ Update remote metadata: ${diff.toUpdateRemote.length} images`)
+          addLocalSyncLog(`  🔄 Replace local: ${diff.toReplaceLocal.length} images`)
+          addLocalSyncLog(`  🔄 Replace remote: ${diff.toReplaceRemote.length} images`)
+        }
+
+        addLocalSyncLog(`✓ Sync successful: ${result.message}`)
         alert(`Sync successful! ${result.message}`)
         await loadLocalSyncStatus()
       } else {
+        addLocalSyncLog(`✗ Sync failed: ${result.message}`)
         alert(`Sync failed: ${result.message}`)
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      addLocalSyncLog(`✗ Sync error: ${errorMsg}`)
       console.error('Sync failed:', error)
       alert('Sync failed. Check console for details.')
     } finally {
@@ -218,42 +287,23 @@ export default function Sync() {
     }
   }
 
-  const getPhaseDisplayName = (phase: SyncProgress['phase']): string => {
-    const phaseNames: Record<SyncProgress['phase'], string> = {
-      initializing: 'Initializing',
-      calculating_diff: 'Calculating Differences',
-      pull_deleting: 'Deleting Local Files',
-      pull_downloading: 'Downloading from Cloud',
-      pull_updating: 'Updating Local Metadata',
-      pull_replacing: 'Replacing Local Files',
-      push_deleting: 'Deleting Remote Files',
-      push_uploading: 'Uploading to Cloud',
-      push_updating: 'Updating Remote Metadata',
-      push_replacing: 'Replacing Remote Files',
-      finalizing: 'Finalizing',
-      completed: 'Completed',
-      failed: 'Failed',
-    }
-    return phaseNames[phase] || phase
-  }
-
   return (
     <div className="w-full flex flex-col px-6 py-6 h-full gap-6 bg-white">
       <div className="space-y-3 shrink-0">
         <HomeLink />
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-4xl font-bold font-sans text-gray-900">Sync</h1>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg *:flex *:items-center *:justify-center *:gap-2 border border-gray-100 shadow-sm">
             {sourceMode === 'cloud' ? (
-              <>
+              <div>
                 <Cloud className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-medium text-gray-700">Cloud Mode</span>
-              </>
+              </div>
             ) : (
-              <>
+              <div>
                 <HardDrive className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium text-gray-700">Local Mode</span>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -301,14 +351,15 @@ export default function Sync() {
                     Auto-refresh interval
                   </label>
                   <p className="text-sm text-gray-600 mb-3">
-                    Choose how often to check for changes from other devices
+                    Choose how often to check for changes from cloud storage
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      variant={!autoSyncEnabled ? 'default' : 'outline'}
+                      className={syncInterval === 'never' ? 'bg-blue-600 text-white' : ''}
                       size="sm"
                       onClick={() => {
                         if (autoSyncEnabled) {
+                          setSyncInterval('never')
                           syncClient.stopAutoSync()
                           setAutoSyncEnabled(false)
                         }
@@ -317,11 +368,13 @@ export default function Sync() {
                       Never
                     </Button>
                     <Button
-                      variant={autoSyncEnabled ? 'default' : 'outline'}
+                      className={syncInterval === '30s' ? 'bg-blue-600 text-white' : ''}
                       size="sm"
                       onClick={() => {
-                        if (!autoSyncEnabled) {
-                          syncClient.startAutoSync(30000)
+                        if (!autoSyncEnabled || syncInterval !== '30s') {
+                          syncClient.stopAutoSync()
+                          setSyncInterval('30s')
+                          syncClient.startAutoSync(30 * 1000)
                           setAutoSyncEnabled(true)
                         }
                       }}
@@ -329,23 +382,31 @@ export default function Sync() {
                       Every 30 seconds
                     </Button>
                     <Button
-                      variant="outline"
+                      className={syncInterval === '1m' ? 'bg-blue-600 text-white' : ''}
                       size="sm"
                       onClick={() => {
-                        syncClient.stopAutoSync()
-                        syncClient.startAutoSync(60000)
-                        setAutoSyncEnabled(true)
+
+                        if (!autoSyncEnabled || syncInterval !== '1m') {
+                          syncClient.stopAutoSync()
+                          setSyncInterval('1m')
+                          syncClient.startAutoSync(60 * 1000)
+                          setAutoSyncEnabled(true)
+                        }
                       }}
                     >
                       Every 1 minute
                     </Button>
                     <Button
-                      variant="outline"
+                      className={syncInterval === '5m' ? 'bg-blue-600 text-white' : ''}
                       size="sm"
                       onClick={() => {
-                        syncClient.stopAutoSync()
-                        syncClient.startAutoSync(300000)
-                        setAutoSyncEnabled(true)
+                        if (!autoSyncEnabled || syncInterval !== '5m') {
+                          syncClient.stopAutoSync()
+                          setSyncInterval('5m')
+            
+                          syncClient.startAutoSync(5 * 60 * 1000)
+                          setAutoSyncEnabled(true)
+                        }
                       }}
                     >
                       Every 5 minutes
@@ -361,184 +422,7 @@ export default function Sync() {
             </div>
 
             {/* Advanced Details - Collapsible */}
-            <Accordion type="multiple" className="w-full">
-              <AccordionItem
-                value="advanced"
-                className="bg-white rounded-lg shadow-md border-none"
-              >
-                <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                  <h2 className="text-lg font-semibold text-gray-600">Advanced Details</h2>
-                </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4 space-y-6">
-                  {/* Status Details */}
-                  <div>
-                    <h3 className="font-medium mb-3">Sync Status Details</h3>
-                    <div className="flex justify-end mb-4">
-                      <Button onClick={loadSyncStatus} variant="outline" size="sm">
-                        Refresh Status
-                      </Button>
-                    </div>
-                    {syncStatus ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-1">Client ID</div>
-                          <div
-                            className="font-mono text-sm truncate"
-                            title={syncClient.getClientId()}
-                          >
-                            {syncClient.getClientId().substring(0, 20)}...
-                          </div>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-1">
-                            Server Sequence
-                          </div>
-                          <div className="text-2xl font-bold">
-                            {syncStatus.currentSequence}
-                          </div>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-1">
-                            Client Sequence
-                          </div>
-                          <div className="text-2xl font-bold">
-                            {syncClient.getLastSyncSequence()}
-                          </div>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-1">Status</div>
-                          <div className="flex items-center gap-2">
-                            {syncStatus.isInSync ? (
-                              <span className="text-green-600 font-semibold">
-                                ✓ In Sync
-                              </span>
-                            ) : (
-                              <span className="text-orange-600 font-semibold">
-                                ⚠ Behind by {syncStatus.operationsBehind}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-gray-500">Loading status...</div>
-                    )}
-                  </div>
 
-                  {/* Debug Controls */}
-                  <div>
-                    <h3 className="font-medium mb-3">Debug Controls</h3>
-                    <div className="flex flex-wrap gap-3">
-                      <Button
-                        onClick={handleManualSync}
-                        disabled={isSyncing}
-                        variant="outline"
-                        size="sm"
-                      >
-                        {isSyncing ? '🔄 Syncing...' : '🔄 Manual Sync'}
-                      </Button>
-                      <Button
-                        onClick={handleInitialize}
-                        disabled={isLoading}
-                        variant="outline"
-                        size="sm"
-                      >
-                        {isLoading ? 'Initializing...' : '🚀 Initialize'}
-                      </Button>
-                      <Button onClick={handleResetSync} variant="outline" size="sm">
-                        🔄 Reset Sync State
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Recent Sync Events */}
-                  <div>
-                    <h3 className="font-medium mb-3">Recent Sync Events</h3>
-                    {syncEvents.length > 0 ? (
-                      <div className="bg-gray-900 text-green-400 font-mono text-xs p-4 rounded-lg max-h-64 overflow-y-auto">
-                        {syncEvents.map((event, index) => (
-                          <div key={index} className="mb-1">
-                            {event}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-gray-500 text-sm">
-                        No events yet. Perform a sync to see events.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* My Operations */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-medium">My Recent Operations</h3>
-                      <Button onClick={loadMyOperations} variant="outline" size="sm">
-                        Refresh List
-                      </Button>
-                    </div>
-                    {myOperations.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left py-2 px-3 text-sm font-semibold">
-                                Seq
-                              </th>
-                              <th className="text-left py-2 px-3 text-sm font-semibold">
-                                Operation
-                              </th>
-                              <th className="text-left py-2 px-3 text-sm font-semibold">
-                                Image UUID
-                              </th>
-                              <th className="text-left py-2 px-3 text-sm font-semibold">
-                                Time
-                              </th>
-                              <th className="text-left py-2 px-3 text-sm font-semibold">
-                                Metadata
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {myOperations.map((op) => (
-                              <tr key={op.id} className="border-b hover:bg-gray-50">
-                                <td className="py-2 px-3 font-mono text-sm">
-                                  {op.sequenceNumber}
-                                </td>
-                                <td className="py-2 px-3">
-                                  <span className="text-lg mr-2">
-                                    {getOperationIcon(op.operation)}
-                                  </span>
-                                  <span className="text-sm">{op.operation}</span>
-                                </td>
-                                <td className="py-2 px-3 font-mono text-xs">
-                                  {op.imageUuid
-                                    ? op.imageUuid.substring(0, 8)
-                                    : '-'}
-                                </td>
-                                <td className="py-2 px-3 text-sm">
-                                  {new Date(op.createdAt).toLocaleString()}
-                                </td>
-                                <td className="py-2 px-3 text-xs text-gray-600">
-                                  {Object.keys(op.metadata || {}).length > 0
-                                    ? JSON.stringify(op.metadata).substring(0, 50) +
-                                      '...'
-                                    : '-'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-gray-500 text-sm">
-                        No operations found for your client.
-                      </div>
-                    )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
           </div>
         ) : (
           // LOCAL MODE SYNC
@@ -561,34 +445,72 @@ export default function Sync() {
                 {/* Local Sync Status */}
                 <div className="mb-6">
                   <div className="flex justify-end mb-4">
-                    <Button onClick={loadLocalSyncStatus} variant="outline" size="sm">
+                    <Button onClick={loadLocalSyncStatus} size="sm" className='hover:bg-gray-100 border border-gray-100'>
                       Refresh Status
                     </Button>
                   </div>
 
                   {localSyncStatus ? (
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Local Sequence</div>
-                        <div className="text-2xl font-bold">{localSyncStatus.localSeq}</div>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Server Sequence</div>
-                        <div className="text-2xl font-bold">{localSyncStatus.serverSeq}</div>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Sync Status</div>
-                        <div className="flex items-center gap-2">
+                    <div className="space-y-4 mb-6">
+                      {/* Sync Status - Prominent Display */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200">
+                        <div className="text-sm text-gray-600 mb-2">Sync Status</div>
+                        <div className="flex items-center gap-3">
                           {localSyncStatus.inSync ? (
-                            <span className="text-green-600 font-semibold">✓ In Sync</span>
+                            <>
+                              <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
+                              <span className="text-2xl font-bold text-green-700">In Sync</span>
+                            </>
                           ) : (
-                            <span className="text-orange-600 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="h-4 w-4" />
-                              Out of Sync
-                            </span>
+                            <>
+                              <AlertTriangle className="h-6 w-6 text-orange-500" />
+                              <span className="text-2xl font-bold text-orange-700">Out of Sync</span>
+                            </>
                           )}
                         </div>
                       </div>
+
+                      {/* UUID-Based Tracking */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
+                          <div className="text-sm text-gray-600 mb-2">Local Sync UUID</div>
+                          {localSyncStatus.localUUID ? (
+                            <div className="font-mono text-sm break-all text-blue-600">
+                              {localSyncStatus.localUUID}
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 italic">Not synced yet</div>
+                          )}
+                        </div>
+                        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
+                          <div className="text-sm text-gray-600 mb-2">Server Sync UUID</div>
+                          {localSyncStatus.serverUUID ? (
+                            <div className="font-mono text-sm break-all text-indigo-600">
+                              {localSyncStatus.serverUUID}
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 italic">Not available</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Sequence Numbers - Secondary Info */}
+                      <details className="group">
+                        <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center gap-2">
+                          <span className="group-open:rotate-90 transition-transform">▶</span>
+                          Show Sequence Numbers 
+                        </summary>
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="text-xs text-gray-600 mb-1">Local Sequence</div>
+                            <div className="text-xl font-bold">{localSyncStatus.localSeq}</div>
+                          </div>
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="text-xs text-gray-600 mb-1">Server Sequence</div>
+                            <div className="text-xl font-bold">{localSyncStatus.serverSeq}</div>
+                          </div>
+                        </div>
+                      </details>
                     </div>
                   ) : (
                     <div className="text-gray-500 mb-6">Loading local sync status...</div>
@@ -603,7 +525,7 @@ export default function Sync() {
                       onClick={handleLocalSync}
                       disabled={isSyncing}
                       size="lg"
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-blue-600 hover:bg-blue-500 text-white"
                     >
                       <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
                       {isSyncing ? 'Syncing...' : 'Sync with Cloud'}
@@ -647,14 +569,44 @@ export default function Sync() {
                     </div>
                   )}
 
+                  {/* Sync Log Area */}
+                  {localSyncLogs.length > 0 && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900 text-sm">Sync Logs</h3>
+                        <Button
+                          onClick={() => setLocalSyncLogs([])}
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs hover:bg-gray-200"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                      <ScrollArea className="h-64">
+                        <div className="p-3 space-y-1">
+                          {localSyncLogs.map((log, index) => (
+                            <div
+                              key={index}
+                              className="font-mono text-xs text-gray-700 py-1 px-2 hover:bg-gray-100 rounded"
+                            >
+                              {log}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+
                   {/* Info Box */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 hidden">
                     <h3 className="font-semibold mb-2 flex items-center gap-2 text-blue-900">
                       <AlertTriangle className="h-4 w-4 text-blue-600" />
                       Local Mode Sync
                     </h3>
                     <ul className="text-sm space-y-1 text-gray-700">
                       <li>• Syncs local storage with cloud using Last-Write-Wins strategy</li>
+                      <li>• Uses UUID-based tracking to detect changes from any source</li>
                       <li>• Automatically handles uploads, downloads, and conflict resolution</li>
                       <li>• Progress shows real-time status of sync operations</li>
                       <li>• Server lock prevents concurrent modifications during sync</li>

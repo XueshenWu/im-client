@@ -4,6 +4,7 @@ import App from './App'
 import './index.css'
 import './i18n/config'
 import './stores/languageStore' // Initialize language store
+import './stores/themeStore' // Initialize theme store
 
 console.log('Renderer process initialized')
 

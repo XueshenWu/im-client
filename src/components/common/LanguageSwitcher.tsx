@@ -23,14 +23,14 @@ const LanguageSwitcher: React.FC = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <Languages className="h-4 w-4 text-gray-600" />
+      <Languages className="h-4 w-4 text-gray-600 dark:text-gray-400" />
       <Select value={language} onValueChange={handleLanguageChange}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-[140px] ring-gray-300 dark:ring-gray-600 border-gray-100 dark:border-gray-700 border-2 cursor-pointer bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {languages.map((lang) => (
-            <SelectItem key={lang.code} value={lang.code}>
+            <SelectItem className='cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700' key={lang.code} value={lang.code}>
               {lang.name}
             </SelectItem>
           ))}

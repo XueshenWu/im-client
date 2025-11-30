@@ -69,7 +69,7 @@ const ExifEditor: React.FC = () => {
 
         <div className="flex justify-end gap-2 px-6 bg-white dark:bg-gray-900">
           <Button
-            variant="outline"
+            className='border border-gray-100 hover:bg-gray-100 cursor-pointer'
             size="sm"
             onClick={() => closeEditor()}
             disabled={saving}
@@ -77,6 +77,7 @@ const ExifEditor: React.FC = () => {
             Cancel
           </Button>
           <Button
+            className='border border-gray-100 hover:bg-gray-100 cursor-pointer'
             size="sm"
             onClick={handleSave}
             disabled={!hasChanges || saving}
@@ -90,22 +91,31 @@ const ExifEditor: React.FC = () => {
           </Button>
         </div>
 
-        <ScrollArea className="max-h-[calc(90vh-12rem)] px-6 bg-white dark:bg-gray-900">
-          <Tabs defaultValue="camera" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="camera">Camera</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-              <TabsTrigger value="metadata">Metadata</TabsTrigger>
-              <TabsTrigger value="location">Location</TabsTrigger>
+        <ScrollArea className="max-h-[calc(90vh-12rem)] px-6 bg-white dark:bg-gray-900 *:px-2 *:py-2 ">
+          <Tabs defaultValue="camera" className="w-full ">
+            <TabsList className="grid w-full grid-cols-4 *:cursor-pointer *:bg-gray-100 ">
+              <TabsTrigger
+                className='data-[state=active]:bg-blue-500 data-[state=active]:text-white'
+                value="camera">Camera</TabsTrigger>
+              <TabsTrigger
+                className='data-[state=active]:bg-blue-500 data-[state=active]:text-white'
+                value="settings">Settings</TabsTrigger>
+              <TabsTrigger
+                className='data-[state=active]:bg-blue-500 data-[state=active]:text-white'
+                value="metadata">Metadata</TabsTrigger>
+              <TabsTrigger
+                className='data-[state=active]:bg-blue-500 data-[state=active]:text-white'
+                value="location">Location</TabsTrigger>
             </TabsList>
 
             {/* Camera Tab */}
-            <TabsContent value="camera" className="space-y-4 mt-4">
+            <TabsContent value="camera" className="space-y-4 mt-4 ">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cameraMake">Camera Make</Label>
                   <Input
                     id="cameraMake"
+                    className=''
                     value={exifData.cameraMake || ''}
                     onChange={(e) => updateField('cameraMake', e.target.value)}
                     placeholder="e.g., Canon"

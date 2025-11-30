@@ -3,18 +3,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CheckCircle2, XCircle, AlertCircle, ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { localSyncService } from '@/services/localSync.service';
+import { localDatabase } from '@/services/localDatabase.service';
 
 interface SyncStatusData {
-  localSequence: number;
-  remoteSequence: number;
+  localSeq: number;
+  serverSeq: number;
+  localUUID: string | null;
+  serverUUID: string | null;
   isInSync: boolean;
   lastSyncTime: string | null;
 }
 
 export function SyncStatus() {
   const [status, setStatus] = useState<SyncStatusData>({
-    localSequence: 0,
-    remoteSequence: 0,
+    localSeq: 0,
+    serverSeq: 0,
+    localUUID: null,
+    serverUUID: null,
     isInSync: false,
     lastSyncTime: null,
   });
@@ -25,8 +31,20 @@ export function SyncStatus() {
     const fetchStatus = async () => {
       setLoading(true);
       try {
-        const result = await window.electron.invoke('get-sync-status');
-        setStatus(result);
+        // Get sync status using UUID-based tracking for local mode
+        const syncStatus = await localSyncService.checkSyncStatus('local');
+
+        // Get last sync time from metadata
+        const metadata = await localDatabase.getSyncMetadata();
+
+        setStatus({
+          localSeq: syncStatus.localSeq,
+          serverSeq: syncStatus.serverSeq,
+          localUUID: syncStatus.localUUID,
+          serverUUID: syncStatus.serverUUID,
+          isInSync: syncStatus.inSync,
+          lastSyncTime: metadata.lastSyncTime,
+        });
       } catch (error) {
         console.error('Failed to fetch sync status:', error);
       } finally {
@@ -66,8 +84,11 @@ export function SyncStatus() {
   const getSyncStatusText = () => {
     if (loading) return 'Checking...';
     if (status.isInSync) return 'In Sync';
-    const behind = status.remoteSequence - status.localSequence;
-    return `${Math.abs(behind)} operation${Math.abs(behind) > 1 ? 's' : ''} behind`;
+
+    // For local mode with UUID tracking, show UUID mismatch
+    if (!status.localUUID) return 'Never synced';
+    if (!status.serverUUID) return 'Server not available';
+    return 'Out of sync';
   };
 
   return (
@@ -108,14 +129,20 @@ export function SyncStatus() {
               </span>
             </div>
 
-            <div className="flex justify-between items-center gap-2">
-              <span className="text-xs sm:text-sm font-medium">Local Sequence:</span>
-              <span className="text-xs sm:text-sm">{status.localSequence}</span>
-            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-xs sm:text-sm font-medium">Local UUID:</span>
+                <span className="text-xs font-mono text-right break-all max-w-[60%]">
+                  {status.localUUID || <span className="text-gray-400 italic">Not set</span>}
+                </span>
+              </div>
 
-            <div className="flex justify-between items-center gap-2">
-              <span className="text-xs sm:text-sm font-medium">Remote Sequence:</span>
-              <span className="text-xs sm:text-sm">{status.remoteSequence}</span>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-xs sm:text-sm font-medium">Server UUID:</span>
+                <span className="text-xs font-mono text-right break-all max-w-[60%]">
+                  {status.serverUUID || <span className="text-gray-400 italic">Not set</span>}
+                </span>
+              </div>
             </div>
 
             <div className="flex justify-between items-center gap-2">

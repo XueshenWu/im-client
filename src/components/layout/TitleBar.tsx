@@ -31,9 +31,9 @@ export default function TitleBar() {
       {/* Left side - Logo and Title */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
-          <span className="text-blue-700 font-bold text-sm">V</span>
+          <span className="text-blue-700 font-bold text-sm">I</span>
         </div>
-        <span className="text-white font-semibold text-sm">Voyis Image Editor {`(${sourceMode})`}</span>
+        <span className="text-white font-semibold text-sm">Image Editor {`(${sourceMode})`}</span>
       </div>
 
       {/* Right side - Window Controls */}

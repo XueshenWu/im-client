@@ -31,10 +31,18 @@ export const getSyncOperations = async (
 
 /**
  * Get sync status - check if client is in sync with server
+ * Also extracts syncUUID from response headers for local mode
  */
-export const getSyncStatus = async (): Promise<SyncStatusResponse['data']> => {
+export const getSyncStatus = async (): Promise<SyncStatusResponse['data'] & { syncUUID?: string }> => {
   const response = await api.get<SyncStatusResponse>('/api/sync/status')
-  return response.data.data
+
+  // Extract syncUUID from headers (for local mode)
+  const syncUUID = response.headers?.['x-current-sync-uuid'];
+
+  return {
+    ...response.data.data,
+    ...(syncUUID && { syncUUID }),
+  };
 }
 
 /**
@@ -64,9 +72,23 @@ export const acquireLwwLock = async (): Promise<string> => {
 /**
  * Release LWW sync lock
  * @param lockUuid - The lock UUID to release
+ * @returns Object containing syncSequence and syncUUID from server
  */
-export const releaseLwwLock = async (lockUuid: string): Promise<void> => {
-  await api.post('/api/sync/lock/release', { lockUuid })
+export const releaseLwwLock = async (lockUuid: string): Promise<{
+  syncSequence: number;
+  syncUUID: string;
+}> => {
+  const response = await api.post<{
+    success: boolean;
+    message: string;
+    syncSequence: number;
+    syncUUID: string;
+  }>('/api/sync/lock/release', { lockUuid });
+
+  return {
+    syncSequence: response.data.syncSequence,
+    syncUUID: response.data.syncUUID,
+  };
 }
 
 /**

@@ -729,7 +729,50 @@ function createWindow() {
     }
   });
 
+  // Delete image and thumbnail files from AppData
+  ipcMain.handle('delete-local-files', async (_event, uuids: Array<{ uuid: string; format: string }>) => {
+    try {
+      const imagesPath = path.join(app.getPath('appData'), 'image-management', 'images');
+      const thumbnailsPath = path.join(app.getPath('appData'), 'image-management', 'thumbnails');
 
+      const results = [];
+      for (const { uuid, format } of uuids) {
+        try {
+          const normalizedFormat = normalizeFormat(format);
+          const imagePath = path.join(imagesPath, `${uuid}.${normalizedFormat}`);
+          const thumbnailPath = path.join(thumbnailsPath, `${uuid}.jpeg`);
+
+          // Delete image file
+          try {
+            await fs.unlink(imagePath);
+          } catch (error: any) {
+            if (error.code !== 'ENOENT') {
+              console.error(`Failed to delete image file ${uuid}:`, error);
+            }
+          }
+
+          // Delete thumbnail file
+          try {
+            await fs.unlink(thumbnailPath);
+          } catch (error: any) {
+            if (error.code !== 'ENOENT') {
+              console.error(`Failed to delete thumbnail file ${uuid}:`, error);
+            }
+          }
+
+          results.push({ uuid, success: true });
+        } catch (error) {
+          console.error(`Failed to delete files for ${uuid}:`, error);
+          results.push({ uuid, success: false, error });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Failed to delete local files:', error);
+      return null;
+    }
+  });
 
 
   ipcMain.handle('dialog:open', async () => {
@@ -932,7 +975,7 @@ function createWindow() {
       return dbOperations.getSyncMetadata();
     } catch (error) {
       console.error('Failed to get sync metadata:', error);
-      return { lastSyncSequence: 0, lastSyncTime: null };
+      return { lastSyncSequence: 0, lastSyncTime: null, lastSyncUUID: null };
     }
   });
 
@@ -1344,14 +1387,23 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Protocol for thumbnails: local-thumbnail://{uuid}
+  // Protocol for thumbnails: local-thumbnail://{uuid}?t={timestamp}
   protocol.handle('local-thumbnail', (request) => {
     try {
-      // request.url will look like: "local-thumbnail://{uuid}"
+      // request.url will look like: "local-thumbnail://{uuid}/?t=1234567890" or "local-thumbnail://{uuid}?t=1234567890"
       let uuid = request.url.slice('local-thumbnail://'.length);
+
+      // Remove query parameters first (cache-busting timestamp)
+      const queryIndex = uuid.indexOf('?');
+      if (queryIndex !== -1) {
+        uuid = uuid.substring(0, queryIndex);
+      }
+
+      // Remove trailing slash if present
       if (uuid.endsWith('/')) {
         uuid = uuid.slice(0, -1);
       }
+
       const decodedUuid = decodeURIComponent(uuid);
 
       // Build path: {AppData}/image-management/thumbnails/{uuid}.jpg

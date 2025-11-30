@@ -23,9 +23,10 @@ export function getLocalImageUrl(uuid: string, format: string): string {
 
 /**
  * Get the display URL for a local thumbnail
+ * Includes a cache-busting timestamp to ensure thumbnails refresh when images are replaced
  */
 export function getLocalThumbnailUrl(uuid: string): string {
-  return `local-thumbnail://${uuid}`;
+  return `local-thumbnail://${uuid}?t=${new Date().getTime()}`;
 }
 
 /**

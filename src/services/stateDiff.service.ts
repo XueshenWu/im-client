@@ -21,6 +21,8 @@ class StateDiffService {
       toDownload: [], toReplaceLocal: [], toUpdateLocal: [], toDeleteLocal: []
     };
 
+
+
     // 3. Iterate Union
     for (const uuid of allUuids) {
       const local = localByUuid.get(uuid);
@@ -46,8 +48,11 @@ class StateDiffService {
         // >>> SUB-CASE A: Local is Newer (Push Changes) <<<
         if (localTime > remoteTime) {
           if (local.deletedAt) {
-            // Local was deleted recently -> Propagate delete
+            // Local was deleted recently -> Propagate delete to remote
             diff.toDeleteRemote.push(uuid);
+          } else if (remote.deletedAt) {
+            // Remote was deleted but local is alive and newer -> Re-upload to resurrect
+            diff.toUpload.push(local);
           } else if (local.hash !== remote.hash) {
             // Binary content changed -> Re-upload file
             diff.toReplaceRemote.push(local);
@@ -62,8 +67,11 @@ class StateDiffService {
         // >>> SUB-CASE B: Remote is Newer (Pull Changes) <<<
         else if (remoteTime > localTime) {
           if (remote.deletedAt) {
-            // Remote was deleted recently -> Propagate delete
+            // Remote was deleted recently -> Propagate delete to local
             diff.toDeleteLocal.push(uuid);
+          } else if (local.deletedAt) {
+            // Local was deleted but remote is alive and newer -> Re-download to resurrect
+            diff.toDownload.push(remote);
           } else if (local.hash !== remote.hash) {
             // Binary content changed -> Re-download file
             diff.toReplaceLocal.push(remote);
@@ -77,8 +85,20 @@ class StateDiffService {
 
         // >>> SUB-CASE C: Timestamps Equal (Tie-Breaker) <<<
         else {
-          // Timestamps are equal, check if content differs
-          if (local.hash !== remote.hash) {
+          // Timestamps are equal
+          // If both are deleted, they're in sync - do nothing
+          if (local.deletedAt && remote.deletedAt) {
+            // Both deleted at same time, in sync
+            continue;
+          }
+          // If one is deleted but other isn't, prefer server (remote)
+          else if (remote.deletedAt && !local.deletedAt) {
+            diff.toDeleteLocal.push(uuid);
+          } else if (local.deletedAt && !remote.deletedAt) {
+            diff.toDeleteRemote.push(uuid);
+          }
+          // Both are alive, check content
+          else if (local.hash !== remote.hash) {
             // Content differs but timestamps match - use server as source of truth
             console.warn(`[StateDiff] Timestamp tie for ${uuid}, hash mismatch. Preferring server version.`);
             diff.toReplaceLocal.push(remote);
@@ -119,7 +139,7 @@ class StateDiffService {
     return false;
   }
 
- 
+
 
   /**
    * Get summary of diff for display
@@ -160,7 +180,7 @@ class StateDiffService {
     return summary;
   }
 
- 
+
 }
 
 // Singleton instance

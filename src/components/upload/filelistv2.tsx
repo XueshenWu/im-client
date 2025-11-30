@@ -7,7 +7,7 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { X, FileText, ArrowUpDown } from 'lucide-react';
+import { X, FileText, ArrowUpDown, Image as ImageIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +23,6 @@ import {
   requestPresignedURLs,
   uploadToPresignedURL,
 } from '@/services/images.service';
-import { useImageViewerStore } from '@/stores/imageViewerStore';
 import type { Image } from '@/types/api';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { localImageService } from '@/services/localImage.service';
@@ -152,9 +151,7 @@ const fileToMockImage = (file: FileWithPreview): Image => ({
 // Define columns for the file list table
 const createColumns = (
   removeFile: (fileName: string) => void,
-  uploadStatuses: Map<string, UploadStatus>,
-  onThumbnailClick: (file: FileWithPreview, index: number) => void,
-  files: FileWithPreview[]
+  uploadStatuses: Map<string, UploadStatus>
 ): ColumnDef<FileWithPreview>[] => [
     {
       accessorKey: 'preview',
@@ -162,14 +159,17 @@ const createColumns = (
       cell: ({ row }) => {
         const file = row.original;
         const isImage = file.type.startsWith('image/');
-        const fileIndex = files.findIndex(f => f.name === file.name);
+        const isTiff = file.type === 'image/tiff' || file.type === 'image/tif' ||
+                       file.name.toLowerCase().endsWith('.tiff') ||
+                       file.name.toLowerCase().endsWith('.tif');
 
         return (
           <div
-            className={`h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-50 bg-muted flex items-center justify-center ${isImage ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all' : ''}`}
-            onClick={() => isImage && onThumbnailClick(file, fileIndex)}
+            className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-50 bg-muted flex items-center justify-center"
           >
-            {isImage ? (
+            {isTiff ? (
+              <ImageIcon className="h-6 w-6 text-blue-500" />
+            ) : isImage ? (
               <img
                 src={file.preview}
                 alt={file.name}
@@ -322,7 +322,6 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   // This prevents re-renders when we just want to update the counter.
   const previousFileCountRef = React.useRef(0);
 
-  const { openViewer } = useImageViewerStore();
   const { sourceMode } = useSettingsStore();
   const { triggerRefresh } = useGalleryRefreshStore();
 
@@ -386,14 +385,10 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   }, [files.length, uploadStatuses, removeFile]);
 
 
-  const handleThumbnailClick = (file: FileWithPreview, index: number) => {
-    
-  };
-
-  // Update the columns memo to include the handler and files:
+  // Update the columns memo:
   const columns = React.useMemo(
-    () => createColumns(removeFile, uploadStatuses, handleThumbnailClick, files),
-    [removeFile, uploadStatuses, files]
+    () => createColumns(removeFile, uploadStatuses),
+    [removeFile, uploadStatuses]
   );
 
 

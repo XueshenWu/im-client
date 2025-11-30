@@ -109,6 +109,31 @@ export const getImages = async (params?: GetImagesParams): Promise<Image[]> => {
   return response.data.data
 }
 
+
+export const getImagesForSync = async (params?: GetImagesParams): Promise<Image[]> => {
+  const response = await api.get<ApiListResponse<any>>('/api/sync/lwwSyncMetadata', {
+    params,
+  })
+
+  // Transform the response: server returns nested structure with 'images' and 'exif_data'
+  // We need to flatten it into the Image interface format
+  return response.data.data.map((item: any) => {
+    // If the item has a nested 'images' property, flatten it
+    if (item.images) {
+      const imageData = item.images;
+      const exifData = item.exif_data;
+
+      return {
+        ...imageData,
+        exifData: exifData || undefined,
+      };
+    }
+
+    // Otherwise, return as-is (already flat)
+    return item;
+  });
+}
+
 /**
  * Get image statistics
  */

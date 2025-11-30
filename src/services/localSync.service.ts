@@ -5,7 +5,7 @@
 import { localImageService } from './localImage.service';
 import { localDatabase } from './localDatabase.service';
 import { stateDiffService } from './stateDiff.service';
-import { getImages, deleteImages, updateImageExif, replaceImages, requestPresignedURLs, uploadToPresignedURL, requestDownloadUrls } from './images.service';
+import { getImages, deleteImages, updateImageExif, replaceImages, requestPresignedURLs, uploadToPresignedURL, requestDownloadUrls, getImagesForSync } from './images.service';
 import { getSyncStatus, acquireLwwLock, releaseLwwLock } from './sync.service';
 import { LocalImage, StateDiff, SyncProgressCallback, SyncProgress, SyncPhase } from '../types/local';
 import { Image } from '../types/api';
@@ -76,24 +76,53 @@ class LocalSyncService {
 
   /**
    * Check sync status
-   * Returns local seq, server seq, and whether they match
+   * Cloud mode: Uses sequence numbers
+   * Local mode: Uses UUID-based tracking
+   * Returns local/server identifiers and whether they match
    */
-  async checkSyncStatus(): Promise<{
+  async checkSyncStatus(mode: 'cloud' | 'local' = 'local'): Promise<{
     localSeq: number;
     serverSeq: number;
+    localUUID: string | null;
+    serverUUID: string | null;
     inSync: boolean;
   }> {
     try {
       const metadata = await localDatabase.getSyncMetadata();
       const localSeq = metadata.lastSyncSequence;
+      const localUUID = metadata.lastSyncUUID || null;
 
+      // Fetch current server status - this makes API call and extracts UUID from header
       const syncStatus = await getSyncStatus();
       const serverSeq = syncStatus.currentSequence;
+      const serverUUID = syncStatus.syncUUID || null;
+
+      console.log(`[LocalSync] Sync Status Check (${mode} mode):`, {
+        localSeq,
+        serverSeq,
+        localUUID: localUUID ? `${localUUID.substring(0, 8)}...` : null,
+        serverUUID: serverUUID ? `${serverUUID.substring(0, 8)}...` : null,
+      });
+
+      // Determine sync status based on mode
+      let inSync: boolean;
+      if (mode === 'cloud') {
+        // Cloud mode: Use sequence number comparison
+        inSync = localSeq === serverSeq;
+      } else {
+        // Local mode: Use UUID comparison
+        // Both must exist and match
+        inSync = !!localUUID && !!serverUUID && localUUID === serverUUID;
+      }
+
+      console.log(`[LocalSync] In Sync: ${inSync}`);
 
       return {
         localSeq,
         serverSeq,
-        inSync: localSeq === serverSeq,
+        localUUID,
+        serverUUID,
+        inSync,
       };
     } catch (error) {
       console.error('[LocalSync] Failed to check sync status:', error);
@@ -164,12 +193,11 @@ class LocalSyncService {
       const localImages = await localImageService.getLocalLWWMetadata();
 
       this.reportProgress('calculating_diff', 1, 2, 'Fetching remote metadata...');
-      const remoteImages = await getImages();
+      const remoteImages = await getImagesForSync();
 
       // step3: calculate bi-directional diff
       this.reportProgress('calculating_diff', 2, 2, 'Calculating differences...');
       const diff = stateDiffService.calculateDiff(localImages, remoteImages);
-
       console.log('[LocalSync] Diff calculated:', {
         toUpload: diff.toUpload.length,
         toDownload: diff.toDownload.length,
@@ -243,21 +271,48 @@ class LocalSyncService {
         await this.replaceRemoteImages(diff.toReplaceRemote, 'push_replacing');
       }
 
-      // step6: update sync metadata
-      this.reportProgress('finalizing', 0, 1, 'Updating sync metadata...');
-      const finalStatus = await getSyncStatus();
+      // step6: Release lock and update sync metadata
+      // Lock must be released before updating metadata to get final syncUUID
+      this.reportProgress('finalizing', 0, 2, 'Releasing sync lock...');
+
+      let syncUUID: string | null = null;
+      let newSeq: number;
+
+      if (lockUuid) {
+        try {
+          const releaseResult = await releaseLwwLock(lockUuid);
+          lockManager.clearLock();
+
+          syncUUID = releaseResult.syncUUID;
+          newSeq = releaseResult.syncSequence;
+
+          console.log(`[LocalSync] Lock released. New sync state - Sequence: ${newSeq}, UUID: ${syncUUID}`);
+        } catch (error) {
+          console.error('[LocalSync] Failed to release lock:', error);
+          throw error;
+        }
+        lockUuid = null; // Clear to prevent double release in finally block
+      } else {
+        // No lock was acquired (shouldn't happen, but handle gracefully)
+        const finalStatus = await getSyncStatus();
+        newSeq = finalStatus.currentSequence;
+        syncUUID = finalStatus.syncUUID || null;
+      }
+
+      this.reportProgress('finalizing', 1, 2, 'Updating sync metadata...');
       await localDatabase.updateSyncMetadata({
-        lastSyncSequence: finalStatus.currentSequence,
+        lastSyncSequence: newSeq,
         lastSyncTime: new Date().toISOString(),
+        lastSyncUUID: syncUUID,
       });
-      this.reportProgress('finalizing', 1, 1, 'Sync metadata updated');
+      this.reportProgress('finalizing', 2, 2, 'Sync metadata updated');
 
       console.log('[LocalSync] LWW sync completed successfully');
       this.reportProgress('completed', 1, 1, 'Sync completed successfully');
       return {
         success: true,
         message: 'LWW sync completed successfully',
-        newSeq: finalStatus.currentSequence,
+        newSeq,
         diff,
       };
 

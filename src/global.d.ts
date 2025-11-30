@@ -23,6 +23,7 @@ interface ElectronAPI {
   writeTempFile: (fileName: string, buffer: ArrayBuffer) => Promise<string | null>
   saveImageBuffer: (uuid: string, format: string, buffer: ArrayBuffer) => Promise<string | null>
   saveThumbnailBuffer: (uuid: string, buffer: ArrayBuffer) => Promise<string | null>
+  deleteLocalFiles: (uuids: Array<{ uuid: string; format: string }>) => Promise<Array<{ uuid: string; success: boolean; error?: any }> | null>
   openDialog: () => Promise<string[]>
   selectDirectory: () => Promise<string | null>
   saveFilesToLocal: (files: Array<{ sourcePath: string; uuid: string; format: string }>) => Promise<{
@@ -115,8 +116,8 @@ interface ElectronAPI {
     deleteImages: (uuids: string[]) => Promise<{ success: boolean }>
     searchImages: (query: string) => Promise<any[]>
     clearAllImages: () => Promise<{ success: boolean }>
-    getSyncMetadata: () => Promise<{ lastSyncSequence: number; lastSyncTime: string | null }>
-    updateSyncMetadata: (metadata: any) => Promise<{ success: boolean }>
+    getSyncMetadata: () => Promise<{ lastSyncSequence: number; lastSyncTime: string | null; lastSyncUUID: string | null }>
+    updateSyncMetadata: (metadata: { lastSyncSequence?: number; lastSyncTime?: string | null; lastSyncUUID?: string | null }) => Promise<{ success: boolean }>
     getExifData: (uuid: string) => Promise<ExifData | null>
     upsertExifData: (uuid: string, exif: any) => Promise<{ id: number; changes: number}>
     getAllImagesWithExif: () => Promise<any[]>

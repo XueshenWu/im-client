@@ -6,6 +6,16 @@
 import { ExifData } from '@/types/api';
 import { LocalImage, SyncMetadata } from '../types/local';
 
+/**
+ * Generate a UUID v4
+ */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 class LocalDatabaseService {
   private isInitialized = false;
@@ -151,22 +161,41 @@ class LocalDatabaseService {
     await this.ensureInitialized();
     try {
       const metadata = await window.electronAPI?.db.getSyncMetadata();
-      return metadata || { lastSyncSequence: 0, lastSyncTime: null };
+      return metadata || { lastSyncSequence: 0, lastSyncTime: null, lastSyncUUID: null };
     } catch (error) {
       console.error('[LocalDB] Failed to get sync metadata:', error);
-      return { lastSyncSequence: 0, lastSyncTime: null };
+      return { lastSyncSequence: 0, lastSyncTime: null, lastSyncUUID: null };
     }
   }
 
   /**
    * Update sync metadata
    */
-  async updateSyncMetadata(metadata: Partial<SyncMetadata>): Promise<void> {
+  async updateSyncMetadata(metadata: { lastSyncSequence?: number; lastSyncTime?: string | null; lastSyncUUID?: string | null }): Promise<void> {
     await this.ensureInitialized();
     try {
       await window.electronAPI?.db.updateSyncMetadata(metadata);
+      console.log('[LocalDB] Sync metadata updated');
     } catch (error) {
       console.error('[LocalDB] Failed to update sync metadata:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark local state as modified by generating a new sync UUID
+   * This should be called whenever local data is changed (upload, delete, modify, etc.)
+   */
+  async markLocalStateModified(): Promise<void> {
+    await this.ensureInitialized();
+    try {
+      const newUUID = generateUUID();
+      await this.updateSyncMetadata({
+        lastSyncUUID: newUUID,
+      });
+      console.log(`[LocalDB] Local state marked as modified with new UUID: ${newUUID.substring(0, 8)}...`);
+    } catch (error) {
+      console.error('[LocalDB] Failed to mark local state as modified:', error);
       throw error;
     }
   }
