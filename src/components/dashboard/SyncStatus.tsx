@@ -93,17 +93,17 @@ export function SyncStatus() {
 
   return (
     <TooltipProvider>
-      <Card className='border-gray-200  hover:shadow-lg transition-shadow' >
+      <Card className='border-gray-200  hover:shadow-lg transition-shadow dark:border-gray-600' >
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl dark:text-gray-200">
               {getSyncIcon()}
               Sync Status
             </CardTitle>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div onClick={() => navigate('/sync')} className="cursor-pointer w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                  <ArrowUpRight className="h-3 w-3 text-gray-600" />
+                <div onClick={() => navigate('/sync')} className="cursor-pointer w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors dark:hover:bg-gray-600">
+                  <ArrowUpRight className="h-3 w-3 text-gray-600 dark:text-gray-300" />
                 </div>
               </TooltipTrigger>
               <TooltipContent>
@@ -111,7 +111,7 @@ export function SyncStatus() {
               </TooltipContent>
             </Tooltip>
           </div>
-          <CardDescription className="text-xs sm:text-sm">
+          <CardDescription className="text-xs sm:text-sm dark:text-gray-400">
             Local synchronization state
           </CardDescription>
         </CardHeader>
@@ -123,13 +123,13 @@ export function SyncStatus() {
         ) : (
           <div className="space-y-3">
             <div className="flex justify-between items-center gap-2">
-              <span className="text-xs sm:text-sm font-medium">Status:</span>
+              <span className="text-xs sm:text-sm font-medium dark:text-gray-300">Status:</span>
               <span className={`text-xs sm:text-sm font-semibold ${status.isInSync ? 'text-green-600' : 'text-yellow-600'}`}>
                 {getSyncStatusText()}
               </span>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 dark:text-gray-300">
               <div className="flex justify-between items-start gap-2">
                 <span className="text-xs sm:text-sm font-medium">Local UUID:</span>
                 <span className="text-xs font-mono text-right break-all max-w-[60%]">
@@ -145,7 +145,7 @@ export function SyncStatus() {
               </div>
             </div>
 
-            <div className="flex justify-between items-center gap-2">
+            <div className="flex justify-between items-center gap-2 dark:text-gray-300">
               <span className="text-xs sm:text-sm font-medium">Last Sync:</span>
               <span className="text-xs sm:text-sm text-muted-foreground">
                 {formatLastSync(status.lastSyncTime)}

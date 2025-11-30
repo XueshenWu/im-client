@@ -67,7 +67,7 @@ const SourceModeSettings: React.FC = () => {
     setSyncPolicy({ intervalSeconds });
   };
   return (
-    <div className="space-y-6 *:border-gray-200">
+    <div className="space-y-6 *:border-gray-200 dark:text-gray-300">
       {/* Source Mode Selection */}
       <Card>
         <CardHeader>
@@ -76,7 +76,7 @@ const SourceModeSettings: React.FC = () => {
             {t('settings.sourceModeDescription', 'Choose where your images are stored and managed')}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 ">
           <RadioGroup value={sourceMode} onValueChange={handleSourceModeChange as any}>
             <div className={"flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors "+`${sourceMode==='cloud'?"border-blue-400":"border-gray-200"}`}>
               <RadioGroupItem value="cloud" id="cloud-mode" />
@@ -162,7 +162,7 @@ const SourceModeSettings: React.FC = () => {
                 </Label>
                 <Select
                   value={syncPolicy.intervalSeconds.toString()}
-                  onValueChange={(value) =>
+                  onValueChange={(value:any) =>
                     handleSyncIntervalChange(parseInt(value))
                   }
                 >

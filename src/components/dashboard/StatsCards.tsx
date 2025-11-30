@@ -54,16 +54,16 @@ export function StatsCards() {
 
   return (
     <TooltipProvider>
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 *:border-gray-200 ">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 *:border-gray-200 dark:*:border-gray-600">
         <Card className=" hover:shadow-lg transition-shadow" >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xl font-semibold">Total Images</CardTitle>
+            <CardTitle className="text-xl font-semibold dark:text-gray-300">Total Images</CardTitle>
             <div className="flex items-center gap-2">
             
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div onClick={() => navigate('/gallery')} className="cursor-pointer w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                    <ArrowUpRight className="h-3 w-3 text-gray-600" />
+                  <div onClick={() => navigate('/gallery')} className="cursor-pointer w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors dark:hover:bg-gray-600">
+                    <ArrowUpRight className="h-3 w-3 text-gray-600 dark:text-gray-300" />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -74,11 +74,11 @@ export function StatsCards() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-2xl font-bold text-muted-foreground">...</p>
+              <p className="text-2xl font-bold text-muted-foreground dark:text-gray-300">...</p>
             ) : (
-              <div className="text-3xl font-bold">{stats.totalCount.toLocaleString()}</div>
+              <div className="text-3xl font-bold dark:text-gray-300">{stats.totalCount.toLocaleString()}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 dark:text-gray-400">
               {sourceMode === 'cloud' ? 'in cloud storage' : 'in local storage'}
             </p>
           </CardContent>
@@ -86,13 +86,13 @@ export function StatsCards() {
 
         <Card className=" hover:shadow-lg transition-shadow" >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xl font-semibold">Total Size</CardTitle>
+            <CardTitle className="text-xl font-semibold dark:text-gray-300">Total Size</CardTitle>
             <div className="flex items-center gap-2">
              
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div onClick={() => navigate('/upload')} className="cursor-pointer w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                    <ArrowUpRight className="h-3 w-3 text-gray-600" />
+                  <div onClick={() => navigate('/upload')} className="cursor-pointer w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors dark:hover:bg-gray-600">
+                    <ArrowUpRight className="h-3 w-3 text-gray-600 dark:text-gray-300" />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -103,11 +103,11 @@ export function StatsCards() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-2xl font-bold text-muted-foreground">...</p>
+              <p className="text-2xl font-bold text-muted-foreground dark:text-gray-300">...</p>
             ) : (
-              <div className="text-3xl font-bold">{formatBytes(stats.totalSize)}</div>
+              <div className="text-3xl font-bold dark:text-gray-300">{formatBytes(stats.totalSize)}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 dark:text-gray-400">
               total file size
             </p>
           </CardContent>
