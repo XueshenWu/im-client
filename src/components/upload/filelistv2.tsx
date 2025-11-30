@@ -1077,22 +1077,22 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   };
 
   return (
-    <div className="rounded-xl bg-white p-2 border-2 border-slate-200 h-full flex flex-col">
+    <div className="rounded-xl bg-white p-2 border-2 border-slate-200 h-full flex flex-col dark:border-gray-600 dark:bg-gray-700">
       {/* Upload Statistics Section */}
       {uploadStats.totalFiles > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-3">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Upload Summary</h3>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-3 dark:from-blue-950/40 dark:to-indigo-950/40 dark:border-gray-600">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 dark:text-gray-200">Upload Summary</h3>
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-md p-3 border border-blue-100">
-              <div className="text-xs text-gray-500 mb-1">Total Files</div>
+            <div className="bg-white rounded-md p-3 border border-blue-100 dark:bg-gray-600 dark:border-gray-500">
+              <div className="text-xs text-gray-500 mb-1 dark:text-gray-300">Total Files</div>
               <div className="text-2xl font-bold text-blue-600">{uploadStats.totalFiles}</div>
             </div>
-            <div className="bg-white rounded-md p-3 border border-blue-100">
-              <div className="text-xs text-gray-500 mb-1">Total Size</div>
+            <div className="bg-white rounded-md p-3 border border-blue-100 dark:bg-gray-600 dark:border-gray-500">
+              <div className="text-xs text-gray-500 mb-1 dark:text-gray-300">Total Size</div>
               <div className="text-2xl font-bold text-green-600">{formatFileSize(uploadStats.totalSize)}</div>
             </div>
-            <div className="bg-white rounded-md p-3 border border-blue-100">
-              <div className="text-xs text-gray-500 mb-1">Corrupted Images</div>
+            <div className="bg-white rounded-md p-3 border border-blue-100 dark:bg-gray-600 dark:border-gray-500">
+              <div className="text-xs text-gray-500 mb-1 dark:text-gray-300">Corrupted Images</div>
               <div className={`text-2xl font-bold ${uploadStats.corruptedCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {uploadStats.corruptedCount}
               </div>
@@ -1101,9 +1101,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto dark:bg-gray-800 dark:text-gray-400">
         <Table>
-          <TableHeader className="sticky top-0 bg-white z-10 border-b border-slate-50">
+          <TableHeader className="sticky top-0 bg-white z-10 border-b border-slate-50 dark:bg-gray-700 dark:text-gray-300">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -1159,9 +1159,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       </div>
 
       {/* Sticky Footer with Clear and Submit Buttons */}
-      <div className="bg-white border-t border-gray-300 p-4 flex gap-3 items-center">
+      <div className="bg-white border-t border-gray-300 p-4 flex gap-3 items-center dark:bg-gray-700">
         <Button
-          className={"text-white cursor-pointer " + (files.length === 0 || isUploading ? "bg-red-200" : "bg-red-600 hover:bg-red-500")}
+          className={"text-white cursor-pointer " + (files.length === 0 || isUploading ? "bg-red-200 dark:bg-red-300" : "bg-red-600 hover:bg-red-500 dark:bg-red-900 dark:hover:bg-red-800 dark:text-gray-300")}
           disabled={files.length === 0 || isUploading}
           onClick={() => {
             // Skip confirmation if all files are completed
@@ -1185,7 +1185,7 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
           Clear All
         </Button>
         <Button
-          className={"flex-1 cursor-pointer text-white " + (files.length === 0 || isUploading ? "bg-blue-100" : "bg-blue-600 hover:bg-blue-500")}
+          className={"flex-1 cursor-pointer text-white " + (files.length === 0 || isUploading ? "bg-blue-100 dark:bg-blue-200" : "bg-blue-600 hover:bg-blue-500 dark:bg-blue-800 dark:hover:bg-blue-700 dark:text-gray-300")}
           disabled={files.length === 0 || isUploading || allFilesCompleted}
           onClick={handleSubmit}
         >
