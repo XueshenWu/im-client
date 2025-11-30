@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 
 const ExifEditor: React.FC = () => {
   const {
@@ -33,11 +34,13 @@ const ExifEditor: React.FC = () => {
     try {
       setSaving(true);
       await saveChanges();
+      toast.success('EXIF data saved successfully');
 
       // Close the editor after successful save
       setTimeout(() => closeEditor(), 500);
     } catch (error) {
       console.error('Failed to save EXIF data:', error);
+      toast.error('Failed to save EXIF data');
     } finally {
       setSaving(false);
     }

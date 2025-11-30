@@ -58,6 +58,7 @@ import { ImageWithSource } from "@/types/gallery"
 import { format } from 'date-fns'
 import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
 import { useExifEditorStore } from "@/stores/exifEditorStore"
+import { toast } from 'sonner'
 
 // Helper function to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -282,12 +283,14 @@ export const createColumns = (
 
             if (!presignedResponse.ok) {
               console.error('Failed to get presigned URL:', presignedResponse.statusText);
+              toast.error('Failed to download image');
               return;
             }
 
             const presignedData = await presignedResponse.json();
             if (!presignedData.success || !presignedData.data.presignedUrl) {
               console.error('Invalid presigned URL response');
+              toast.error('Invalid presigned URL response');
               return;
             }
 
@@ -296,6 +299,7 @@ export const createColumns = (
 
             if (!response.ok) {
               console.error('Download failed:', response.statusText);
+              toast.error('Failed to download image');
               return;
             }
 
@@ -308,8 +312,10 @@ export const createColumns = (
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+            toast.success(`Prepared: ${image.filename}`);
           } catch (error) {
             console.error('Download error:', error);
+            toast.error('Failed to download image');
           }
         };
 
@@ -448,12 +454,13 @@ export default function DetailList() {
   const handleExport = async () => {
     const selectedUuids = Object.keys(rowSelection);
     if (selectedUuids.length === 0) {
-      alert('Please select at least one image to export');
+      toast.error('Please select at least one image to export');
       return;
     }
 
     try {
       setIsLoading(true);
+      toast.loading('Preparing export...', { id: 'export-table' });
       const zip = new JSZip();
       const imagesFolder = zip.folder('images');
 
@@ -541,10 +548,10 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      alert(`Successfully exported ${invoiceItems.length} image(s)`);
+      toast.success(`Prepared: ${invoiceItems.length} images`, { id: 'export-table' });
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export images. Please try again.');
+      toast.error('Failed to export images. Please try again.', { id: 'export-table' });
     } finally {
       setIsLoading(false);
     }
@@ -554,7 +561,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
   const handleDelete = async () => {
     const selectedUuids = Object.keys(rowSelection);
     if (selectedUuids.length === 0) {
-      alert(t('table.selectAtLeastOne'));
+      toast.error(t('table.selectAtLeastOne'));
       return;
     }
 
@@ -564,15 +571,17 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
 
     try {
       setIsLoading(true);
+      toast.loading('Deleting images...', { id: 'delete-table' });
 
       await deleteImages(selectedUuids);
 
       // Clear selection and refresh data
       setRowSelection({});
       fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
+      toast.success(`Successfully deleted ${selectedUuids.length} images`, { id: 'delete-table' });
     } catch (error) {
       console.error('Delete failed:', error);
-      alert(t('table.deleteError'));
+      toast.error(t('table.deleteError'), { id: 'delete-table' });
     } finally {
       setIsLoading(false);
     }

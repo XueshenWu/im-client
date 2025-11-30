@@ -60,6 +60,7 @@ import {
 import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
 import { ImageWithSource } from "@/types/gallery"
 import { useExifEditorStore } from "@/stores/exifEditorStore"
+import { toast } from 'sonner'
 
 // Helper function to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -278,8 +279,10 @@ const createLocalColumns = (
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+            toast.success(`Downloaded ${image.filename}`);
           } catch (error) {
             console.error('Download error:', error);
+            toast.error('Failed to download image');
           }
         };
 
@@ -434,7 +437,7 @@ export default function LocalDetailList() {
   const handleExport = async () => {
     const selectedUuids = Object.keys(rowSelection);
     if (selectedUuids.length === 0) {
-      alert('Please select at least one image to export');
+      toast.error('Please select at least one image to export');
       return;
     }
 
@@ -445,6 +448,7 @@ export default function LocalDetailList() {
       // Use Electron's export API
       const destination = await window.electronAPI?.selectDirectory();
       if (!destination) {
+        setIsLoading(false);
         return; // User cancelled
       }
 
@@ -457,13 +461,13 @@ export default function LocalDetailList() {
       const result = await window.electronAPI?.exportImages(imagesToExport, destination);
 
       if (result?.success) {
-        alert(`Successfully exported ${selectedImages.length} image(s) to ${destination}`);
+        toast.success(`Successfully exported ${selectedImages.length} images to ${destination}`);
       } else {
-        alert('Failed to export some images. Check console for details.');
+        toast.error('Failed to export some images. Check console for details.');
       }
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export images. Please try again.');
+      toast.error('Failed to export images. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -473,7 +477,7 @@ export default function LocalDetailList() {
   const handleDelete = async () => {
     const selectedUuids = Object.keys(rowSelection);
     if (selectedUuids.length === 0) {
-      alert(t('table.selectAtLeastOne'));
+      toast.error(t('table.selectAtLeastOne'));
       return;
     }
 
@@ -483,14 +487,16 @@ export default function LocalDetailList() {
 
     try {
       setIsLoading(true);
+      toast.loading('Deleting images...', { id: 'delete-local-table' });
       await localImageService.deleteImages(selectedUuids);
 
       // Clear selection and refresh data
       setRowSelection({});
       fetchData(pagination.page, pagination.pageSize);
+      toast.success(`Successfully deleted ${selectedUuids.length} images`, { id: 'delete-local-table' });
     } catch (error) {
       console.error('Delete failed:', error);
-      alert(t('table.deleteError'));
+      toast.error(t('table.deleteError'), { id: 'delete-local-table' });
     } finally {
       setIsLoading(false);
     }

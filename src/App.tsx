@@ -11,6 +11,7 @@ import { ImageViewer } from './components/viewer/ImageViewer'
 import { TiffImageViewer } from './components/viewer/tiffImageViewer'
 import ExifEditor from './components/gallery/ExifEditor'
 import { useSettingsStore } from './stores/settingsStore'
+import { Toaster } from './components/ui/sonner'
 
 function App() {
   const { sourceMode } = useSettingsStore()
@@ -57,9 +58,8 @@ function App() {
       <ImageViewer />
       <TiffImageViewer/>
       <ExifEditor />
+      <Toaster />
     </HashRouter>
-
-    
   )
 }
 
