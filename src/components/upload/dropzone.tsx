@@ -161,12 +161,12 @@ function withDropzone<P extends WithDropzoneProps>(
     }, []);
 
     return (
-      <div className="h-full w-full flex flex-col font-sans gap-4">
+      <div className="h-full w-full flex flex-col font-sans gap-4 ">
         <div
           {...getRootProps()}
           onClick={openNativeDialog} // Manual Click Handler
           className={cn(
-            "relative border-2  border-dashed border-slate-300 hover:border-slate-400 rounded-lg p-10 transition-all duration-100 ease-in-out cursor-pointer flex flex-col items-center justify-center gap-4  bg-slate-100",
+            "relative border-2  border-dashed border-slate-300 hover:border-slate-400 rounded-lg p-10 transition-all duration-100 ease-in-out cursor-pointer flex flex-col items-center justify-center gap-4  bg-slate-100b dark:bg-gray-800 dark:border-gray-600",
             "",
             isDragActive && "ring-2 ring-blue-300 border-0 hover:border-0",
             isProcessing && "opacity-60 pointer-events-none cursor-wait"
@@ -178,7 +178,7 @@ function withDropzone<P extends WithDropzoneProps>(
             <div className="flex flex-col items-center gap-3 animate-pulse">
               <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
               <div className="text-center">
-                <p className="text-sm font-semibold text-gray-700">Processing Selection...</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-500">Processing Selection...</p>
                 <p className="text-xs text-gray-500">Reading files & scanning folders...</p>
               </div>
             </div>
@@ -203,20 +203,20 @@ function withDropzone<P extends WithDropzoneProps>(
                   ) : (
                     <>
                       <span
-                        className="text-blue-600 font-medium hover:text-blue-700 cursor-pointer "
+                        className="text-blue-600 font-medium hover:text-blue-700 cursor-pointer dark:text-blue-600 dark:hover:text-blue-500"
                       >
                         Click 
-                        <span className='text-black px-1'>
+                        <span className='text-black px-1 dark:text-gray-300'>
                             or 
                         </span>
                         
                         Drag
                       </span>
-                      <span className="text-gray-600"> to upload your file.</span>
+                      <span className="text-gray-600 dark:text-gray-400"> to upload your file.</span>
                     </>
                   )}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Supported Format: Images, ZIP, JSON, Folders (4K max)
                 </p>
               </div>
