@@ -33,9 +33,7 @@ import { v4 as uuidv4 } from 'uuid';
 import exifr from 'exifr';
 import { normalizeFormatFromMimeType, normalizeFormatFromFilename } from '@/utils/formatNormalizer';
 
-// Upload configuration
-const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
-const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+
 
 // Upload status tracking
 interface UploadStatus {
