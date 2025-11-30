@@ -17,6 +17,7 @@ import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { getCloudImagePresignedUrlEndpoint, getCloudThumbnailUrl } from '@/utils/imagePaths';
 import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
 import { useExifEditorStore } from '@/stores/exifEditorStore';
+import { toast } from 'sonner';
 interface CloudPhotoCardProps {
   image: ImageWithSource;
   selectionMode?: boolean;
@@ -62,24 +63,22 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
     if (!image.uuid) return;
 
     try {
-
-
       const endpoint = getCloudImagePresignedUrlEndpoint(image.uuid);
       let response = await fetch(endpoint);
 
       if (!response.ok) {
         console.error('Download failed:', response.statusText);
+        toast.error('Failed to download image');
         return;
       }
 
       const data = await response.json();
       if (!data.success || !data.data.presignedUrl) {
-        alert('Invalid presigned URL response');
+        toast.error('Invalid presigned URL response');
         return;
       }
       const presignedUrl = data.data.presignedUrl;
       response = await fetch(presignedUrl);
-
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -90,14 +89,17 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      toast.success(`Prepared: ${image.filename || 'image'}`);
     } catch (error) {
       console.error('Download error:', error);
+      toast.error('Failed to download image');
     }
   };
 
   const handleCopyId = () => {
     if (image.uuid) {
       navigator.clipboard.writeText(image.uuid);
+      toast.success('Image ID copied to clipboard');
     }
   };
 
@@ -147,8 +149,10 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
     try {
       await deleteImages([image.uuid]);
       triggerRefresh();
+      toast.success('Image deleted successfully');
     } catch (error) {
       console.error('Delete error:', error);
+      toast.error('Failed to delete image');
     }
   };
 

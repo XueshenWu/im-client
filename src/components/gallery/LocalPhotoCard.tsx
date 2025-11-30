@@ -16,6 +16,7 @@ import { localImageService } from '@/services/localImage.service';
 import { getImageUrl, getThumbnailUrl } from '@/utils/imagePaths';
 import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
 import { useExifEditorStore } from '@/stores/exifEditorStore';
+import { toast } from 'sonner';
 
 
 interface LocalPhotoCardProps {
@@ -52,9 +53,6 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
     if (!image.uuid || !image.format) return;
 
     try {
-      // Construct the local-image URL and fetch it
-
-
       const buffer = await window.electronAPI?.loadLocalImage(image.uuid, image.format)
       if (!buffer) {
         throw "cannot read file"
@@ -69,14 +67,17 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      toast.success(`Prepared: ${displayName}`);
     } catch (error) {
       console.error('Download error:', error);
+      toast.error('Failed to download image');
     }
   };
 
   const handleCopyId = () => {
     if (image.uuid) {
       navigator.clipboard.writeText(image.uuid);
+      toast.success('Image ID copied to clipboard');
     }
   };
 
@@ -148,8 +149,10 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
     try {
       await localImageService.deleteImages([image.uuid]);
       triggerRefresh();
+      toast.success('Image deleted successfully');
     } catch (error) {
       console.error('Delete error:', error);
+      toast.error('Failed to delete image');
     }
   };
 

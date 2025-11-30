@@ -10,6 +10,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose, DrawerBo
 import { cn } from '@/lib/utils';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { LocalImage } from '@/types/local';
+import { toast } from 'sonner';
 
 interface LocalPhotoWallProps {
   columnWidth?: number;
@@ -137,26 +138,45 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
   }, [page, hasMore, sortBy, sortOrder]);
 
   // ... (Sort handlers: handleSort, handleDrawerSort, handleResetSort remain exactly the same) ...
-  const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
-    if (sortBy === column) {
-      if (sortOrder === 'asc') {
-        setSortOrder('desc');
-      } else if (sortOrder === 'desc') {
-        if (column === 'updatedAt') {
-          setSortOrder('asc');
-          return;
-        }
-        setSortBy('updatedAt');
-        setSortOrder('desc');
-      }
+const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
+  // default fallback configuration
+  const defaultSortBy = 'updatedAt';
+  const defaultSortOrder = 'desc';
+
+  let nextSortBy = column;
+  let nextSortOrder = 'asc';
+
+  // If clicking the currently active column
+  if (sortBy === column) {
+    if (sortOrder === 'asc') {
+      // Toggle to Descending
+      nextSortOrder = 'desc';
     } else {
-      setSortBy(column);
-      setSortOrder('asc');
+      // Currently Descending: deciding whether to reset or loop
+      if (column === defaultSortBy) {
+        // If we are on the default column, just loop back to Asc
+        nextSortOrder = 'asc';
+      } else {
+        // Otherwise, reset to the default sort state
+        nextSortBy = defaultSortBy;
+        nextSortOrder = defaultSortOrder;
+      }
     }
-    setImages([]);
-    setPage(1);
-    setHasMore(true);
-  };
+  } else {
+    // Clicking a new column: Start with Ascending
+    nextSortBy = column;
+    nextSortOrder = 'asc';
+  }
+
+  // 1. Update State
+  setSortBy(nextSortBy);
+  setSortOrder(nextSortOrder as 'asc' | 'desc'); // Type assertion if needed
+
+  // 2. Reset List (This will now run correctly for all cases)
+  setImages([]);
+  setPage(1);
+  setHasMore(true);
+};
 
   const handleDrawerSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt', order: 'asc' | 'desc') => {
     setSortBy(column);
@@ -216,10 +236,10 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
       }));
       await window.electronAPI?.exportImages(imagesToExport, destination);
       handleClearSelection();
-      alert(t('gallery.exportSuccess', { count: selectedImages.length }));
+      toast.success(t('gallery.exportSuccess', { count: selectedImages.length }));
     } catch (error) {
       console.error('Export error:', error);
-      alert(t('gallery.exportError'));
+      toast.error(t('gallery.exportError'));
     } finally {
       setExporting(false);
     }
@@ -237,9 +257,10 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
       setPage(1);
       setHasMore(true);
       loadingRef.current = false;
+      toast.success(t('gallery.deleteSuccess', { count: uuids.length }));
     } catch (error) {
       console.error('Delete error:', error);
-      alert(t('gallery.deleteError'));
+      toast.error(t('gallery.deleteError'));
     } finally {
       setExporting(false);
     }
