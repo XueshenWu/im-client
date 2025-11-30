@@ -29,8 +29,18 @@ export default function Settings() {
         <Separator />
 
         {/* Source Mode Settings */}
-        <section>
-          <SourceModeSettings />
+
+
+         <section>
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-200">{t('settings.sourceMode', 'Source Mode')}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+               {t('settings.sourceModeDescription', 'Choose where your images are stored and managed')}
+              </p>
+            </div>
+        <SourceModeSettings />
+          </div>
         </section>
 
         <Separator />
