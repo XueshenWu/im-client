@@ -96,15 +96,14 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
       onSelect(image.uuid);
     } else if (!selectionMode) {
       // Open viewer when clicking the card (not in selection mode)
-      openViewer({
-        uuid: image.uuid || '',
-        filename: image.filename || '',
-        fileSize: image.fileSize || 0,
-        format: image.format || '',
-        width: image.width,
-        height: image.height,
-        source: 'local'
-      } as any);
+
+
+      if (image.format === 'tiff') {
+        openTiffViewer(image)
+      } else {
+        openViewer(image);
+
+      }
     }
   };
 
@@ -163,7 +162,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
             width: '100%',
             aspectRatio: image.aspectRatio || 1,
           }}
-          onClick={handleCardClick}
+          onDoubleClick={handleCardDoubleClick}
         >
           {image.uuid ? (
 
@@ -211,21 +210,20 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
           </div>
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className='*:cursor-pointer *:hover:bg-gray-100'>
         {!selectionMode && (
           <>
             <ContextMenuItem onClick={handleSelect}>
               <CheckSquare className="mr-2 h-4 w-4" />
               {t('contextMenu.select')}
             </ContextMenuItem>
-            <ContextMenuSeparator />
           </>
         )}
         <ContextMenuItem onClick={handleCopyId}>
           <Copy className="mr-2 h-4 w-4" />
           {t('contextMenu.copyId')}
         </ContextMenuItem>
-        <ContextMenuSeparator />
+
         <ContextMenuItem onClick={handleViewDetails}>
           <Eye className="mr-2 h-4 w-4" />
           {t('contextMenu.viewDetails')}
@@ -238,7 +236,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
           <Download className="mr-2 h-4 w-4" />
           {t('contextMenu.download')}
         </ContextMenuItem>
-        <ContextMenuSeparator />
+
         <ContextMenuItem className="text-destructive" onClick={handleDelete}>
           <Trash2 className="mr-2 h-4 w-4" />
           {t('contextMenu.delete')}

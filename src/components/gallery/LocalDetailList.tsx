@@ -8,7 +8,7 @@ import { localDatabase } from '@/services/localDatabase.service'
 import { localImageService } from '@/services/localImage.service'
 import { ColumnDef } from "@tanstack/react-table"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Download, Trash2, Eye, Edit } from "lucide-react"
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Download, Trash2, Eye, Edit, Copy } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -31,8 +31,8 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ChevronDown, FileArchive, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
-import JSZip from 'jszip'
+import { ChevronDown, X, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
+
 import { format } from 'date-fns'
 import {
   Table,
@@ -291,14 +291,14 @@ const createLocalColumns = (
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{t('table.actions')}</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="*:cursor-pointer *:hover:bg-gray-100">
               <DropdownMenuItem
                 onClick={() => navigator.clipboard.writeText(image.uuid)}
               >
+                <Copy className="mr-2 h-4 w-4" />
                 {t('contextMenu.copyId')}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+
               <DropdownMenuItem onClick={() => onEditExif(image)}>
                 <Edit className="mr-2 h-4 w-4" />
                 {'Edit EXIF'}
@@ -581,31 +581,42 @@ export default function LocalDetailList() {
           className="max-w-sm border-gray-300 ring-gray-400"
         />
         <div className="flex items-center gap-2">
+          {/* Selection Controls - shown only when items are selected */}
           {Object.keys(rowSelection).length > 0 && (
-            <Button
-              variant="ghost"
-              onClick={() => setRowSelection({})}
-              className="h-8 px-2 lg:px-3 hover:text-blue-500 hover:underline duration-75"
-            >
-              {t('table.clearSelection')}
-            </Button>
+            <>
+              <span className="text-sm text-gray-600">
+                {Object.keys(rowSelection).length} {t('gallery.selected')}
+              </span>
+              <Button
+                size="sm"
+                onClick={handleExport}
+                disabled={Object.keys(rowSelection).length === 0 || isLoading}
+                className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Download className="h-4 w-4" />
+                {isLoading ? t('gallery.exporting') : `${t('table.export')} (${Object.keys(rowSelection).length})`}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleDelete}
+                disabled={Object.keys(rowSelection).length === 0 || isLoading}
+                className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                {t('table.delete')} ({Object.keys(rowSelection).length})
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setRowSelection({})}
+                className="flex items-center gap-2 border-gray-100 border hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+                {t('table.clearSelection')}
+              </Button>
+            </>
           )}
-          <Button
-            className=" border-gray-200 border bg-blue-600 text-white hover:bg-blue-500"
-            onClick={handleExport}
-            disabled={Object.keys(rowSelection).length === 0 || isLoading}
-          >
-            <FileArchive className="mr-2 h-4 w-4" />
-            {t('table.export')} ({Object.keys(rowSelection).length})
-          </Button>
-          <Button
-            className=" border-gray-200 border hover:bg-gray-100 "
-            onClick={handleDelete}
-            disabled={Object.keys(rowSelection).length === 0 || isLoading}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            {t('table.delete')} ({Object.keys(rowSelection).length})
-          </Button>
+
+          {/* Column Visibility Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"

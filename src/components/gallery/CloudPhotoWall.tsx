@@ -503,30 +503,27 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
               {selectedIds.size} {t('gallery.selected')}
             </span>
             <Button
-    
               size="sm"
               onClick={handleExport}
               disabled={selectedIds.size === 0 || exporting}
-              className="flex items-center gap-2 border-gray-100 border  hover:bg-gray-100"
+              className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
             >
               <Download className="h-4 w-4" />
               {exporting ? t('gallery.exporting') : `${t('gallery.export')} (${selectedIds.size})`}
             </Button>
             <Button
-
               size="sm"
               onClick={handleDelete}
               disabled={selectedIds.size === 0 || exporting}
-              className="flex items-center gap-2  border-gray-100 border hover:bg-gray-100"
+              className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
             >
               <Trash2 className="h-4 w-4" />
               {t('gallery.delete')} ({selectedIds.size})
             </Button>
             <Button
-
               size="sm"
               onClick={handleClearSelection}
-              className="flex items-center gap-2 border-gray-100 border  hover:bg-gray-100"
+              className="flex items-center gap-2 border-gray-100 border hover:bg-gray-100"
             >
               <X className="h-4 w-4" />
               {t('gallery.clearSelection')}

@@ -408,6 +408,7 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
       <button
         onClick={() => handleDrawerSort(column, order)}
         className="flex items-center justify-between py-4 px-6 hover:bg-gray-50 transition-colors text-left w-full border-b border-gray-100 last:border-b-0"
+        style={{ cursor: 'pointer' }}
       >
         <span className={`text-base ${isActive ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
           {label}
@@ -444,33 +445,58 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
           <SortButton column="updatedAt" label="Modified" />
         </div>
         <div className="lg:hidden">
-          <Button variant="ghost" size="sm" onClick={() => setDrawerOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500"
+          >
             <ListFilter className="h-4 w-4" />
-            {sortBy ? <span className="text-sm">Sort</span> : t('gallery.sortBy')}
+            {sortBy ? (
+              <span className="text-sm">
+                {sortBy === 'name' && (sortOrder === 'asc' ? 'Name: A-Z' : 'Name: Z-A')}
+                {sortBy === 'size' && (sortOrder === 'asc' ? 'Smallest' : 'Largest')}
+                {sortBy === 'type' && (sortOrder === 'asc' ? 'Type: A-Z' : 'Type: Z-A')}
+                {sortBy === 'createdAt' && (sortOrder === 'desc' ? 'Created: Newest' : 'Created: Oldest')}
+                {sortBy === 'updatedAt' && (sortOrder === 'desc' ? 'Modified: Newest' : 'Modified: Oldest')}
+              </span>
+            ) : (
+              t('gallery.sortBy')
+            )}
           </Button>
         </div>
-        {/* Selection Toolbar */}
+        {/* Selection Controls */}
         {selectionMode && (
-          <div className="flex items-center justify-between px-6 py-3">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={handleClearSelection} className="text-gray-700 hover:text-gray-900">
-                <X className="h-4 w-4 mr-1" />
-                {t('common.cancel')}
-              </Button>
-              <span className="text-sm font-medium text-gray-700">
-                {t('gallery.selected', { count: selectedIds.size })}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={handleExport} disabled={selectedIds.size === 0 || exporting} className="bg-blue-600 text-white hover:bg-blue-700">
-                {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
-                {t('gallery.export')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleDelete} disabled={selectedIds.size === 0 || exporting} className="bg-red-600 text-white hover:bg-red-700">
-                <Trash2 className="h-4 w-4 mr-1" />
-                {t('gallery.delete')}
-              </Button>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {selectedIds.size} {t('gallery.selected')}
+            </span>
+            <Button
+              size="sm"
+              onClick={handleExport}
+              disabled={selectedIds.size === 0 || exporting}
+              className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Download className="h-4 w-4" />
+              {exporting ? t('gallery.exporting') : `${t('gallery.export')} (${selectedIds.size})`}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleDelete}
+              disabled={selectedIds.size === 0 || exporting}
+              className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('gallery.delete')} ({selectedIds.size})
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleClearSelection}
+              className="flex items-center gap-2 border-gray-100 border hover:bg-gray-100"
+            >
+              <X className="h-4 w-4" />
+              {t('gallery.clearSelection')}
+            </Button>
           </div>
         )}
       </div>
