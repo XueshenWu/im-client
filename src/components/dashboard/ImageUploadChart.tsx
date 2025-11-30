@@ -54,25 +54,25 @@ export function ImageUploadChart({ days = 7 }: ImageUploadChartProps) {
   }, [sourceMode, days]);
 
   return (
-    <Card className='border-gray-200'>
+    <Card className='border-gray-200 dark:border-gray-600'>
       <CardHeader>
-        <CardTitle className="text-lg sm:text-xl">Upload Activity</CardTitle>
-        <CardDescription className="text-xs sm:text-sm">
+        <CardTitle className="text-lg sm:text-xl dark:text-gray-300">Upload Activity</CardTitle>
+        <CardDescription className="text-xs sm:text-sm dark:text-gray-400">
           Last {days} days upload and delete counts
         </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex items-center justify-center h-48 sm:h-64">
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <p className="text-sm text-muted-foreground dark:text-gray-300">Loading...</p>
           </div>
         ) : data.length === 0 ? (
           <div className="flex items-center justify-center h-48 sm:h-64">
-            <p className="text-sm text-muted-foreground">No data available</p>
+            <p className="text-sm text-muted-foreground dark:text-gray-300">No data available</p>
           </div>
         ) : (
           <div className="w-full overflow-x-auto">
-            <div className="min-w-[300px]">
+            <div className="min-w-[300px] ">
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-50" />

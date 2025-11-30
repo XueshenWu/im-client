@@ -10,12 +10,12 @@ export default function Dashboard() {
 
   return (
     <ScrollArea className="h-full w-full">
-      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 pb-6 w-full mx-auto bg-white">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 pb-6 w-full mx-auto bg-white dark:bg-gray-900">
         <div className='space-y-3 shrink-0'>
 
           <div className='flex items-center justify-between gap-3'>
 
-            <h1 className='text-4xl font-bold font-sans text-gray-900'>
+            <h1 className='text-4xl font-bold font-sans text-gray-900 dark:text-gray-200'>
               {'Dashboard'}
             </h1>
 
@@ -32,7 +32,7 @@ export default function Dashboard() {
         </div>
 
         {/* Bottom Charts */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 ">
           {/* Image Format Pie Chart - Bottom Left */}
           <ImageFormatPieChart />
 

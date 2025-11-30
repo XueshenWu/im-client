@@ -16,7 +16,7 @@ export default function Settings() {
           <HomeLink />
           <div className='flex items-center justify-between gap-3'>
 
-            <h1 className='text-4xl font-bold font-sans text-gray-900 dark:text-white'>
+            <h1 className='text-4xl font-bold font-sans text-gray-900 dark:text-gray-200'>
               {t('navigation.settings')}
             </h1>
 
@@ -39,8 +39,8 @@ export default function Settings() {
         <section>
           <div className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('settings.theme', 'Theme')}</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-200">{t('settings.theme', 'Theme')}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 {t('settings.themeDescription', 'Customize your own theme pages')}
               </p>
             </div>
@@ -54,8 +54,8 @@ export default function Settings() {
         <section>
           <div className=" flex items-center justify-start gap-x-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('settings.language', 'Language')}</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-200">{t('settings.language', 'Language')}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 {t('settings.languageDescription', 'Choose your preferred language')}
               </p>
             </div>
