@@ -43,7 +43,68 @@ interface UploadStatus {
   progress: number;
   status: 'staged' | 'pending' | 'uploading' | 'completed' | 'failed';
   error?: string;
+  isCorrupted?: boolean;
 }
+
+// Upload statistics tracking
+interface UploadStatistics {
+  totalFiles: number;
+  totalSize: number;
+  corruptedCount: number;
+}
+
+/**
+ * Check if an image file is corrupted by attempting to load it
+ */
+const checkImageCorruption = async (file: File): Promise<boolean> => {
+  // Only check image files
+  if (!file.type.startsWith('image/')) {
+    return false;
+  }
+
+  try {
+    // For TIFF files, we can't reliably check in browser
+    const isTiff = file.type === 'image/tiff' || file.type === 'image/tif' ||
+                   file.name.toLowerCase().endsWith('.tiff') ||
+                   file.name.toLowerCase().endsWith('.tif');
+
+    if (isTiff) {
+      // TIFF corruption will be detected during Electron processing
+      return false;
+    }
+
+    // For other image types, try to load them
+    const imageUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    const isCorrupted = await new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        URL.revokeObjectURL(imageUrl);
+        resolve(true); // Timeout means likely corrupted
+      }, 5000);
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        URL.revokeObjectURL(imageUrl);
+        // Check if dimensions are valid
+        resolve(img.naturalWidth === 0 || img.naturalHeight === 0);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeout);
+        URL.revokeObjectURL(imageUrl);
+        resolve(true); // Error means corrupted
+      };
+
+      img.src = imageUrl;
+    });
+
+    return isCorrupted;
+  } catch (error) {
+    console.warn(`Error checking corruption for ${file.name}:`, error);
+    return true; // If we can't check, assume corrupted
+  }
+};
 
 /**
  * Extract EXIF data from an image file
@@ -261,27 +322,52 @@ const createColumns = (
         return (
           <div className="text-sm">
             {status.status === 'staged' && (
-              <span className="text-gray-400">Staged</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-gray-400">Staged</span>
+                {status.isCorrupted && (
+                  <span className="text-xs text-red-500">⚠ Corrupted</span>
+                )}
+              </div>
             )}
             {status.status === 'pending' && (
-              <span className="text-gray-500">Pending</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-gray-500">Pending</span>
+                {status.isCorrupted && (
+                  <span className="text-xs text-red-500">⚠ Corrupted</span>
+                )}
+              </div>
             )}
             {status.status === 'uploading' && (
-              <div className="flex items-center gap-2">
-                <span className="text-blue-600">{status.progress}%</span>
-                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 transition-all"
-                    style={{ width: `${status.progress}%` }}
-                  />
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600">{status.progress}%</span>
+                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600 transition-all"
+                      style={{ width: `${status.progress}%` }}
+                    />
+                  </div>
                 </div>
+                {status.isCorrupted && (
+                  <span className="text-xs text-red-500">⚠ Corrupted</span>
+                )}
               </div>
             )}
             {status.status === 'completed' && (
-              <span className="text-green-600">Completed</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-green-600">Completed</span>
+                {status.isCorrupted && (
+                  <span className="text-xs text-orange-500">⚠ Was Corrupted</span>
+                )}
+              </div>
             )}
             {status.status === 'failed' && (
-              <span className="text-red-600" title={status.error}>Failed</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-red-600" title={status.error}>Failed</span>
+                {status.isCorrupted && (
+                  <span className="text-xs text-red-500">⚠ Corrupted</span>
+                )}
+              </div>
             )}
           </div>
         );
@@ -317,6 +403,11 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [uploadStatuses, setUploadStatuses] = React.useState<Map<string, UploadStatus>>(new Map());
   const [isUploading, setIsUploading] = React.useState(false);
+  const [uploadStats, setUploadStats] = React.useState<UploadStatistics>({
+    totalFiles: 0,
+    totalSize: 0,
+    corruptedCount: 0,
+  });
 
   // FIX 1: Use useRef instead of useState for tracking file count.
   // This prevents re-renders when we just want to update the counter.
@@ -422,6 +513,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         // LOCAL MODE: Save to local database only
         console.log('[Upload] Local mode: saving to local database');
 
+        // Calculate total size
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+
         // Initialize upload status for all files
         const initialStatuses = new Map<string, UploadStatus>();
         files.forEach((file) => {
@@ -433,9 +527,19 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         });
         setUploadStatuses(initialStatuses);
 
+        // Initialize statistics
+        setUploadStats({
+          totalFiles: files.length,
+          totalSize: totalSize,
+          corruptedCount: 0,
+        });
+
         // Process each file
         for (const file of files) {
           try {
+            // Check for corruption first
+            const isCorrupted = await checkImageCorruption(file);
+
             // Update status to uploading
             setUploadStatuses((prev) => {
               const newMap = new Map(prev);
@@ -443,9 +547,18 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
                 fileName: file.name,
                 progress: 20,
                 status: 'uploading',
+                isCorrupted: isCorrupted,
               });
               return newMap;
             });
+
+            // Update corruption count if needed
+            if (isCorrupted) {
+              setUploadStats((prev) => ({
+                ...prev,
+                corruptedCount: prev.corruptedCount + 1,
+              }));
+            }
 
             // Generate UUID for this image
             const uuid = uuidv4();
@@ -607,7 +720,15 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         }
 
         // Show summary
-        alert(`Local upload complete!\n✓ ${completedCount} files saved\n${failedCount > 0 ? `✗ ${failedCount} files failed` : ''}`);
+        const corruptedInCompleted = uploadStats.corruptedCount;
+        let summaryMessage = `Local upload complete!\n✓ ${completedCount} files saved`;
+        if (failedCount > 0) {
+          summaryMessage += `\n✗ ${failedCount} files failed`;
+        }
+        if (corruptedInCompleted > 0) {
+          summaryMessage += `\n⚠ ${corruptedInCompleted} corrupted image(s) detected`;
+        }
+        alert(summaryMessage);
 
         // Trigger gallery refresh
         triggerRefresh();
@@ -621,6 +742,9 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
 
 
 
+      // Calculate total size for cloud upload
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+
       // Initialize upload status for all files
       const initialStatuses = new Map<string, UploadStatus>();
       files.forEach((file) => {
@@ -631,6 +755,13 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
         });
       });
       setUploadStatuses(initialStatuses);
+
+      // Initialize statistics for cloud upload
+      setUploadStats({
+        totalFiles: files.length,
+        totalSize: totalSize,
+        corruptedCount: 0,
+      });
 
       // STEP 1: Generate UUIDs, calculate hashes, dimensions, extract EXIF, and request presigned URLs
       const fileMetadata = await Promise.all(files.map(async (file) => {
@@ -767,6 +898,26 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
       for (const meta of fileMetadata) {
         const file = meta.file;
         try {
+          // Check for corruption
+          const isCorrupted = await checkImageCorruption(file);
+          if (isCorrupted) {
+            setUploadStats((prev) => ({
+              ...prev,
+              corruptedCount: prev.corruptedCount + 1,
+            }));
+            setUploadStatuses((prev) => {
+              const newMap = new Map(prev);
+              const current = newMap.get(file.name);
+              if (current) {
+                newMap.set(file.name, {
+                  ...current,
+                  isCorrupted: true,
+                });
+              }
+              return newMap;
+            });
+          }
+
           const urls = presignedURLMap.get(meta.uuid);
           if (!urls) {
             throw new Error('No presigned URLs found for file');
@@ -895,13 +1046,20 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
 
 
       // Show completion message using tracked counts
+      const corruptedInCompleted = uploadStats.corruptedCount;
       if (failedCount === 0) {
-        alert(`Successfully uploaded ${completedCount} file(s)!`);
+        let message = `Successfully uploaded ${completedCount} file(s)!`;
+        if (corruptedInCompleted > 0) {
+          message += `\n⚠ ${corruptedInCompleted} corrupted image(s) detected`;
+        }
+        alert(message);
         // Don't clear files or statuses - let them see the completion status
       } else {
-        alert(
-          `Upload completed with ${completedCount} success(es) and ${failedCount} failure(s).`
-        );
+        let message = `Upload completed with ${completedCount} success(es) and ${failedCount} failure(s).`;
+        if (corruptedInCompleted > 0) {
+          message += `\n⚠ ${corruptedInCompleted} corrupted image(s) detected`;
+        }
+        alert(message);
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -911,8 +1069,40 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
     }
   };
 
+  // Format file size for display
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
     <div className="rounded-xl bg-white p-2 border-2 border-slate-200 h-full flex flex-col">
+      {/* Upload Statistics Section */}
+      {uploadStats.totalFiles > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Upload Summary</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-md p-3 border border-blue-100">
+              <div className="text-xs text-gray-500 mb-1">Total Files</div>
+              <div className="text-2xl font-bold text-blue-600">{uploadStats.totalFiles}</div>
+            </div>
+            <div className="bg-white rounded-md p-3 border border-blue-100">
+              <div className="text-xs text-gray-500 mb-1">Total Size</div>
+              <div className="text-2xl font-bold text-green-600">{formatFileSize(uploadStats.totalSize)}</div>
+            </div>
+            <div className="bg-white rounded-md p-3 border border-blue-100">
+              <div className="text-xs text-gray-500 mb-1">Corrupted Images</div>
+              <div className={`text-2xl font-bold ${uploadStats.corruptedCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {uploadStats.corruptedCount}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 bg-white z-10 border-b border-slate-50">
@@ -986,6 +1176,12 @@ const FileListV2: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
 
             files.forEach(file => removeFile(file.name));
             setUploadStatuses(new Map());
+            // Reset statistics when clearing files
+            setUploadStats({
+              totalFiles: 0,
+              totalSize: 0,
+              corruptedCount: 0,
+            });
           }}
         >
           Clear All

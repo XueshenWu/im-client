@@ -198,6 +198,7 @@ class LocalSyncService {
       // step3: calculate bi-directional diff
       this.reportProgress('calculating_diff', 2, 2, 'Calculating differences...');
       const diff = stateDiffService.calculateDiff(localImages, remoteImages);
+      
       console.log('[LocalSync] Diff calculated:', {
         toUpload: diff.toUpload.length,
         toDownload: diff.toDownload.length,
