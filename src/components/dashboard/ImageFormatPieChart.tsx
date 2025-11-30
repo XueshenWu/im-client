@@ -57,10 +57,10 @@ export function ImageFormatPieChart() {
   }));
 
   return (
-    <Card className='border-gray-200'>
+    <Card className='border-gray-200 dark:border-gray-600'>
       <CardHeader>
-        <CardTitle className="text-lg sm:text-xl">Image Formats</CardTitle>
-        <CardDescription className="text-xs sm:text-sm">
+        <CardTitle className="text-lg sm:text-xl dark:text-gray-300">Image Formats</CardTitle>
+        <CardDescription className="text-xs sm:text-sm dark:text-gray-400">
           Distribution by file format
         </CardDescription>
       </CardHeader>

@@ -288,74 +288,74 @@ export default function Sync() {
   }
 
   return (
-    <div className="w-full flex flex-col px-6 py-6 h-full gap-6 bg-white">
-      <div className="space-y-3 shrink-0">
+    <div className="w-full flex flex-col px-6 py-6 h-full gap-6 bg-white dark:bg-gray-900">
+      <div className="space-y-3 shrink-0 dark:border-gray-600">
         <HomeLink />
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-4xl font-bold font-sans text-gray-900">Sync</h1>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg *:flex *:items-center *:justify-center *:gap-2 border border-gray-100 shadow-sm">
+          <h1 className="text-4xl font-bold font-sans text-gray-900 dark:text-gray-200">Sync</h1>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg *:flex *:items-center *:justify-center *:gap-2 border border-gray-100 shadow-sm dark:bg-gray-900 dark:border-gray-600">
             {sourceMode === 'cloud' ? (
               <div>
                 <Cloud className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-gray-700">Cloud Mode</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 ">Cloud Mode</span>
               </div>
             ) : (
               <div>
                 <HardDrive className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-gray-700">Local Mode</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 ">Local Mode</span>
               </div>
             )}
           </div>
         </div>
       </div>
-      <div className="border-t border-gray-300 shrink-0" />
+      <div className="border-t border-gray-300 shrink-0 dark:border-gray-600" />
 
       <ScrollArea className="h-full w-full rounded-md">
         {sourceMode === 'cloud' ? (
           // CLOUD MODE SYNC - Simplified UI
-          <div className="w-full space-y-6 p-1">
+          <div className="w-full space-y-6 p-1 ">
             {/* Simple Status Card */}
-            <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow-md p-6 space-y-6 dark:bg-gray-900 dark:shadow-gray-600">
               <div className="space-y-4">
                 {/* Status Display */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold mb-1">Cloud Sync Status</h2>
-                    <p className="text-sm text-gray-600">
+                    <h2 className="text-xl font-semibold mb-1 dark:text-gray-200">Cloud Sync Status</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
                       Automatic synchronization keeps your gallery up to date across devices
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {syncStatus?.isInSync ? (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg dark:bg-green-950">
                         <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-green-700 font-medium">Up to date</span>
+                        <span className="text-green-700 font-medium dark:text-green-400">Up to date</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-lg">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-lg dark:bg-orange-950">
                         <div className="h-3 w-3 bg-orange-500 rounded-full" />
-                        <span className="text-orange-700 font-medium">Syncing...</span>
+                        <span className="text-orange-700 font-medium dark:text-orange-400">Syncing...</span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {lastSyncTime && (
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     Last updated: {lastSyncTime.toLocaleString()}
                   </div>
                 )}
 
-                <div className="border-t pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="border-t pt-4 dark:border-gray-600">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">
                     Auto-refresh interval
                   </label>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-gray-600 mb-3 dark:text-gray-300">
                     Choose how often to check for changes from cloud storage
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 ">
                     <Button
-                      className={syncInterval === 'never' ? 'bg-blue-600 text-white' : ''}
+                      className={syncInterval === 'never' ? 'bg-blue-600 text-white dark:bg-blue-800 dark:text-gray-50' : 'dark:text-gray-400 dark:bg-blue-950'}
                       size="sm"
                       onClick={() => {
                         if (autoSyncEnabled) {
@@ -368,7 +368,7 @@ export default function Sync() {
                       Never
                     </Button>
                     <Button
-                      className={syncInterval === '30s' ? 'bg-blue-600 text-white' : ''}
+                      className={syncInterval === '30s' ? 'bg-blue-600 text-white dark:bg-blue-800 dark:text-gray-50' : 'dark:text-gray-400 dark:bg-blue-950'}
                       size="sm"
                       onClick={() => {
                         if (!autoSyncEnabled || syncInterval !== '30s') {
@@ -382,7 +382,7 @@ export default function Sync() {
                       Every 30 seconds
                     </Button>
                     <Button
-                      className={syncInterval === '1m' ? 'bg-blue-600 text-white' : ''}
+                      className={syncInterval === '1m' ? 'bg-blue-600 text-white dark:bg-blue-800 dark:text-gray-50' : 'dark:text-gray-400 dark:bg-blue-950'}
                       size="sm"
                       onClick={() => {
 
@@ -397,7 +397,7 @@ export default function Sync() {
                       Every 1 minute
                     </Button>
                     <Button
-                      className={syncInterval === '5m' ? 'bg-blue-600 text-white' : ''}
+                      className={syncInterval === '5m' ? 'bg-blue-600 text-white dark:bg-blue-800 dark:text-gray-50' : 'dark:text-gray-400 dark:bg-blue-950'}
                       size="sm"
                       onClick={() => {
                         if (!autoSyncEnabled || syncInterval !== '5m') {
@@ -412,7 +412,7 @@ export default function Sync() {
                       Every 5 minutes
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 mt-2 dark:text-gray-400">
                     {autoSyncEnabled
                       ? '✓ Auto-refresh is enabled'
                       : 'Auto-refresh is disabled. Your gallery will only update when you navigate to it.'}
@@ -429,23 +429,23 @@ export default function Sync() {
           <Accordion
             type="multiple"
             defaultValue={['local-sync']}
-            className="w-full space-y-6 p-1"
+            className="w-full space-y-6 p-1 dark:text-white"
           >
             <AccordionItem
               value="local-sync"
-              className="bg-white rounded-lg shadow-md border-none"
+              className="bg-white rounded-lg shadow-md border-none dark:bg-gray-900"
             >
               <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
+                <h2 className="text-xl font-semibold flex items-center gap-2 dark:text-gray-200">
                   <Upload className="h-5 w-5" />
                   Local Mode Sync
                 </h2>
               </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4">
+              <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4 dark:border-gray-600">
                 {/* Local Sync Status */}
                 <div className="mb-6">
                   <div className="flex justify-end mb-4">
-                    <Button onClick={loadLocalSyncStatus} size="sm" className='hover:bg-gray-100 border border-gray-100'>
+                    <Button onClick={loadLocalSyncStatus} size="sm" className='hover:bg-gray-100 border border-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'>
                       Refresh Status
                     </Button>
                   </div>
@@ -453,18 +453,18 @@ export default function Sync() {
                   {localSyncStatus ? (
                     <div className="space-y-4 mb-6">
                       {/* Sync Status - Prominent Display */}
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200">
-                        <div className="text-sm text-gray-600 mb-2">Sync Status</div>
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200 dark:from-blue-950/40 dark:to-indigo-950/40 dark:border-gray-600">
+                        <div className="text-sm text-gray-600 mb-2 dark:text-gray-300">Sync Status</div>
                         <div className="flex items-center gap-3">
                           {localSyncStatus.inSync ? (
                             <>
                               <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
-                              <span className="text-2xl font-bold text-green-700">In Sync</span>
+                              <span className="text-2xl font-bold text-green-700 dark:text-green-600">In Sync</span>
                             </>
                           ) : (
                             <>
                               <AlertTriangle className="h-6 w-6 text-orange-500" />
-                              <span className="text-2xl font-bold text-orange-700">Out of Sync</span>
+                              <span className="text-2xl font-bold text-orange-700 dark:text-orange-600">Out of Sync</span>
                             </>
                           )}
                         </div>
@@ -472,20 +472,20 @@ export default function Sync() {
 
                       {/* UUID-Based Tracking */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-2">Local Sync UUID</div>
+                        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg dark:bg-gray-900 dark:border-gray-600">
+                          <div className="text-sm text-gray-600 mb-2 dark:text-gray-400">Local Sync UUID</div>
                           {localSyncStatus.localUUID ? (
-                            <div className="font-mono text-sm break-all text-blue-600">
+                            <div className="font-mono text-sm break-all text-blue-600 dark:text-blue-400">
                               {localSyncStatus.localUUID}
                             </div>
                           ) : (
-                            <div className="text-gray-400 italic">Not synced yet</div>
+                            <div className="text-gray-500 italic">Not synced yet</div>
                           )}
                         </div>
-                        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg">
-                          <div className="text-sm text-gray-600 mb-2">Server Sync UUID</div>
+                        <div className="bg-white border-2 border-gray-200 p-4 rounded-lg dark:bg-gray-900 dark:border-gray-600">
+                          <div className="text-sm text-gray-600 mb-2 dark:text-gray-400">Server Sync UUID</div>
                           {localSyncStatus.serverUUID ? (
-                            <div className="font-mono text-sm break-all text-indigo-600">
+                            <div className="font-mono text-sm break-all text-indigo-600 dark:text-indigo-400">
                               {localSyncStatus.serverUUID}
                             </div>
                           ) : (
@@ -496,18 +496,18 @@ export default function Sync() {
 
                       {/* Sequence Numbers - Secondary Info */}
                       <details className="group">
-                        <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center gap-2">
+                        <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center gap-2 dark:text-gray-400 dark:hover:text-gray-300">
                           <span className="group-open:rotate-90 transition-transform">▶</span>
                           Show Sequence Numbers 
                         </summary>
                         <div className="grid grid-cols-2 gap-4 mt-3">
-                          <div className="bg-gray-50 p-3 rounded-lg">
-                            <div className="text-xs text-gray-600 mb-1">Local Sequence</div>
-                            <div className="text-xl font-bold">{localSyncStatus.localSeq}</div>
+                          <div className="bg-gray-50 p-3 rounded-lg dark:bg-gray-900">
+                            <div className="text-xs text-gray-600 mb-1 dark:text-gray-400">Local Sequence</div>
+                            <div className="text-xl font-bold dark:text-gray-300">{localSyncStatus.localSeq}</div>
                           </div>
-                          <div className="bg-gray-50 p-3 rounded-lg">
-                            <div className="text-xs text-gray-600 mb-1">Server Sequence</div>
-                            <div className="text-xl font-bold">{localSyncStatus.serverSeq}</div>
+                          <div className="bg-gray-50 p-3 rounded-lg dark:bg-gray-900">
+                            <div className="text-xs text-gray-600 mb-1 dark:text-gray-400">Server Sequence</div>
+                            <div className="text-xl font-bold dark:text-gray-300">{localSyncStatus.serverSeq}</div>
                           </div>
                         </div>
                       </details>
@@ -525,7 +525,7 @@ export default function Sync() {
                       onClick={handleLocalSync}
                       disabled={isSyncing}
                       size="lg"
-                      className="bg-blue-600 hover:bg-blue-500 text-white"
+                      className="bg-blue-600 hover:bg-blue-500 text-white dark:bg-blue-800 dark:text-gray-50 dark:hover:bg-blue-700"
                     >
                       <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
                       {isSyncing ? 'Syncing...' : 'Sync with Cloud'}
@@ -534,21 +534,21 @@ export default function Sync() {
 
                   {/* Progress Display */}
                   {syncProgress && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3 dark:bg-gray-800 dark:border-gray-600">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                          <span className="font-medium text-blue-900">
+                          <span className="font-medium text-blue-900 dark:text-blue-400">
                             {getPhaseDisplayName(syncProgress.phase)}
                           </span>
                         </div>
-                        <span className="text-sm font-semibold text-blue-700">
+                        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
                           {syncProgress.percentage}%
                         </span>
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div className="w-full bg-blue-200 rounded-full h-2 dark:bg-blue-600">
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${syncProgress.percentage}%` }}
@@ -556,13 +556,13 @@ export default function Sync() {
                       </div>
 
                       {/* Progress Message */}
-                      <p className="text-sm text-blue-800">
+                      <p className="text-sm text-blue-800 dark:text-blue-400">
                         {syncProgress.message}
                       </p>
 
                       {/* Item Progress */}
                       {syncProgress.total > 0 && (
-                        <p className="text-xs text-blue-600">
+                        <p className="text-xs text-blue-600 dark:text-blue-400">
                           Processing: {syncProgress.current} / {syncProgress.total}
                         </p>
                       )}
@@ -571,14 +571,14 @@ export default function Sync() {
 
                   {/* Sync Log Area */}
                   {localSyncLogs.length > 0 && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
-                      <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900 text-sm">Sync Logs</h3>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden dark:bg-gray-800 dark:border-gray-600">
+                      <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center justify-between dark:bg-gray-700 dark:border-gray-600">
+                        <h3 className="font-semibold text-gray-900 text-sm dark:text-gray-300">Sync Logs</h3>
                         <Button
                           onClick={() => setLocalSyncLogs([])}
                           size="sm"
                           variant="ghost"
-                          className="h-7 text-xs hover:bg-gray-200"
+                          className="h-7 text-xs hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-gray-300"
                         >
                           Clear
                         </Button>
@@ -588,7 +588,7 @@ export default function Sync() {
                           {localSyncLogs.map((log, index) => (
                             <div
                               key={index}
-                              className="font-mono text-xs text-gray-700 py-1 px-2 hover:bg-gray-100 rounded"
+                              className="font-mono text-xs text-gray-700 py-1 px-2 hover:bg-gray-100 rounded dark:bg-gray-600 dark:text-gray-400 dark:hover:bg-gray-500"
                             >
                               {log}
                             </div>
