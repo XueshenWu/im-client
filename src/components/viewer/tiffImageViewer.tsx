@@ -7,7 +7,6 @@ import {
     ZoomIn,
     ZoomOut,
     Download,
-    RotateCw,
     Maximize2,
     Info,
     Crop as CropIcon,
@@ -20,16 +19,11 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
-import { useImageViewerStore } from '@/stores/imageViewerStore';
-import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
-import { replaceImages, deleteImages } from '@/services/images.service';
-import { createCroppedImage, blobToFile } from '@/utils/cropImage';
-import { format } from 'date-fns';
-import { localImageService } from '@/services/localImage.service';
-import { LocalImage } from '@/types/local';
-import { generateThumbnail } from '@/utils/thumbnailGenerator';
 
-import { v4 as uuidv4 } from 'uuid';
+import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
+
+import { format } from 'date-fns';
+
 import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
 
 
@@ -348,18 +342,7 @@ export const TiffImageViewer: React.FC = () => {
                                         </Button>
                                     )}
 
-                                    {/* Download - Hide in readonly mode */}
-                                    {!readOnly && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={handleDownload}
-                                            className="text-white hover:bg-white/20"
-                                            title={t('contextMenu.download')}
-                                        >
-                                            <Download className="h-5 w-5" />
-                                        </Button>
-                                    )}
+                              
 
                                     {/* Info toggle */}
                                     <Button
@@ -372,18 +355,7 @@ export const TiffImageViewer: React.FC = () => {
                                         <Info className="h-5 w-5" />
                                     </Button>
 
-                                    {/* Delete - Hide in readonly mode */}
-                                    {!readOnly && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={handleDelete}
-                                            className="text-white hover:bg-red-500/80"
-                                            title={t('contextMenu.delete')}
-                                        >
-                                            <Trash2 className="h-5 w-5" />
-                                        </Button>
-                                    )}
+                              
 
                                     {/* Close */}
                                     <Button
