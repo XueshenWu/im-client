@@ -96,6 +96,7 @@ A cross-platform desktop application for managing and organizing images. Built w
    VITE_S3_URL=http://s3.127.0.0.1.nip.io:9999
    ```
 
+   If you are not using 127.0.0.1 as server address, Content Security Policy(CSP) also need to be modified at **index.html** and **electron/main.ts**
 4. **Start Development**
    ```bash
    npm run dev
