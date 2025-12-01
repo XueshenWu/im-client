@@ -1,5 +1,12 @@
 # Image Management Client
 
+![Electron](https://img.shields.io/badge/Electron-39-47848F?style=flat&logo=electron&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=flat&logo=vite&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat)
+![License](https://img.shields.io/badge/License-ISC-green?style=flat)
+
 A cross-platform desktop application for managing and organizing images. Built with Electron, supports local / cloud storage mode with seamless cloud synchronization.
 
 > **Note**: This is the Frontend Client. For the backend infrastructure, see the [Server Repository](https://github.com/XueshenWu/im-server).
