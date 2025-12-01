@@ -7,7 +7,7 @@ import { Image } from './api';
 export interface LocalImage extends Omit<Image, 'id'> {
   id?: number;
 
-
+}
 
 
 // State difference between local and remote

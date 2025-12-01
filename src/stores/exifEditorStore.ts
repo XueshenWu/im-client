@@ -85,19 +85,28 @@ export const useExifEditorStore = create<ExifEditorStore>((set, get) => ({
     }
 
     try {
+      // Ensure all date fields are properly serialized as ISO strings
+      const sanitizedExifData: Partial<ExifData> = { ...exifData };
+
+      // Convert any Date objects to ISO strings
+      if (sanitizedExifData.dateTaken && typeof sanitizedExifData.dateTaken !== 'string') {
+        sanitizedExifData.dateTaken = new Date(sanitizedExifData.dateTaken).toISOString();
+      }
+
       if (image.source === 'local') {
         // Update EXIF data in local database
-        await localDatabase.upsertExifData(image.uuid, exifData as ExifData);
+        await localDatabase.upsertExifData(image.uuid, sanitizedExifData as ExifData);
 
         // Update only the updatedAt timestamp in the images table
         await localImageService.updateImage(image.uuid, {
           updatedAt: new Date().toISOString(),
         });
       } else {
+
         // Update EXIF data via cloud API
         const result = await updateImageExif([{
           uuid: image.uuid,
-          exifData: exifData as ExifData,
+          exifData: sanitizedExifData as ExifData,
         }]);
 
         if (result.errors.length > 0) {
@@ -107,7 +116,7 @@ export const useExifEditorStore = create<ExifEditorStore>((set, get) => ({
 
       set({
         hasChanges: false,
-        originalExifData: { ...exifData },
+        originalExifData: { ...sanitizedExifData },
       });
 
       console.log('EXIF data saved successfully');

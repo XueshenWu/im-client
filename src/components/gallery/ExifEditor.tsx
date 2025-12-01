@@ -238,15 +238,28 @@ const ExifEditor: React.FC = () => {
                   type="datetime-local"
                   value={
                     exifData.dateTaken
-                      ? new Date(exifData.dateTaken).toISOString().slice(0, 16)
+                      ? (() => {
+                          try {
+                            const date = new Date(exifData.dateTaken);
+                            return isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16);
+                          } catch {
+                            return '';
+                          }
+                        })()
                       : ''
                   }
-                  onChange={(e) =>
-                    updateField(
-                      'dateTaken',
-                      e.target.value ? new Date(e.target.value).toISOString() : null
-                    )
-                  }
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      try {
+                        const isoString = new Date(e.target.value).toISOString();
+                        updateField('dateTaken', isoString);
+                      } catch {
+                        updateField('dateTaken', null);
+                      }
+                    } else {
+                      updateField('dateTaken', null);
+                    }
+                  }}
                 />
               </div>
             </TabsContent>
