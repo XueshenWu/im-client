@@ -1,7 +1,3 @@
-/**
- * Local sync service for push/pull operations between local and cloud
- */
-
 import { localImageService } from './localImage.service';
 import { localDatabase } from './localDatabase.service';
 import { stateDiffService } from './stateDiff.service';
@@ -15,16 +11,12 @@ class LocalSyncService {
   private syncInProgress = false;
   private progressCallback: SyncProgressCallback | null = null;
 
-  /**
-   * Set progress callback for sync operations
-   */
+
+  // Set progress callback for sync operations
   setProgressCallback(callback: SyncProgressCallback | null): void {
     this.progressCallback = callback;
   }
 
-  /**
-   * Report progress to the callback
-   */
   private reportProgress(phase: SyncPhase, current: number, total: number, message: string): void {
     if (this.progressCallback) {
       // Calculate overall percentage based on phase weights
@@ -78,7 +70,6 @@ class LocalSyncService {
    * Check sync status
    * Cloud mode: Uses sequence numbers
    * Local mode: Uses UUID-based tracking
-   * Returns local/server identifiers and whether they match
    */
   async checkSyncStatus(mode: 'cloud' | 'local' = 'local'): Promise<{
     localSeq: number;
@@ -92,7 +83,7 @@ class LocalSyncService {
       const localSeq = metadata.lastSyncSequence;
       const localUUID = metadata.lastSyncUUID || null;
 
-      // Fetch current server status - this makes API call and extracts UUID from header
+      // Fetch current server status
       const syncStatus = await getSyncStatus();
       const serverSeq = syncStatus.currentSequence;
       const serverUUID = syncStatus.syncUUID || null;
@@ -107,11 +98,8 @@ class LocalSyncService {
       // Determine sync status based on mode
       let inSync: boolean;
       if (mode === 'cloud') {
-        // Cloud mode: Use sequence number comparison
         inSync = localSeq === serverSeq;
       } else {
-        // Local mode: Use UUID comparison
-        // Both must exist and match
         inSync = !!localUUID && !!serverUUID && localUUID === serverUUID;
       }
 
@@ -138,8 +126,6 @@ class LocalSyncService {
    */
   async getLWWSyncMetaData(): Promise<Image[]> {
     try {
-      // This endpoint returns the same data structure as /api/images?withExif=true
-      // which is Image[] with embedded exifData
       const res = await api.get<Image[]>("/api/sync/lwwSyncMetadata")
       return res.data
     } catch (error: any) {
@@ -167,11 +153,11 @@ class LocalSyncService {
     let lockUuid: string | null = null;
 
     try {
-      // step1: check sequence numbers and acquire lock
+      // check sequence numbers and acquire lock
       this.reportProgress('initializing', 0, 1, 'Checking sync status...');
       const status = await this.checkSyncStatus();
 
-      // If sequences don't match, we need to acquire lock before syncing
+      // If sequences don't match, acquire lock before syncing
       if (!status.inSync) {
         console.log('[LocalSync] Sequences out of sync. Acquiring lock...');
         this.reportProgress('initializing', 0, 1, 'Acquiring sync lock...');
@@ -188,14 +174,14 @@ class LocalSyncService {
         };
       }
 
-      // step2: get local and remote images
+      // get local and remote images
       this.reportProgress('calculating_diff', 0, 2, 'Fetching local metadata...');
       const localImages = await localImageService.getLocalLWWMetadata();
 
       this.reportProgress('calculating_diff', 1, 2, 'Fetching remote metadata...');
       const remoteImages = await getImagesForSync();
 
-      // step3: calculate bi-directional diff
+      // calculate bi-directional diff
       this.reportProgress('calculating_diff', 2, 2, 'Calculating differences...');
       const diff = stateDiffService.calculateDiff(localImages, remoteImages);
       
@@ -210,10 +196,10 @@ class LocalSyncService {
         toReplaceLocal: diff.toReplaceLocal.length,
       });
 
-      // step4: execute sync plan - PULL operations first (remote -> local)
+      // sync plan - PULL operations first
       console.log('[LocalSync] Starting PULL operations...');
 
-      // Pull: Delete local
+      // Delete local
       if (diff.toDeleteLocal.length > 0) {
         console.log(`[LocalSync] Deleting ${diff.toDeleteLocal.length} local images`);
         this.reportProgress('pull_deleting', 0, diff.toDeleteLocal.length, `Deleting ${diff.toDeleteLocal.length} local images...`);
@@ -221,13 +207,13 @@ class LocalSyncService {
         this.reportProgress('pull_deleting', diff.toDeleteLocal.length, diff.toDeleteLocal.length, 'Local deletions complete');
       }
 
-      // Pull: Download new images
+      // Download new images
       if (diff.toDownload.length > 0) {
         console.log(`[LocalSync] Downloading ${diff.toDownload.length} new images`);
         await this.downloadImagesFromCloud(diff.toDownload, 'pull_downloading');
       }
 
-      // Pull: Update local metadata
+      // Update local metadata
       if (diff.toUpdateLocal.length > 0) {
         console.log(`[LocalSync] Updating ${diff.toUpdateLocal.length} local metadata`);
         this.reportProgress('pull_updating', 0, diff.toUpdateLocal.length, `Updating ${diff.toUpdateLocal.length} local metadata...`);
@@ -235,16 +221,16 @@ class LocalSyncService {
         this.reportProgress('pull_updating', diff.toUpdateLocal.length, diff.toUpdateLocal.length, 'Local metadata updates complete');
       }
 
-      // Pull: Replace local images
+      // Replace local images
       if (diff.toReplaceLocal.length > 0) {
         console.log(`[LocalSync] Replacing ${diff.toReplaceLocal.length} local images`);
         await this.replaceLocalImages(diff.toReplaceLocal, 'pull_replacing');
       }
 
-      // step5: execute sync plan - PUSH operations (local -> remote)
+      // PUSH operations
       console.log('[LocalSync] Starting PUSH operations...');
 
-      // Push: Delete remote
+      // Delete remote
       if (diff.toDeleteRemote.length > 0) {
         console.log(`[LocalSync] Deleting ${diff.toDeleteRemote.length} remote images`);
         this.reportProgress('push_deleting', 0, diff.toDeleteRemote.length, `Deleting ${diff.toDeleteRemote.length} remote images...`);
@@ -252,13 +238,13 @@ class LocalSyncService {
         this.reportProgress('push_deleting', diff.toDeleteRemote.length, diff.toDeleteRemote.length, 'Remote deletions complete');
       }
 
-      // Push: Upload new images
+      // Upload new images
       if (diff.toUpload.length > 0) {
         console.log(`[LocalSync] Uploading ${diff.toUpload.length} new images`);
         await this.uploadImagesToCloud(diff.toUpload, 'push_uploading');
       }
 
-      // Push: Update remote metadata
+      // Update remote metadata
       if (diff.toUpdateRemote.length > 0) {
         console.log(`[LocalSync] Updating ${diff.toUpdateRemote.length} remote metadata`);
         this.reportProgress('push_updating', 0, diff.toUpdateRemote.length, `Updating ${diff.toUpdateRemote.length} remote metadata...`);
@@ -266,14 +252,13 @@ class LocalSyncService {
         this.reportProgress('push_updating', diff.toUpdateRemote.length, diff.toUpdateRemote.length, 'Remote metadata updates complete');
       }
 
-      // Push: Replace remote images
+      // Replace remote images
       if (diff.toReplaceRemote.length > 0) {
         console.log(`[LocalSync] Replacing ${diff.toReplaceRemote.length} remote images`);
         await this.replaceRemoteImages(diff.toReplaceRemote, 'push_replacing');
       }
 
-      // step6: Release lock and update sync metadata
-      // Lock must be released before updating metadata to get final syncUUID
+      // Release lock and update sync metadata
       this.reportProgress('finalizing', 0, 2, 'Releasing sync lock...');
 
       let syncUUID: string | null = null;
@@ -292,9 +277,8 @@ class LocalSyncService {
           console.error('[LocalSync] Failed to release lock:', error);
           throw error;
         }
-        lockUuid = null; // Clear to prevent double release in finally block
+        lockUuid = null;
       } else {
-        // No lock was acquired (shouldn't happen, but handle gracefully)
         const finalStatus = await getSyncStatus();
         newSeq = finalStatus.currentSequence;
         syncUUID = finalStatus.syncUUID || null;
@@ -337,7 +321,6 @@ class LocalSyncService {
         message: errorMessage,
       };
     } finally {
-      // Always release the lock and clear the sync flag
       if (lockUuid) {
         try {
           console.log(`[LocalSync] Releasing lock: ${lockUuid}`);
@@ -356,9 +339,8 @@ class LocalSyncService {
   }
 
 
-  /**
-   * Upload local images to cloud
-   */
+
+  // Upload local images to cloud
   private async uploadImagesToCloud(localImages: LocalImage[], phase: SyncPhase = 'push_uploading'): Promise<void> {
     if (localImages.length === 0) return;
 
@@ -398,7 +380,6 @@ class LocalSyncService {
         this.reportProgress(phase, i, localImages.length, `Uploading ${localImage.filename} (${i + 1}/${localImages.length})...`);
 
         try {
-          // Read image file
           const imageBuffer = await window.electronAPI?.loadLocalImage(localImage.uuid, localImage.format);
           if (!imageBuffer) {
             console.error(`[LocalSync] Failed to read image: ${localImage.filename}`);
@@ -435,9 +416,8 @@ class LocalSyncService {
     }
   }
 
-  /**
-   * Download images from cloud to local storage
-   */
+
+  // Download images from cloud to local storage
   private async downloadImagesFromCloud(remoteImages: Image[], phase: SyncPhase = 'pull_downloading'): Promise<void> {
     if (remoteImages.length === 0) return;
 
@@ -467,8 +447,6 @@ class LocalSyncService {
             throw new Error(`No presigned URL found for ${remoteImage.filename}`);
           }
 
-          // Thumbnail URL - always from public S3 storage
-          // Thumbnails are always stored as .jpeg regardless of source format
           const thumbnailUrl = `${STORAGE_BASE_URL}/thumbnails/${remoteImage.uuid}.jpeg`;
 
           // Download image using presigned URL
@@ -527,9 +505,8 @@ class LocalSyncService {
     }
   }
 
-  /**
-   * Replace local images with remote versions
-   */
+
+  // Replace local images with remote versions
   private async replaceLocalImages(remoteImages: Image[], phase: SyncPhase = 'pull_replacing'): Promise<void> {
     if (remoteImages.length === 0) return;
 
@@ -551,9 +528,8 @@ class LocalSyncService {
     }
   }
 
-  /**
-   * Update local metadata from remote
-   */
+
+  // Update local metadata from remote
   private async updateLocalMetadata(updateImages: Image[]): Promise<void> {
 
     const updatePromises = updateImages.map(async (image) => {
@@ -584,9 +560,8 @@ class LocalSyncService {
     await Promise.all(updatePromises);
   }
 
-  /**
-   * Update remote metadata from local
-   */
+
+  // Update remote metadata from local
   private async updateRemoteMetadata(localImages: LocalImage[]): Promise<void> {
     if (localImages.length === 0) return;
 
@@ -631,9 +606,8 @@ class LocalSyncService {
     }
   }
 
-  /**
-   * Delete remote images
-   */
+
+  // Delete remote images
   private async deleteRemoteImages(uuids: string[]): Promise<void> {
     if (uuids.length === 0) return;
 
@@ -650,9 +624,8 @@ class LocalSyncService {
     }
   }
 
-  /**
-   * Replace remote images with local versions
-   */
+
+  // Replace remote images with local versions
   private async replaceRemoteImages(localImages: LocalImage[], phase: SyncPhase = 'push_replacing'): Promise<void> {
     if (localImages.length === 0) return;
 
@@ -716,5 +689,4 @@ class LocalSyncService {
   }
 }
 
-// Singleton instance
 export const localSyncService = new LocalSyncService();

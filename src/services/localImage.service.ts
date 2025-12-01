@@ -1,18 +1,11 @@
-/**
- * Local image service for managing images in local mode
- * Handles file operations and database CRUD
- */
-
-import { localDatabase } from './localDatabase.service';
+port { localDatabase } from './localDatabase.service';
 import { LocalImage } from '../types/local';
 import { Image, ExifData } from '../types/api';
 
 
 class LocalImageService {
-  /**
-   * Add images to local storage
-   * Files should already be copied to AppData by Electron
-   */
+
+  // Add images to local storage
   async addImages(images: LocalImage[]): Promise<LocalImage[]> {
     try {
       const inserted = await localDatabase.insertImages(images);
@@ -25,9 +18,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Add single image
-   */
+
+  // Add single image
   async addImage(image: LocalImage): Promise<LocalImage> {
     try {
       const inserted = await localDatabase.insertImage(image);
@@ -35,7 +27,7 @@ class LocalImageService {
       if (exifData) {
         await localDatabase.upsertExifData(inserted.uuid, exifData);
       }
-      await localDatabase.markLocalStateModified(); // Mark local state as changed
+      await localDatabase.markLocalStateModified();
       console.log('[LocalImage] Added image:', inserted.uuid);
       return inserted;
     } catch (error) {
@@ -44,9 +36,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Get all local images
-   */
+
+  // Get all local images
   async getAllImages(): Promise<LocalImage[]> {
     try {
       return await localDatabase.getAllImages();
@@ -56,9 +47,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Get image by UUID
-   */
+
+  // Get image by UUID
   async getImageByUuid(uuid: string): Promise<LocalImage | null> {
     try {
       return await localDatabase.getImageByUuid(uuid);
@@ -68,9 +58,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Get paginated images
-   */
+
+  // Get paginated images
   async getPaginatedImages(
     page: number,
     pageSize: number
@@ -83,9 +72,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Update image metadata
-   */
+
+  // Update image metadata
   async updateImage(uuid: string, updates: Partial<LocalImage>): Promise<void> {
     try {
       await localDatabase.updateImage(uuid, updates);
@@ -97,20 +85,15 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Delete image
-   *
-   * - Set deletedAt in database (tombstone)
-   * - Delete actual file from disk
-   */
+
+  // Delete image from disk, set deletedAt in database
   async deleteImage(uuid: string): Promise<void> {
     try {
-      // First, get the image format from the database
       const image = await localDatabase.getImageByUuid(uuid);
 
-      // Update database to set deletedAt (tombstone)
+      // Update database
       await localDatabase.deleteImage(uuid);
-      await localDatabase.markLocalStateModified(); // Mark local state as changed
+      await localDatabase.markLocalStateModified();
 
       // Delete the actual file from disk
       if (image) {
@@ -128,20 +111,13 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Delete multiple images
-   *
-   * - Set deletedAt in database (tombstone)
-   * - Delete actual files from disk
-   */
+
+  // Delete multiple images
   async deleteImages(uuids: string[]): Promise<void> {
     try {
-      // First, get the image formats from the database
       const imageFormats = await window.electronAPI?.db.getImageFormatByUUIDs(uuids);
-
-      // Update database to set deletedAt (tombstone)
       await localDatabase.deleteImages(uuids);
-      await localDatabase.markLocalStateModified(); // Mark local state as changed
+      await localDatabase.markLocalStateModified(); 
 
       // Delete the actual files from disk
       if (imageFormats && imageFormats.length > 0) {
@@ -161,9 +137,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Search images by filename
-   */
+  
+  // Search images by filename
   async searchImages(query: string): Promise<LocalImage[]> {
     try {
       return await localDatabase.searchImages(query);
@@ -173,9 +148,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Export images to a directory
-   */
+
+  // Export images to a directory
   async exportImages(
     uuids: string[],
     destination: string
@@ -203,7 +177,6 @@ class LocalImageService {
         return { success: false, results: [] };
       }
 
-      // Return the result, but force 'results' to be an empty array if it's missing
       return {
         success: result.success,
         results: result.results ?? []
@@ -216,9 +189,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Clear all local images (for testing/reset)
-   */
+
+  // Clear all local images
   async clearAll(): Promise<void> {
     try {
       await localDatabase.clearAllImages();
@@ -229,10 +201,8 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Convert server Image to LocalImage format
-   * Used when pulling from cloud
-   */
+
+  // Convert server Image to LocalImage format when pulling from cloud
   serverImageToLocal(serverImage: Image): LocalImage {
     return {
       uuid: serverImage.uuid,
@@ -251,10 +221,8 @@ class LocalImageService {
     };
   }
 
-  /**
-   * Convert LocalImage to server Image format
-   * Used when pushing to cloud
-   */
+
+  // Convert LocalImage to server Image format when pushing to cloud
   localImageToServer(localImage: LocalImage): Omit<Image, 'id'> {
     return {
       uuid: localImage.uuid,
@@ -274,10 +242,8 @@ class LocalImageService {
   }
 
 
-  /**
-   * Get EXIF data for a local image by UUID
-   * Loads EXIF data from the database separately (useful when image object doesn't include it)
-   */
+
+  // Get EXIF data for a local image by UUID
   async getLocalImageExifData(uuid: string): Promise<ExifData | null> {
     try {
       const exifData = await localDatabase.getExifData(uuid);
@@ -288,15 +254,12 @@ class LocalImageService {
     }
   }
 
-  /**
-   * Get all local images with EXIF data for LWW sync diff calculation
-   * Queries both images and exif_data tables via JOIN
-   */
+
+  // Get all local images with EXIF data for LWW sync diff calculation
   async getLocalLWWMetadata(): Promise<Image[]> {
     try {
       const localImages = await localDatabase.getAllImagesWithExif();
 
-      // Convert LocalImage[] to Image[] format
       const images: Image[] = localImages.map((localImage) => ({
         id: 0, // Local images don't have server ID
         uuid: localImage.uuid,
@@ -327,5 +290,5 @@ class LocalImageService {
 
 }
 
-// Singleton instance
+
 export const localImageService = new LocalImageService();

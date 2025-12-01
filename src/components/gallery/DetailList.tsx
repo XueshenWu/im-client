@@ -60,7 +60,7 @@ import { useTiffImageViewerStore } from "@/stores/tiffImageViewerStore"
 import { useExifEditorStore } from "@/stores/exifEditorStore"
 import { toast } from 'sonner'
 
-// Helper function to format file size
+// Format file size
 const formatBytes = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -90,7 +90,6 @@ const Thumbnail = ({ src }: { src: string }) => {
 };
 
 
-// Helper component for sortable column headers
 const SortableHeader = ({
   label,
   column,
@@ -277,7 +276,7 @@ export const createColumns = (
 
         const handleDownload = async () => {
           try {
-            // First, fetch the presigned URL from the endpoint
+            // Fetch the presigned URL from the endpoint
             const endpoint = imageService.getImageFileUrl(image.uuid);
             const presignedResponse = await fetch(endpoint);
 
@@ -294,7 +293,7 @@ export const createColumns = (
               return;
             }
 
-            // Now download the image using the presigned URL
+            // Download the image using the presigned URL
             const response = await fetch(presignedData.data.presignedUrl);
 
             if (!response.ok) {
@@ -424,7 +423,7 @@ export default function DetailList() {
     fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
   }, [pagination.page, pagination.pageSize, sortBy, sortOrder]);
 
-  // Listen for gallery refresh trigger (e.g., after image crop/save)
+  // Listen for gallery refresh trigger
   React.useEffect(() => {
     if (refreshTrigger > 0) {
       fetchData(pagination.page, pagination.pageSize, sortBy || undefined, sortOrder);
@@ -434,7 +433,6 @@ export default function DetailList() {
   // Handle sort column click
   const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
     if (sortBy === column) {
-      // Same column: cycle through inactive -> asc -> desc -> inactive
       if (sortOrder === 'asc') {
         setSortOrder('desc');
       } else if (sortOrder === 'desc') {
@@ -442,11 +440,9 @@ export default function DetailList() {
         setSortOrder('desc');
       }
     } else {
-      // Different column: set to asc
       setSortBy(column);
       setSortOrder('asc');
     }
-    // Clear selections when sorting changes
     setRowSelection({});
   };
 
@@ -470,7 +466,7 @@ export default function DetailList() {
       // Download each image with metadata
       for (const uuid of selectedUuids) {
         try {
-          // First, fetch the presigned URL and metadata from the endpoint
+          // Fetch the presigned URL and metadata from the endpoint
           const endpoint = imageService.getImageFileUrl(uuid);
           const presignedResponse = await fetch(endpoint);
 
@@ -493,7 +489,7 @@ export default function DetailList() {
 
           console.log(`Extracted: name=${originalName}, size=${fileSize}, format=${format}`);
 
-          // Now download the image using the presigned URL
+          // Download the image using the presigned URL
           const response = await fetch(presignedData.data.presignedUrl);
 
           if (!response.ok) {

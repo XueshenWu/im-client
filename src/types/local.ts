@@ -1,5 +1,3 @@
-// Local storage types for local mode
-
 import { Image } from './api';
 
 /**
@@ -7,22 +5,20 @@ import { Image } from './api';
  * Paths are calculated on-the-fly using UUID + format
  */
 export interface LocalImage extends Omit<Image, 'id'> {
-  id?: number; // SQLite ROWID, optional for new images
-}
+  id?: number;
 
 
 
-/**
- * State difference between local and remote
- */
+
+// State difference between local and remote
 export interface StateDiff {
-  // --- REMOTE ACTIONS (PUSH: Local -> Remote) ---
+  // REMOTE ACTIONS (PUSH: Local -> Remote) 
   toUpload: LocalImage[];           // New file locally -> Upload binary + meta
   toReplaceRemote: LocalImage[];    // Binary changed locally -> Upload binary + meta
   toUpdateRemote: LocalImage[];     // Only metadata changed locally -> Update DB
   toDeleteRemote: string[];         // Deleted locally -> Delete on Server
 
-  // --- LOCAL ACTIONS (PULL: Remote -> Local) ---
+  // LOCAL ACTIONS (PULL: Remote -> Local)
   toDownload: Image[];              // New file remotely -> Download binary + meta
   toReplaceLocal: Image[];          // Binary changed remotely -> Download binary + meta
   toUpdateLocal: Image[];           // Only metadata changed remotely -> Update DB
@@ -40,49 +36,43 @@ export interface ReplacePair {
   remoteImage: Image;
 }
 
-/**
- * Sync metadata stored in database
- */
+
+// Sync metadata stored in database
 export interface SyncMetadata {
   lastSyncSequence: number;
   lastSyncTime: string | null;
-  lastSyncUUID: string | null;  // For local mode: UUID-based sync tracking
+  lastSyncUUID: string | null;  
 }
 
-/**
- * Export options for conflict resolution
- */
+
+// Export options for conflict resolution
 export interface ExportOptions {
   exportDeleted: boolean;
   exportReplaced: boolean;
   destination: string;
 }
 
-/**
- * Source mode for application
- */
+
+// Source mode for application
 export type SourceMode = 'cloud' | 'local';
 
-/**
- * Sync policy settings
- */
+
+// Sync policy settings
 export interface SyncPolicy {
   mode: 'manual' | 'auto';
   intervalSeconds: number; // Used if mode is 'auto'
 }
 
-/**
- * Application settings
- */
+
+// Application settings
 export interface AppSettings {
   sourceMode: SourceMode;
   syncPolicy: SyncPolicy;
   exportOnConflict: boolean; // Show export dialog on pull conflicts
 }
 
-/**
- * Sync progress phases
- */
+
+// Sync progress phases
 export type SyncPhase =
   | 'initializing'      // Acquiring lock, checking status
   | 'calculating_diff'  // Calculating differences
@@ -98,9 +88,8 @@ export type SyncPhase =
   | 'completed'         // Sync completed
   | 'failed'            // Sync failed
 
-/**
- * Progress update for sync operations
- */
+
+// Progress update for sync operations
 export interface SyncProgress {
   phase: SyncPhase;
   current: number;      // Current item being processed
@@ -109,7 +98,6 @@ export interface SyncProgress {
   percentage: number;   // Overall percentage (0-100)
 }
 
-/**
- * Progress callback for sync operations
- */
+
+// Progress callback for sync operations
 export type SyncProgressCallback = (progress: SyncProgress) => void;

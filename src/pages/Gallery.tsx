@@ -16,7 +16,6 @@ export default function Gallery() {
 
   return (
     <div className='w-full flex flex-col px-6 py-6 h-full gap-6 bg-white'>
-       {/* Header Section */}
             <div className='space-y-3 shrink-0'>
               <HomeLink />
               <div className='flex items-center justify-between gap-3'>
@@ -30,7 +29,6 @@ export default function Gallery() {
 
             </div>
 
-            {/* Divider */}
             <div className='border-t border-gray-300 shrink-0' />
 
           <div className='flex-1 min-h-0'>

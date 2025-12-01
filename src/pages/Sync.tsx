@@ -23,7 +23,6 @@ export default function Sync() {
 
   const [syncInterval, setSyncInterval] = useState<'never' | '30s' | '1m' | '5m'>('never');
 
-
   // Cloud mode state
   const [syncStatus, setSyncStatus] = useState<{
     currentSequence: number
@@ -83,14 +82,14 @@ export default function Sync() {
     const eventListener = (event: SyncEvent) => {
       const timestamp = new Date().toLocaleTimeString()
       const eventMsg = `[${timestamp}] ${event.type}: ${JSON.stringify(event.data || {})}`
-      setSyncEvents((prev) => [eventMsg, ...prev].slice(0, 20)) // Keep last 20 events
+      setSyncEvents((prev) => [eventMsg, ...prev].slice(0, 20)) 
 
       if (event.type === 'sync_started') {
         setIsSyncing(true)
       } else if (event.type === 'sync_completed') {
         setIsSyncing(false)
         setLastSyncTime(new Date())
-        loadSyncStatus() // Refresh status after sync
+        loadSyncStatus()
       } else if (event.type === 'sync_error') {
         setIsSyncing(false)
       }
@@ -123,7 +122,6 @@ export default function Sync() {
       })
 
       return () => {
-        // Clean up progress callback
         localSyncService.setProgressCallback(null)
       }
     }
@@ -132,13 +130,8 @@ export default function Sync() {
   const loadSyncStatus = async () => {
     try {
       const status = await getSyncStatus()
-      // IMPORTANT: After the API call, the response interceptor has already updated
-      // the client's sequence from the X-Current-Sequence header.
-      // We must use the updated client sequence, not the one from before the call.
       const clientSeq = syncClient.getLastSyncSequence()
 
-      // Use the client's current sequence (which was just updated by response interceptor)
-      // to determine sync status
       const isInSync = clientSeq === status.currentSequence
       const operationsBehind = Math.max(0, status.currentSequence - clientSeq)
 
@@ -312,12 +305,9 @@ export default function Sync() {
 
       <ScrollArea className="h-full w-full rounded-md">
         {sourceMode === 'cloud' ? (
-          // CLOUD MODE SYNC - Simplified UI
           <div className="w-full space-y-6 p-1 ">
-            {/* Simple Status Card */}
             <div className="bg-white rounded-lg shadow-md p-6 space-y-6 dark:bg-gray-900 dark:shadow-gray-600">
               <div className="space-y-4">
-                {/* Status Display */}
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-semibold mb-1 dark:text-gray-200">Cloud Sync Status</h2>
@@ -421,11 +411,10 @@ export default function Sync() {
               </div>
             </div>
 
-            {/* Advanced Details - Collapsible */}
 
           </div>
         ) : (
-          // LOCAL MODE SYNC
+
           <Accordion
             type="multiple"
             defaultValue={['local-sync']}
@@ -442,7 +431,7 @@ export default function Sync() {
                 </h2>
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-6 border-t border-gray-100 pt-4 dark:border-gray-600">
-                {/* Local Sync Status */}
+
                 <div className="mb-6">
                   <div className="flex justify-end mb-4">
                     <Button onClick={loadLocalSyncStatus} size="sm" className='hover:bg-gray-100 border border-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'>
@@ -452,7 +441,7 @@ export default function Sync() {
 
                   {localSyncStatus ? (
                     <div className="space-y-4 mb-6">
-                      {/* Sync Status - Prominent Display */}
+
                       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200 dark:from-blue-950/40 dark:to-indigo-950/40 dark:border-gray-600">
                         <div className="text-sm text-gray-600 mb-2 dark:text-gray-300">Sync Status</div>
                         <div className="flex items-center gap-3">
@@ -470,7 +459,6 @@ export default function Sync() {
                         </div>
                       </div>
 
-                      {/* UUID-Based Tracking */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white border-2 border-gray-200 p-4 rounded-lg dark:bg-gray-900 dark:border-gray-600">
                           <div className="text-sm text-gray-600 mb-2 dark:text-gray-400">Local Sync UUID</div>
@@ -494,7 +482,7 @@ export default function Sync() {
                         </div>
                       </div>
 
-                      {/* Sequence Numbers - Secondary Info */}
+
                       <details className="group">
                         <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center gap-2 dark:text-gray-400 dark:hover:text-gray-300">
                           <span className="group-open:rotate-90 transition-transform">▶</span>
@@ -517,9 +505,8 @@ export default function Sync() {
                   )}
                 </div>
 
-                {/* Sync Controls */}
                 <div className="space-y-4">
-                  {/* Sync Button */}
+
                   <div className="flex flex-wrap gap-3">
                     <Button
                       onClick={handleLocalSync}
@@ -547,7 +534,7 @@ export default function Sync() {
                         </span>
                       </div>
 
-                      {/* Progress Bar */}
+
                       <div className="w-full bg-blue-200 rounded-full h-2 dark:bg-blue-600">
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -555,12 +542,12 @@ export default function Sync() {
                         />
                       </div>
 
-                      {/* Progress Message */}
+
                       <p className="text-sm text-blue-800 dark:text-blue-400">
                         {syncProgress.message}
                       </p>
 
-                      {/* Item Progress */}
+
                       {syncProgress.total > 0 && (
                         <p className="text-xs text-blue-600 dark:text-blue-400">
                           Processing: {syncProgress.current} / {syncProgress.total}

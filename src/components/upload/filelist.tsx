@@ -50,7 +50,7 @@ const FileListItem: React.FC<FileListItemProps> = ({ file, onRemove }) => {
   );
 };
 
-// Destructure removeFile from props
+
 const FileList: React.FC<WithDropzoneProps> = ({ files, removeFile }) => {
   if (files.length === 0) return null;
 

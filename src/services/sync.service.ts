@@ -6,19 +6,15 @@ import {
   MyOperationsResponse,
 } from '@/types/api'
 
-/**
- * Get current sync sequence number
- */
+
+// Get current sync sequence number
 export const getCurrentSequence = async (): Promise<number> => {
   const response = await api.get<SyncCurrentResponse>('/api/sync/current')
   return response.data.data.currentSequence
 }
 
-/**
- * Get sync operations since a specific sequence number
- * @param since - Sequence number to get operations after
- * @param limit - Maximum number of operations to return (default: 100)
- */
+
+// Get sync operations since a specific sequence number
 export const getSyncOperations = async (
   since: number,
   limit: number = 100
@@ -36,7 +32,6 @@ export const getSyncOperations = async (
 export const getSyncStatus = async (): Promise<SyncStatusResponse['data'] & { syncUUID?: string }> => {
   const response = await api.get<SyncStatusResponse>('/api/sync/status')
 
-  // Extract syncUUID from headers (for local mode)
   const syncUUID = response.headers?.['x-current-sync-uuid'];
 
   return {
@@ -45,10 +40,8 @@ export const getSyncStatus = async (): Promise<SyncStatusResponse['data'] & { sy
   };
 }
 
-/**
- * Get operations performed by the current client
- * @param limit - Maximum number of operations to return
- */
+
+// Get operations performed by the current client
 export const getMyOperations = async (limit?: number): Promise<MyOperationsResponse> => {
   const response = await api.get<MyOperationsResponse>('/api/sync/my-operations', {
     params: { limit },
@@ -56,10 +49,7 @@ export const getMyOperations = async (limit?: number): Promise<MyOperationsRespo
   return response.data
 }
 
-/**
- * Acquire LWW sync lock
- * @returns Lock UUID to be used in subsequent requests
- */
+
 export const acquireLwwLock = async (): Promise<string> => {
   const response = await api.post<{
     success: boolean
@@ -69,11 +59,7 @@ export const acquireLwwLock = async (): Promise<string> => {
   return response.data.lockUuid
 }
 
-/**
- * Release LWW sync lock
- * @param lockUuid - The lock UUID to release
- * @returns Object containing syncSequence and syncUUID from server
- */
+
 export const releaseLwwLock = async (lockUuid: string): Promise<{
   syncSequence: number;
   syncUUID: string;
@@ -91,10 +77,7 @@ export const releaseLwwLock = async (lockUuid: string): Promise<{
   };
 }
 
-/**
- * Sync service object - provides all sync functions as methods
- * This allows importing either individual functions or the entire service object
- */
+
 export const syncService = {
   getCurrentSequence,
   getSyncOperations,

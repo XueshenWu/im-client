@@ -3,14 +3,9 @@ import { ApiError } from '@/types/api'
 import { syncClient } from './syncClient'
 
 // Get API URL from environment variables
-// Hardcoded for production - TODO: Move to settings
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.24.nip.io:9999'
 const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'http://s3.192.168.0.24.nip.io:9999'
 
-/**
- * Lock manager for LWW sync operations
- * Stores the current lock UUID to be sent with protected write operations
- */
 class LockManager {
   private lockUuid: string | null = null
 
@@ -47,9 +42,7 @@ api.interceptors.request.use(
   async (config) => {
     // Add sync headers for write operations
     if (config.method && ['get', 'post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
-      // Import syncClient lazily to avoid circular dependencies
       try {
-        // We'll add sync headers dynamically
         const clientId = await syncClient.waitForClientId()
         const lastSyncSequence = syncClient.getLastSyncSequence()
 
@@ -59,7 +52,7 @@ api.interceptors.request.use(
           console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url} - Sending seq: ${lastSyncSequence}`)
         }
 
-        // Add lock UUID header if we have an active lock
+        // Add lock UUID header
         const lockUuid = lockManager.getLockUuid()
         if (lockUuid) {
           config.headers['X-Lock-UUID'] = lockUuid
@@ -70,11 +63,6 @@ api.interceptors.request.use(
       }
     }
 
-    // You can add authentication headers here if needed
-    // const token = localStorage.getItem('token')
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
     return config
   },
   (error) => {
@@ -85,8 +73,6 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-
-
 
     // Update sync sequence from response headers
     const currentSequence = response.headers['x-current-sequence']
@@ -106,7 +92,6 @@ api.interceptors.response.use(
     if (error.response?.status === 409) {
       console.warn('[API] Sync conflict detected (409). Client needs to sync.')
 
-      // Get operations behind from header
       const operationsBehind = error.response.headers['x-operations-behind']
       const parsedBehind = operationsBehind ? parseInt(operationsBehind, 10) : undefined
 
@@ -124,7 +109,7 @@ api.interceptors.response.use(
       return Promise.reject(conflictError)
     }
 
-    // Handle 423 Locked - Resource is locked by another sync operation
+    // Resource is locked by another sync operation
     if (error.response?.status === 423) {
       console.warn('[API] Resource locked (423). Another sync operation is in progress.')
 
@@ -169,11 +154,9 @@ api.interceptors.response.use(
   }
 )
 
-// API Service Functions
 export const imageService = {
-  /**
-   * Fetch cursor paginated images from the cloud server
-   */
+
+  // Fetch cursor paginated images from the cloud server
   async getPaginatedImages(params?: import('@/types/api').GetPaginatedImagesParams): Promise<import('@/types/api').PaginatedImagesResponse> {
     const response = await api.get<import('@/types/api').PaginatedImagesResponse>('/api/images/paginated', {
       params,
@@ -181,9 +164,8 @@ export const imageService = {
     return response.data
   },
 
-  /**
-   * Fetch page paginated images from the cloud server
-   */
+
+  // Fetch page paginated images from the cloud server
   async getPagePaginatedImages(params?:import('@/types/api').GetPagePaginatedImagesParams): Promise<import('@/types/api').GetPagePaginatedImagesResponse> {
     const response = await api.get<import('@/types/api').GetPagePaginatedImagesResponse>('/api/images/page', {
       params,
@@ -197,7 +179,6 @@ export const imageService = {
   /**
    * Get thumbnail URL for cloud images
    * Thumbnails are publicly accessible from MinIO storage
-   * Note: Thumbnails are always stored as .jpeg regardless of source image format
    */
   getThumbnailUrl(uuid: string, _: string): string {
     return `${STORAGE_BASE_URL}/thumbnails/${uuid}.jpeg`
@@ -211,9 +192,6 @@ export const imageService = {
     return `${API_BASE_URL}/api/images/file/uuid/${uuid}`
   },
 
-  /**
-   * Fetch all collections
-   */
 
 }
 

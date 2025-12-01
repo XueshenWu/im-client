@@ -1,9 +1,3 @@
-/**
- * Utility for generating thumbnails from images
- * Supports both WASM-based (ImageMagick) and Canvas-based thumbnail generation
- * with automatic fallback for compatibility
- */
-
 import { initializeImageMagick, ImageMagick, MagickFormat } from '@imagemagick/magick-wasm';
 
 export interface ThumbnailResult {
@@ -19,17 +13,13 @@ let wasmInitialized = false;
 let wasmInitializationFailed = false;
 let wasmInitPromise: Promise<void> | null = null;
 
-/**
- * Initialize ImageMagick WASM module
- * Only initializes once, subsequent calls return cached promise
- */
+
+// Initialize ImageMagick WASM module
 async function ensureWasmInitialized(): Promise<boolean> {
-  // If already failed, don't try again
   if (wasmInitializationFailed) {
     return false;
   }
 
-  // If already initialized, return immediately
   if (wasmInitialized) {
     return true;
   }
@@ -73,10 +63,8 @@ async function ensureWasmInitialized(): Promise<boolean> {
   }
 }
 
-/**
- * Generate a thumbnail blob using ImageMagick WASM
- * @throws Error if WASM processing fails
- */
+
+// Generate a thumbnail blob using ImageMagick WASM
 async function generateThumbnailBlobWasm(
   file: File | Blob,
   maxWidth: number = 300
@@ -96,12 +84,10 @@ async function generateThumbnailBlobWasm(
           // Resize image
           img.resize(thumbnailWidth, thumbnailHeight);
 
-          // Set quality (0.8 = 80%)
           img.quality = 80;
 
           // Write to JPEG blob
           img.write(MagickFormat.Jpeg, (data) => {
-            // Create a new standard Uint8Array to avoid SharedArrayBuffer issues
             const standardArray = new Uint8Array(data);
             const blob = new Blob([standardArray], { type: 'image/jpeg' });
             resolve(blob);
@@ -116,10 +102,8 @@ async function generateThumbnailBlobWasm(
   });
 }
 
-/**
- * Generate a thumbnail blob using Canvas API (fallback method)
- * This is the original implementation, maintained for backward compatibility
- */
+
+// Generate a thumbnail blob using Canvas API (fallback method)
 async function generateThumbnailBlobCanvas(
   file: File | Blob,
   maxWidth: number = 300
@@ -167,17 +151,12 @@ async function generateThumbnailBlobCanvas(
 
     return thumbnailBlob;
   } finally {
-    // Clean up object URL
     URL.revokeObjectURL(imageUrl);
   }
 }
 
-/**
- * Generate a thumbnail blob from a File or Blob (for cloud upload)
- * This version doesn't save to disk, just returns the blob for upload
- *
- * Automatically uses WASM (ImageMagick) if available, falls back to Canvas if not
- */
+
+// Generate a thumbnail blob from a File or Blob (for cloud upload)
 export async function generateThumbnailBlob(
   file: File | Blob,
   maxWidth: number = 300
@@ -195,13 +174,11 @@ export async function generateThumbnailBlob(
       return blob;
     } catch (error) {
       console.warn('[ThumbnailGenerator] WASM thumbnail generation failed, falling back to Canvas:', error);
-      // Fall through to Canvas fallback
     }
   } else {
     console.log('[ThumbnailGenerator] WASM not available, using Canvas');
   }
 
-  // Fallback to Canvas
   const startTime = performance.now();
   const blob = await generateThumbnailBlobCanvas(file, maxWidth);
   const endTime = performance.now();
@@ -240,7 +217,7 @@ export async function generateThumbnail(
     // Generate thumbnail using WASM or Canvas
     const thumbnailBlob = await generateThumbnailBlob(blob, maxWidth);
 
-    // Get dimensions for the result (we need to extract this from the blob)
+    // Get dimensions for the result
     let thumbnailWidth = maxWidth;
     let thumbnailHeight = 0;
 
@@ -260,7 +237,6 @@ export async function generateThumbnail(
       URL.revokeObjectURL(thumbnailUrl);
     } catch (error) {
       console.warn('[ThumbnailGenerator] Could not extract thumbnail dimensions:', error);
-      // Keep default values
     }
 
     // Convert blob to ArrayBuffer and save via Electron
@@ -292,18 +268,14 @@ export async function generateThumbnail(
   }
 }
 
-/**
- * Utility function to check if WASM is available
- * Useful for debugging or conditional logic
- */
+
+// Check if WASM is available
 export async function isWasmAvailable(): Promise<boolean> {
   return await ensureWasmInitialized();
 }
 
-/**
- * Force reset WASM initialization state
- * Useful for testing or recovery from errors
- */
+
+// Force reset WASM initialization state
 export function resetWasmState(): void {
   wasmInitialized = false;
   wasmInitializationFailed = false;

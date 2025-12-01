@@ -69,12 +69,6 @@ export const TiffImageViewer: React.FC = () => {
 
 
 
-
-
-
-
-
-
     // Reset crop mode when closing viewer
     useEffect(() => {
         if (!isOpen) {
@@ -105,10 +99,6 @@ export const TiffImageViewer: React.FC = () => {
         setIsCropping(true);
 
         try {
-            // completedCrop coordinates are relative to the RENDERED image on screen
-            // imgRef.current gives us the actual displayed dimensions
-            // imgRef.current.naturalWidth/Height are the PNG preview dimensions
-
             const displayedWidth = imgRef.current.width;
             const displayedHeight = imgRef.current.height;
             const naturalWidth = imgRef.current.naturalWidth;
@@ -177,7 +167,6 @@ export const TiffImageViewer: React.FC = () => {
                 console.log('Page appended successfully, new total:', appendResult.totalPages);
             }
 
-            // Mark as changed
             markAsChanged();
 
             // Refresh the preview to show the updated page

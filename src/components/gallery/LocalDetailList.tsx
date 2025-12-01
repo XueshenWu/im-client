@@ -445,11 +445,10 @@ export default function LocalDetailList() {
       setIsLoading(true);
       const selectedImages = data.filter(img => selectedUuids.includes(img.uuid));
 
-      // Use Electron's export API
       const destination = await window.electronAPI?.selectDirectory();
       if (!destination) {
         setIsLoading(false);
-        return; // User cancelled
+        return; 
       }
 
       const imagesToExport = selectedImages.map(img => ({

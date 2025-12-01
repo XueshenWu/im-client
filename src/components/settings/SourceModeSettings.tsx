@@ -1,9 +1,3 @@
-/**
- * Source Mode Settings Component
- * Allows users to switch between cloud and local mode
- * and configure sync policy for local mode
- */
-
 import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

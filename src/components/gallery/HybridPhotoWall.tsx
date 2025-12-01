@@ -1,8 +1,3 @@
-/**
- * Hybrid Photo Wall
- * Switches between Local and Cloud gallery based on source mode setting
- */
-
 import React from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 import LocalPhotoWall from './LocalPhotoWall';

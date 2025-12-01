@@ -1,8 +1,3 @@
-/**
- * Export Dialog for conflict resolution
- * Shows images that will be replaced/deleted and allows user to export them
- */
-
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -63,12 +58,11 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   const handleExport = async () => {
     try {
       setExporting(true);
-
       // Ask user to select export directory
       const destination = await window.electronAPI?.selectDirectory();
       if (!destination) {
         setExporting(false);
-        return; // User cancelled directory selection
+        return; 
       }
 
       // Export selected images

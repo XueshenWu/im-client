@@ -104,7 +104,6 @@ const CloudPhotoWall: React.FC<CloudPhotoWallProps> = ({
   // Track internal reload trigger
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Listen for gallery refresh trigger (e.g., after image crop/save/delete)
   useEffect(() => {
     if (refreshTrigger > 0) {
       // Reset state and trigger reload
@@ -127,15 +126,11 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
   // If clicking the currently active column
   if (sortBy === column) {
     if (sortOrder === 'asc') {
-      // Toggle to Descending
       nextSortOrder = 'desc';
     } else {
-      // Currently Descending: deciding whether to reset or loop
       if (column === defaultSortBy) {
-        // If we are on the default column, just loop back to Asc
         nextSortOrder = 'asc';
       } else {
-        // Otherwise, reset to the default sort state
         nextSortBy = defaultSortBy;
         nextSortOrder = defaultSortOrder;
       }
@@ -146,11 +141,11 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
     nextSortOrder = 'asc';
   }
 
-  // 1. Update State
+  // Update State
   setSortBy(nextSortBy);
-  setSortOrder(nextSortOrder as 'asc' | 'desc'); // Type assertion if needed
+  setSortOrder(nextSortOrder as 'asc' | 'desc');
 
-  // 2. Reset List (This will now run correctly for all cases)
+  // Reset List
   setImages([]);
   setCursor(undefined);
   setHasMore(true);
@@ -224,7 +219,6 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
         if (!image?.uuid) continue;
 
         try {
-          // First, fetch the presigned URL and metadata from the endpoint
           const endpoint = imageService.getImageFileUrl(image.uuid);
           const presignedResponse = await fetch(endpoint);
 
@@ -245,7 +239,7 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
           const fileSize = metadata.fileSize || 0;
           const imageFormat = metadata.format || 'unknown';
 
-          // Now download the image using the presigned URL
+          // Download the image using the presigned URL
           const response = await fetch(presignedData.data.presignedUrl);
 
           if (!response.ok) {
@@ -322,7 +316,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
       return;
     }
 
-    setExporting(true); // Reuse loading state
+    setExporting(true);
     toast.loading('Deleting images...', { id: 'delete' });
     try {
       // Get UUIDs from selected images
@@ -430,7 +424,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     );
   }
 
-  // Sort button component (for desktop)
+  // Sort button component for desktop
   const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'; label: string }) => {
     const isActive = sortBy === column;
     const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;
@@ -451,7 +445,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     );
   };
 
-  // Sort option component (for mobile drawer)
+  // Sort option component for mobile drawer
   const SortOption = ({
     column,
     label,
@@ -481,7 +475,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
     <div className="h-full w-full flex flex-col">
       {/* Controls Bar */}
       <div className="flex items-center justify-between px-6 py-3 border-gray-200">
-        {/* Desktop Sort Controls (visible on lg and up) */}
+        {/* Desktop */}
         <div className="hidden lg:flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700 mr-2">{t('gallery.sortBy')}</span>
           <SortButton column="name" label={t('gallery.name')} />
@@ -491,7 +485,7 @@ ${invoiceItems.map((item, idx) => `| ${idx + 1} | ${item.name} | ${item.format} 
           <SortButton column="updatedAt" label="Modified" />
         </div>
 
-        {/* Mobile Sort Button (visible below lg) */}
+        {/* Mobile */}
         <div className="lg:hidden">
           <Button
             variant="ghost"

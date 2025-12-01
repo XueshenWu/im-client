@@ -1,19 +1,6 @@
 import { syncClient } from '@/services/syncClient'
 import { ApiError } from '@/types/api'
 
-/**
- * Wrapper for API operations that automatically handles 409 conflicts
- * by syncing and retrying the operation
- *
- * Usage:
- * ```ts
- * const result = await withSyncRetry(() => uploadImages(files))
- * ```
- *
- * @param operation - The async operation to execute
- * @param maxRetries - Maximum number of retries (default: 3)
- * @returns The result of the operation
- */
 export async function withSyncRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3
@@ -22,7 +9,6 @@ export async function withSyncRetry<T>(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // Try the operation
       return await operation()
     } catch (error: any) {
       lastError = error
@@ -42,7 +28,7 @@ export async function withSyncRetry<T>(
           // Sync to get latest operations
           await syncClient.handleConflict(error?.operationsBehind)
 
-          // Wait a bit before retrying
+          // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, 500))
 
           // Continue to next iteration to retry
@@ -52,23 +38,15 @@ export async function withSyncRetry<T>(
           throw syncError
         }
       } else {
-        // Not a sync conflict or max retries reached, throw the error
         throw error
       }
     }
   }
 
-  // Should not reach here, but just in case
   throw lastError
 }
 
-/**
- * Wrapper for operations that should trigger a refresh after completion
- * Useful for operations that modify data and need UI to refresh
- *
- * @param operation - The async operation to execute
- * @param onSuccess - Callback to execute after successful operation
- */
+
 export async function withRefresh<T>(
   operation: () => Promise<T>,
   onSuccess?: (result: T) => void | Promise<void>
@@ -85,9 +63,8 @@ export async function withRefresh<T>(
   return result
 }
 
-/**
- * Check if an error is a sync conflict error
- */
+
+// Check if an error is a sync conflict error
 export function isSyncConflictError(error: any): boolean {
   return (
     error?.statusCode === 409 ||
@@ -96,9 +73,7 @@ export function isSyncConflictError(error: any): boolean {
   )
 }
 
-/**
- * Extract the number of operations behind from an error
- */
+// Extract the number of operations behind from an error
 export function getOperationsBehind(error: any): number | undefined {
   return error?.operationsBehind
 }

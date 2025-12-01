@@ -19,7 +19,7 @@ i18n
     fallbackLng: 'en',
     debug: true,
     interpolation: {
-      escapeValue: false // react already safes from xss
+      escapeValue: false 
     },
     react: {
       useSuspense: false,

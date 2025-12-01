@@ -43,7 +43,7 @@ export const useThemeStore = create<ThemeStore>()(
         if (state?.theme) {
           applyTheme(state.theme);
         } else {
-          // Apply default theme if no stored theme
+          // Apply default theme
           applyTheme('system');
         }
       },
@@ -53,14 +53,13 @@ export const useThemeStore = create<ThemeStore>()(
 
 // Initialize theme immediately on module load
 if (typeof window !== 'undefined') {
-  // Get initial theme from localStorage or use default
   const storedTheme = localStorage.getItem('theme-storage');
   const initialTheme: Theme = storedTheme
     ? (JSON.parse(storedTheme).state?.theme || 'system')
     : 'system';
   applyTheme(initialTheme);
 
-  // Listen for system theme changes when theme is set to 'system'
+  // Listen for system theme changes
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     const { theme } = useThemeStore.getState();
     if (theme === 'system') {

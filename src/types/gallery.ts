@@ -7,5 +7,5 @@ export interface ImageWithSource extends Image {
   aspectRatio?: number
 }
 
-// Legacy type - deprecated, use ImageWithSource instead
+
 export type ImageItem = ImageWithSource

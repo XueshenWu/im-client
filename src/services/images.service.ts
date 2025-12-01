@@ -12,9 +12,9 @@ import type {
 import exifr from 'exifr'
 import { normalizeFormatFromFilename } from '@/utils/formatNormalizer'
 import type { TiffPageDimensions } from '@/types/api'
-/**
- * Extract EXIF data from an image file
- */
+
+
+// Extract EXIF data from an image file
 export const extractExifData = async (file: File): Promise<ExifData | undefined> => {
   try {
     if (!file.type.startsWith('image/')) {
@@ -99,9 +99,8 @@ export const extractExifData = async (file: File): Promise<ExifData | undefined>
   }
 };
 
-/**
- * Get all images with optional EXIF data
- */
+
+// Get all images with optional EXIF data
 export const getImages = async (params?: GetImagesParams): Promise<Image[]> => {
   const response = await api.get<ApiListResponse<Image>>('/api/images', {
     params,
@@ -115,8 +114,6 @@ export const getImagesForSync = async (params?: GetImagesParams): Promise<Image[
     params,
   })
 
-  // Transform the response: server returns nested structure with 'images' and 'exif_data'
-  // We need to flatten it into the Image interface format
   return response.data.data.map((item: any) => {
     // If the item has a nested 'images' property, flatten it
     if (item.images) {
@@ -129,30 +126,26 @@ export const getImagesForSync = async (params?: GetImagesParams): Promise<Image[
       };
     }
 
-    // Otherwise, return as-is (already flat)
     return item;
   });
 }
 
-/**
- * Get image statistics
- */
+
+// Get image statistics
 export const getImageStats = async (): Promise<ImageStats> => {
   const response = await api.get<ApiResponse<ImageStats>>('/api/images/stats')
   return response.data.data
 }
 
-/**
- * Get image by UUID
- */
+
+// Get image by UUID
 export const getImageByUuid = async (uuid: string): Promise<Image> => {
   const response = await api.get<ApiResponse<Image>>(`/api/images/uuid/${uuid}`)
   return response.data.data
 }
 
-/**
- * Get multiple images by UUIDs
- */
+
+// Get multiple images by UUIDs
 export const getImagesByUuid = async (uuids: string[], withExif?: boolean): Promise<Image[]> => {
   const response = await api.post<GetImagesByUUIDResponse>('/api/images/batch/get/uuids', {
     uuids,
@@ -169,10 +162,8 @@ export const getExifByUuid = async (uuid: string): Promise<ExifData | null> => {
 
 
 
-/**
- * Update image EXIF data (single or batch)
- * Uses unified endpoint - array length determines if it's single or batch operation
- */
+
+// Update image EXIF data (single or batch)
 export const updateImageExif = async (
   updates: Array<{ uuid: string; exifData: Partial<ExifData> }>
 ): Promise<{ updated: Image[]; stats: { requested: number; successful: number; failed: number }; errors: Array<{ uuid: string; error: string }> }> => {
@@ -245,11 +236,7 @@ export const uploadToPresignedURL = async (url: string, file: File | Blob, thumb
   }
 }
 
-/**
- * Replace images (single or batch) - Complete workflow with file uploads
- * Accepts files, calculates metadata, gets presigned URLs, and uploads
- * Uses unified endpoint - array length determines if it's single or batch operation
- */
+
 export const replaceImages = async (
   replacements: Array<{
     uuid: string;
@@ -271,18 +258,17 @@ export const replaceImages = async (
   stats: { requested: number; successful: number; failed: number };
   errors: Array<{ uuid: string; error: string }>;
 }> => {
-  // Process all files to extract metadata
+  // Extract metadata
   const replacementRequests = await Promise.all(
     replacements.map(async ({ uuid, file, metadata }) => {
       const isFile = file instanceof File;
       const filename = metadata?.filename || (isFile ? file.name : 'image.jpeg');
       const format = metadata?.format || normalizeFormatFromFilename(filename);
 
-      // Calculate dimensions (use provided metadata if available, especially for TIFF)
+      // Calculate dimensions
       let width = metadata?.width || 0;
       let height = metadata?.height || 0;
 
-      // Only try to load in browser if metadata not provided and format is browser-compatible
       if (!metadata && format !== 'tiff') {
         const imageUrl = URL.createObjectURL(file);
         const img = new Image();
@@ -301,13 +287,13 @@ export const replaceImages = async (
         });
       }
 
-      // Calculate file hash using Web Crypto API
+      // Calculate file hash
       const arrayBuffer = await file.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Extract EXIF data (only for File objects)
+      // Extract EXIF data
       const exifData = isFile ? await extractExifData(file as File) : undefined;
 
       return {
@@ -401,9 +387,8 @@ export const replaceImages = async (
 }
 
 
-/**
- * Request download URLs with metadata and EXIF data
- */
+
+// Request download URLs with metadata and EXIF data
 export const requestDownloadUrls = async (
   uuids: string[],
   expiry?: number
@@ -436,9 +421,8 @@ export const requestDownloadUrls = async (
   return response.data.data.downloads
 }
 
-/**
- * Get minimal metadata for all images (for efficient sync state comparison)
- */
+
+// Get minimal metadata for all images
 export const getImagesMetadata = async (
   since?: number
 ): Promise<{
@@ -471,9 +455,8 @@ export const getImagesMetadata = async (
   }
 }
 
-/**
- * Update cloud image metadata (for TIFF edits, dimension changes, etc.)
- */
+
+// Update cloud image metadata 
 export const updateCloudImageMetadata = async (
   uuid: string,
   updates: Partial<Pick<Image, 'fileSize' | 'pageCount' | 'tiffDimensions' | 'width' | 'height'>>

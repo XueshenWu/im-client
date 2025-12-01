@@ -1,51 +1,41 @@
-/**
- * State diff service for comparing local and remote image states
- */
-
 import { LocalImage, StateDiff } from '../types/local';
 import { Image } from '../types/api';
 
 class StateDiffService {
-  /**
-   * Calculate the difference between local and remote states
-   */
+  // Calculate the difference between local and remote states
   calculateDiff(localImages: LocalImage[], remoteImages: Image[]): StateDiff {
-    // 1. Indexing (Same as before)
     const localByUuid = new Map(localImages.map((img) => [img.uuid, img]));
     const remoteByUuid = new Map(remoteImages.map((img) => [img.uuid, img]));
     const allUuids = new Set([...localByUuid.keys(), ...remoteByUuid.keys()]);
 
-    // 2. Initialize Buckets
     const diff: StateDiff = {
       toUpload: [], toReplaceRemote: [], toUpdateRemote: [], toDeleteRemote: [],
       toDownload: [], toReplaceLocal: [], toUpdateLocal: [], toDeleteLocal: []
     };
-
-
 
     // 3. Iterate Union
     for (const uuid of allUuids) {
       const local = localByUuid.get(uuid);
       const remote = remoteByUuid.get(uuid);
 
-      // --- CASE 1: Local Only (New or Zombie?) ---
+      // Local Only
       if (local && !remote) {
         if (local.deletedAt) continue; // It's dead, ignore.
-        diff.toUpload.push(local);     // It's new, upload it.
+        diff.toUpload.push(local);    
       }
 
-      // --- CASE 2: Remote Only (New or Zombie?) ---
+      // Remote Only
       else if (!local && remote) {
         if (remote.deletedAt) continue; // It's dead, ignore.
-        diff.toDownload.push(remote);   // It's new, download it.
+        diff.toDownload.push(remote);   
       }
 
-      // --- CASE 3: Both Exist (Conflict!) ---
+      // Both Exist
       else if (local && remote) {
         const localTime = new Date(local.updatedAt).getTime();
         const remoteTime = new Date(remote.updatedAt).getTime();
 
-        // >>> SUB-CASE A: Local is Newer (Push Changes) <<<
+        // Local is Newer (Push Changes)
         if (localTime > remoteTime) {
           if (local.deletedAt) {
             // Local was deleted recently -> Propagate delete to remote
@@ -64,7 +54,7 @@ class StateDiffService {
           }
         }
 
-        // >>> SUB-CASE B: Remote is Newer (Pull Changes) <<<
+        // Remote is Newer (Pull Changes)
         else if (remoteTime > localTime) {
           if (remote.deletedAt) {
             // Remote was deleted recently -> Propagate delete to local
@@ -83,10 +73,8 @@ class StateDiffService {
           }
         }
 
-        // >>> SUB-CASE C: Timestamps Equal (Tie-Breaker) <<<
+        // Timestamps Equal (Tie-Breaker)
         else {
-          // Timestamps are equal
-          // If both are deleted, they're in sync - do nothing
           if (local.deletedAt && remote.deletedAt) {
             // Both deleted at same time, in sync
             continue;
@@ -106,7 +94,7 @@ class StateDiffService {
             // Content matches, but metadata differs - use server metadata
             diff.toUpdateLocal.push(remote);
           }
-          // If both hash and metadata match, they are truly in sync - do nothing
+          // If both hash and metadata match, do nothing
         }
       }
     }
@@ -141,9 +129,7 @@ class StateDiffService {
 
 
 
-  /**
-   * Get summary of diff for display
-   */
+  // Get summary of diff for display
   getDiffSummary(diff: StateDiff): {
     toUpload: number;
     toDownload: number;
@@ -183,5 +169,5 @@ class StateDiffService {
 
 }
 
-// Singleton instance
+
 export const stateDiffService = new StateDiffService();

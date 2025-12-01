@@ -1,6 +1,4 @@
 /**
- * Utility functions for generating image URLs
- *
  * Local mode:
  * - local-image://{uuid}.{format} - for full-size images
  * - local-thumbnail://{uuid} - for thumbnails (always .jpeg)
@@ -10,13 +8,12 @@
  * - Images: Request presigned URL from server
  */
 
-// Hardcoded for production - TODO: Move to settings
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://192.168.0.24.nip.io:9999';
 const STORAGE_BASE_URL = import.meta.env.VITE_STORAGE_URL || 'http://s3.192.168.0.24.nip.io:9999';
 
-/**
- * Get the display URL for a full-size local image
- */
+
+// Get the display URL for a full-size local image
 export function getLocalImageUrl(uuid: string, format: string): string {
   return `local-image://${uuid}.${format}`;
 }
@@ -32,7 +29,6 @@ export function getLocalThumbnailUrl(uuid: string): string {
 /**
  * Get the public URL for a cloud thumbnail
  * Cloud thumbnails are publicly accessible from MinIO
- * Note: Thumbnails are always stored as .jpeg regardless of source image format
  */
 export function getCloudThumbnailUrl(uuid: string, _: string): string {
   return `${STORAGE_BASE_URL}/thumbnails/${uuid}.jpeg?t=${new Date().getTime()}}`;

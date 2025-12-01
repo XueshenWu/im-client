@@ -28,9 +28,6 @@ export default function Settings() {
 
         <Separator />
 
-        {/* Source Mode Settings */}
-
-
          <section>
           <div className="space-y-4">
             <div>
@@ -45,7 +42,6 @@ export default function Settings() {
 
         <Separator />
 
-        {/* Theme Settings */}
         <section>
           <div className="space-y-4">
             <div>
@@ -60,7 +56,6 @@ export default function Settings() {
 
         <Separator />
 
-        {/* Language Settings */}
         <section>
           <div className=" flex items-center justify-start gap-x-6">
             <div>

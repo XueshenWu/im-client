@@ -62,7 +62,6 @@ export const ImageViewer: React.FC = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [cloudImageUrl, setCloudImageUrl] = useState<string>('');
 
-  // Crop mode states
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [isCropping, setIsCropping] = useState(false);
@@ -231,7 +230,6 @@ export const ImageViewer: React.FC = () => {
       } else {
         // CLOUD MODE: Upload to cloud using presigned URLs
         if (replaceOriginal) {
-          // Replace the original image using replaceImages
           const result = await replaceImages([{
             uuid: currentImage.uuid,
             file: croppedFile,
@@ -242,7 +240,7 @@ export const ImageViewer: React.FC = () => {
             throw new Error(error?.error || 'Failed to replace image');
           }
         } else {
-          // Upload as new image using requestPresignedURLs
+          // Upload as new image 
           const { requestPresignedURLs, uploadToPresignedURL } = await import('@/services/images.service');
           const { generateThumbnailBlob } = await import('@/utils/thumbnailGenerator');
 
@@ -268,7 +266,7 @@ export const ImageViewer: React.FC = () => {
           const width = img.naturalWidth;
           const height = img.naturalHeight;
 
-          // Calculate file hash using Web Crypto API
+          // Calculate file hash
           const arrayBuffer = await croppedFile.arrayBuffer();
           const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
           const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -293,7 +291,7 @@ export const ImageViewer: React.FC = () => {
 
           const urls = presignedURLs[0];
 
-          // Generate and upload thumbnail first
+          // Generate and upload thumbnail
           const thumbnailBlob = await generateThumbnailBlob(croppedFile, 300);
           const thumbnailSuccess = await uploadToPresignedURL(urls.thumbnailUrl, thumbnailBlob, true);
 
@@ -378,7 +376,6 @@ export const ImageViewer: React.FC = () => {
   const handleDownload = async () => {
     try {
       if (isLocalImage) {
-        // Fetch using the local-image:// protocol
         const buffer = await window.electronAPI?.loadLocalImage(currentImage.uuid, currentImage.format)
         if (!buffer) {
           throw "cannot read file"
@@ -393,7 +390,7 @@ export const ImageViewer: React.FC = () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        // Cloud image download - fetch from presigned URL endpoint
+        // Fetch cloud image from presigned URL endpoint
         const response = await fetch(imageUrl);
         if (!response.ok) {
           console.error('Failed to fetch cloud image');
@@ -451,7 +448,6 @@ export const ImageViewer: React.FC = () => {
         <VisuallyHidden.Root>
           <DialogTitle>{currentImage.filename}</DialogTitle>
         </VisuallyHidden.Root>
-        {/* Top toolbar */}
         <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-white">
@@ -472,7 +468,6 @@ export const ImageViewer: React.FC = () => {
 
             <div className="flex items-center gap-2">
               {viewMode === 'view' ? (
-                // View mode controls
                 <>
                   {/* Zoom controls */}
                   <Button
@@ -568,7 +563,6 @@ export const ImageViewer: React.FC = () => {
                     </Button>
                   )}
 
-                  {/* Close */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -579,7 +573,7 @@ export const ImageViewer: React.FC = () => {
                   </Button>
                 </>
               ) : (
-                // Crop mode controls (unchanged)
+                // Crop mode controls
                 <>
                   <Button
                     variant="ghost"
@@ -614,7 +608,6 @@ export const ImageViewer: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation arrows - only in view mode */}
         {hasMultipleImages && viewMode === 'view' && (
           <>
             <Button
@@ -639,7 +632,6 @@ export const ImageViewer: React.FC = () => {
         {/* Main image container */}
         <div className="relative w-full h-full flex items-center justify-center overflow-hidden p-16">
           {viewMode === 'view' ? (
-            // View mode - normal image with zoom/rotation
             <>
               {!imageLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -659,7 +651,6 @@ export const ImageViewer: React.FC = () => {
               />
             </>
           ) : (
-            // Crop mode - react-image-crop component
             <div className="flex items-center justify-center w-full h-full">
               <ReactCrop
                 crop={crop}
@@ -687,7 +678,7 @@ export const ImageViewer: React.FC = () => {
           )}
         </div>
 
-        {/* Info panel - only in view mode */}
+        {/* Info panel */}
         {showInfo && viewMode === 'view' && (
           <div className="absolute bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-black/90 to-transparent p-6">
             <div className="grid grid-cols-2 gap-4 text-white text-sm max-w-2xl">

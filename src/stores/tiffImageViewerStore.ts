@@ -190,7 +190,7 @@ export const useTiffImageViewerStore = create<TiffImageViewerStore>((set, get) =
 
         if (tiffImage.source === 'local') {
             try {
-                // 1. Get the final TIFF buffer with all changes
+                // Get the final TIFF buffer with all changes
                 const finalBuffer = await window.electronAPI?.tiff.getFinalBuffer();
                 if (!finalBuffer || !finalBuffer.success || !finalBuffer.buffer) {
                     console.error('Failed to get final buffer:', finalBuffer?.error);
@@ -198,7 +198,7 @@ export const useTiffImageViewerStore = create<TiffImageViewerStore>((set, get) =
                     return;
                 }
 
-                // 2. Save the TIFF file (this will delete old file first, then write new)
+                // Save the TIFF file (write new one)
                 const savedPath = await window.electronAPI?.saveImageBuffer(
                     tiffImage.uuid,
                     tiffImage.format,
@@ -209,29 +209,29 @@ export const useTiffImageViewerStore = create<TiffImageViewerStore>((set, get) =
                     throw new Error('Failed to save TIFF file');
                 }
 
-                // 3. Get metadata for the saved TIFF (including all page dimensions)
+                // Get metadata for the saved TIFF
                 const metadata = await window.electronAPI?.getImgMetadata(savedPath);
                 if (!metadata || !metadata.success) {
                     console.error('Failed to get TIFF metadata');
                     throw new Error('Failed to get TIFF metadata');
                 }
 
-                // 4. Generate new thumbnail (from first page)
+                // Generate new thumbnail (from first page)
                 const thumbnailResult = await window.electronAPI?.generateThumbnail(savedPath, tiffImage.uuid);
                 if (!thumbnailResult || !thumbnailResult.success) {
                     console.error('Failed to generate thumbnail');
                 }
 
-                // 5. Calculate new file size from buffer
+                // Calculate new file size
                 const fileSize = finalBuffer.buffer?.byteLength || tiffImage.fileSize;
 
-                // 6. Prepare page dimensions array
+                // Prepare page dimensions array
                 const pageDimensions = metadata.pages?.map((page: { width: number, height: number }) => ({
                     width: page.width,
                     height: page.height
                 })) || [];
 
-                // 7. Update database with new metadata
+                // Update database with new metadata
                 await window.electronAPI?.db.updateImage(tiffImage.uuid, {
                     fileSize: fileSize,
                     pageCount: totalPages,
@@ -247,9 +247,9 @@ export const useTiffImageViewerStore = create<TiffImageViewerStore>((set, get) =
                 alert('Failed to save TIFF changes: ' + (error instanceof Error ? error.message : 'Unknown error'));
             }
         } else {
-            // Cloud mode - Upload edited TIFF to cloud storage (no disk I/O)
+            // Cloud mode - Upload edited TIFF to cloud storage
             try {
-                // 1. Get the final TIFF buffer with all changes and metadata
+                // Get the final TIFF buffer with all changes and metadata
                 const finalBuffer = await window.electronAPI?.tiff.getFinalBuffer();
                 if (!finalBuffer || !finalBuffer.success || !finalBuffer.buffer || !finalBuffer.metadata) {
                     console.error('Failed to get final buffer:', finalBuffer?.error);
@@ -257,14 +257,14 @@ export const useTiffImageViewerStore = create<TiffImageViewerStore>((set, get) =
                     return;
                 }
 
-                // 2. Extract metadata directly from buffer (no disk I/O)
+                // Extract metadata directly from buffer
                 const { metadata } = finalBuffer;
                 const pageDimensions: TiffPageDimensions[] = metadata.pageDimensions;
 
-                // 3. Create a Blob from the buffer for upload
+                //  Create a Blob from buffer
                 const tiffBlob = new Blob([finalBuffer.buffer.buffer as ArrayBuffer], { type: 'image/tiff' });
 
-                // 4. Generate thumbnail from the first page (always use page 0 for thumbnail)
+                // Generate thumbnail from the first page
                 const firstPagePreview = await window.electronAPI?.tiff.getPreview(0);
                 let thumbnailBlob: Blob | undefined;
                 if (firstPagePreview && firstPagePreview.success && firstPagePreview.previewSrc) {
@@ -273,7 +273,7 @@ export const useTiffImageViewerStore = create<TiffImageViewerStore>((set, get) =
                     thumbnailBlob = await response.blob();
                 }
 
-                // 5. Upload the modified TIFF to cloud using replaceImages (with complete metadata and thumbnail)
+                // Upload the modified TIFF to cloud
                 const replaceResult = await replaceImages([{
                     uuid: tiffImage.uuid,
                     file: tiffBlob,

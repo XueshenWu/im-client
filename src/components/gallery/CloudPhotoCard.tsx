@@ -116,7 +116,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
       e.preventDefault();
       onSelect(image.uuid);
     } else if (!selectionMode) {
-      // Open viewer when clicking the card (not in selection mode)
+      // Open viewer when clicking the card
       if (image.format === 'tiff') {
         openTiffViewer(image)
         return

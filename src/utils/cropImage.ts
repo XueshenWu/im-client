@@ -1,18 +1,7 @@
-/**
- * Crop image utility using Canvas API
- * For use with react-image-crop
- */
 
 import type { PixelCrop } from 'react-image-crop';
 
-/**
- * Creates a cropped image from an HTMLImageElement
- * @param image - Source image element
- * @param crop - Crop area in pixels from react-image-crop
- * @param format - Output format (jpeg, png)
- * @param quality - JPEG quality (0-1)
- * @returns Promise that resolves to a Blob of the cropped image
- */
+
 export const createCroppedImage = async (
   image: HTMLImageElement,
   crop: PixelCrop,
@@ -63,12 +52,7 @@ export const createCroppedImage = async (
   });
 };
 
-/**
- * Convert a Blob to a File
- * @param blob - Blob to convert
- * @param filename - Desired filename
- * @returns File object
- */
+// Convert a Blob to a File
 export const blobToFile = (blob: Blob, filename: string): File => {
   return new File([blob], filename, { type: blob.type });
 };

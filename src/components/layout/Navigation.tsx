@@ -19,7 +19,6 @@ export default function Navigation() {
     const checkWidth = () => {
       if (navRef.current) {
         const parentWidth = navRef.current.parentElement?.clientWidth || 0
-        // Expand if parent container is wide enough (more than 1200px)
         setIsExpanded(parentWidth > 1200)
       }
     }
@@ -139,7 +138,6 @@ export default function Navigation() {
           </span>
         )}
 
-        {/* Tooltip - only show when collapsed */}
         {!isExpanded && (
           <div className="absolute left-full ml-6 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-lg">
             {t('navigation.settings')}

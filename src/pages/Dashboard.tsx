@@ -23,20 +23,15 @@ export default function Dashboard() {
 
         </div>
 
-        {/* Stats Cards - Top */}
         <StatsCards />
 
-        {/* Upload Activity Chart - Middle, full width */}
         <div className="w-full">
           <ImageUploadChart days={7} />
         </div>
 
-        {/* Bottom Charts */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 ">
-          {/* Image Format Pie Chart - Bottom Left */}
           <ImageFormatPieChart />
 
-          {/* Sync Status - Bottom Right, only shown in local mode */}
           {sourceMode === 'local' ? (
             <SyncStatus />
           ) : (

@@ -85,7 +85,6 @@ export function SyncStatus() {
     if (loading) return 'Checking...';
     if (status.isInSync) return 'In Sync';
 
-    // For local mode with UUID tracking, show UUID mismatch
     if (!status.localUUID) return 'Never synced';
     if (!status.serverUUID) return 'Server not available';
     return 'Out of sync';

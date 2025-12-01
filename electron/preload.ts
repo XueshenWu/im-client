@@ -1,7 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Window controls
   minimizeWindow: () => ipcRenderer.send('minimize-window'),
@@ -80,10 +78,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }
 })
 
-// Also expose a simpler electron namespace for dashboard features
+// Also expose a simpler electron namespace for dashboard
 contextBridge.exposeInMainWorld('electron', {
   invoke: (channel: string, ...args: any[]) => {
-    // Whitelist allowed channels
     const allowedChannels = [
       'get-upload-summary',
       'get-format-stats',

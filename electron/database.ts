@@ -3,20 +3,15 @@ import path from 'path';
 import { mkdirSync } from 'fs';
 import { createRequire } from 'module';
 
-// FIX: Native modules like sqlite3 cannot be bundled by Vite/Webpack.
-// We must use 'createRequire' to load them dynamically at runtime from node_modules.
+
 const require = createRequire(import.meta.url);
 const sqlite3 = require('sqlite3').verbose();
 
-// Use the type from the import for TypeScript, but the runtime value from require
 import type { Database } from 'sqlite3';
 import { ExifData, ExifExtra } from '@/types/api';
 
 let db: Database | null = null;
 
-/**
- * Helper functions for UUID-based file path resolution
- */
 export function getImagePath(uuid: string, format: string): string {
   return path.join(
     app.getPath('appData'),
@@ -35,9 +30,8 @@ export function getThumbnailPath(uuid: string): string {
   );
 }
 
-/**
- * Initialize the SQLite database
- */
+
+// Initialize the SQLite database
 export async function initializeDatabase(): Promise<Database> {
   if (db) return db;
 
@@ -63,7 +57,6 @@ export async function initializeDatabase(): Promise<Database> {
 
       console.log('[DB] Database opened successfully');
 
-      // Enable WAL mode
       db?.run('PRAGMA journal_mode = WAL', (err: Error | null) => {
         if (err) console.error('[DB] Failed to set WAL mode:', err);
       });
@@ -78,9 +71,8 @@ export async function initializeDatabase(): Promise<Database> {
   });
 }
 
-/**
- * Create database tables
- */
+
+// Create database tables
 async function createTables(database: Database): Promise<void> {
   const run = (sql: string) => new Promise<void>((resolve, reject) => {
     database.run(sql, (err: Error | null) => err ? reject(err) : resolve());
@@ -161,9 +153,8 @@ async function createTables(database: Database): Promise<void> {
   console.log('[DB] Tables created successfully');
 }
 
-/**
- * Get the database instance
- */
+
+// Get the database instance
 export function getDatabase(): Database {
   if (!db) {
     throw new Error('Database not initialized. Call initializeDatabase() first.');
@@ -171,9 +162,8 @@ export function getDatabase(): Database {
   return db;
 }
 
-/**
- * Close the database connection
- */
+
+// Close the database connection
 export function closeDatabase() {
   if (db) {
     db.close((err: Error | null) => {
@@ -184,9 +174,8 @@ export function closeDatabase() {
   }
 }
 
-/**
- * Helper to wrap sqlite3 methods in Promises
- */
+
+// Wrap sqlite3 methods in Promises
 const sql = {
   all: (sql: string, params: any[] | any = []) => {
     const db = getDatabase();
@@ -203,7 +192,6 @@ const sql = {
   run: (sql: string, params: any[] | any = []) => {
     const db = getDatabase();
     return new Promise<{ id: number; changes: number }>((resolve, reject) => {
-      // Intentionally using function() to access 'this'
       db.run(sql, params, function (this: any, err: Error | null) {
         if (err) reject(err);
         else resolve({ id: this.lastID, changes: this.changes });
@@ -212,9 +200,7 @@ const sql = {
   }
 };
 
-/**
- * Helper to parse image data from database
- */
+
 function parseImageData(row: any): any {
   if (!row) return row;
 
@@ -231,9 +217,7 @@ function parseImageData(row: any): any {
   return row;
 }
 
-/**
- * Database operations
- */
+
 export const dbOperations = {
   async getAllImages(): Promise<any[]> {
     const images = await sql.all('SELECT * FROM images WHERE deletedAt IS NULL ORDER BY createdAt DESC');
@@ -281,7 +265,7 @@ export const dbOperations = {
   },
 
   async upsertExifData(uuid: string, exifData: ExifData): Promise<{ id: number; changes: number }> {
-    // Helper to convert GPS string values to numbers for NUMERIC fields
+    // Convert GPS string values to numbers for NUMERIC fields
     const parseGpsValue = (value: string | null | undefined): number | null => {
       if (value === null || value === undefined) return null;
       const parsed = parseFloat(value);
@@ -338,7 +322,6 @@ export const dbOperations = {
     const countResult = await sql.get('SELECT COUNT(*) as count FROM images WHERE deletedAt IS NULL');
     const total = countResult ? countResult.count : 0;
 
-    // Build ORDER BY clause
     const orderByColumn = sortBy || 'createdAt';
     const orderDirection = sortOrder || 'desc';
     const orderBy = `${orderByColumn} ${orderDirection.toUpperCase()}`;
@@ -376,7 +359,6 @@ export const dbOperations = {
         return;
       }
       if (k === 'tiffDimensions' && image[k]) {
-        // Serialize tiffDimensions to JSON string
         bindData['$' + k] = JSON.stringify(image[k]);
       } else {
         bindData['$' + k] = image[k];
@@ -399,7 +381,6 @@ export const dbOperations = {
         await this.insertExifData(image.uuid, image.exifData);
       } catch (error) {
         console.error('[DB] Failed to insert EXIF data:', error);
-        // Don't fail the entire operation if EXIF insert fails
       }
     }
 
@@ -407,7 +388,6 @@ export const dbOperations = {
   },
 
   async insertExifData(uuid: string, exifData: any): Promise<void> {
-    // Helper to convert GPS string values to numbers for NUMERIC fields
     const parseGpsValue = (value: string | null | undefined): number | null => {
       if (value === null || value === undefined) return null;
       const parsed = parseFloat(value);
@@ -453,9 +433,7 @@ export const dbOperations = {
     `, bindData);
   },
 
-  /**
-   * Insert multiple images using a manual transaction
-   */
+// Insert multiple images using a manual transaction
   async insertImages(images: any[]): Promise<any[]> {
     const db = getDatabase();
     const results: any[] = [];
@@ -496,11 +474,9 @@ export const dbOperations = {
           const bindData: any = {};
           Object.keys(img).forEach(k => {
             if (k === 'exifData') {
-              // Skip exifData - it goes to separate table
               return;
             }
             if (k === 'tiffDimensions' && img[k]) {
-              // Serialize tiffDimensions to JSON string
               bindData['$' + k] = JSON.stringify(img[k]);
             } else {
               bindData['$' + k] = img[k];
@@ -517,7 +493,6 @@ export const dbOperations = {
 
           // Insert EXIF data if available
           if (img.exifData) {
-            // Helper to convert GPS string values to numbers for NUMERIC fields
             const parseGpsValue = (value: string | null | undefined): number | null => {
               if (value === null || value === undefined) return null;
               const parsed = parseFloat(value);
@@ -566,7 +541,6 @@ export const dbOperations = {
   async updateImage(uuid: string, updates: any): Promise<void> {
     const db = getDatabase();
 
-    // Helper to parse GPS values (same logic as your insert function)
     const parseGpsValue = (value: string | number | null | undefined): number | null => {
       if (value === null || value === undefined) return null;
       if (typeof value === 'number') return value;
@@ -598,18 +572,16 @@ export const dbOperations = {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
-        // --- 1. PREPARE IMAGE UPDATES ---
         const imageBindData: any = { $uuid: uuid };
         const imageSetClauses: string[] = [];
 
         // Always update the 'updatedAt' timestamp
         imageSetClauses.push("updatedAt = datetime('now')");
 
-        // Separate Exif data from Image data
         const exifUpdates = updates.exifData;
 
         Object.keys(updates).forEach((k) => {
-          // Skip exifData (handled separately) and 'uuid' (used for WHERE clause)
+          // Skip exifData (handled separately) and uuid
           if (k === 'exifData' || k === 'uuid') return;
 
           // Special handling for tiffDimensions
@@ -634,7 +606,6 @@ export const dbOperations = {
           }
         });
 
-        // --- 2. PREPARE EXIF UPDATES ---
         if (exifUpdates && Object.keys(exifUpdates).length > 0) {
           const exifBindData: any = { $uuid: uuid };
           const exifSetClauses: string[] = [];
@@ -642,7 +613,6 @@ export const dbOperations = {
           Object.keys(exifUpdates).forEach((k) => {
             const dbColumn = exifColumnMapping[k];
 
-            // Only proceed if we map to a valid DB column
             if (dbColumn) {
               exifSetClauses.push(`${dbColumn} = $${dbColumn}`);
 
@@ -658,10 +628,6 @@ export const dbOperations = {
           });
 
           if (exifSetClauses.length > 0) {
-            // Note: We use UPDATE here. If the image previously had NO exif data, 
-            // this will return 0 changes. If you need to create new exif data 
-            // for an existing image, you would need to check existing row or use UPSERT logic.
-            // Assuming here we are modifying existing records.
             const exifSql = `UPDATE exif_data SET ${exifSetClauses.join(', ')} WHERE uuid = $uuid`;
 
             db.run(exifSql, exifBindData, (err: Error | null) => {
@@ -674,7 +640,6 @@ export const dbOperations = {
           }
         }
 
-        // --- 3. COMMIT ---
         db.run('COMMIT', (err: Error | null) => {
           if (err) reject(err);
           else resolve();
@@ -766,7 +731,7 @@ export const dbOperations = {
   /**
    * Get all images with their EXIF data for LWW sync diff calculation
    * Joins images and exif_data tables
-   * NOTE: Includes deleted records (deletedAt IS NOT NULL) for tombstone sync
+   * Includes deleted records for tombstone sync
    */
   async getAllImagesWithExif(): Promise<any[]> {
     const images = await sql.all(`

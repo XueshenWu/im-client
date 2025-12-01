@@ -1,14 +1,7 @@
-/**
- * Local SQLite database service
- * Handles all database operations for local mode
- */
-
 import { ExifData } from '@/types/api';
 import { LocalImage, SyncMetadata } from '../types/local';
 
-/**
- * Generate a UUID v4
- */
+
 function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0;
@@ -20,9 +13,7 @@ function generateUUID(): string {
 class LocalDatabaseService {
   private isInitialized = false;
 
-  /**
-   * Initialize the database (create tables if not exist)
-   */
+  //create tables if not exist
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
@@ -36,9 +27,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Get all local images
-   */
+
+  // Get all local images
   async getAllImages(): Promise<LocalImage[]> {
     await this.ensureInitialized();
     try {
@@ -50,9 +40,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Get image by UUID
-   */
+
+  // Get image by UUID
   async getImageByUuid(uuid: string): Promise<LocalImage | null> {
     await this.ensureInitialized();
     try {
@@ -64,9 +53,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Get paginated images
-   */
+
+  // Get paginated images
   async getPaginatedImages(
     page: number,
     pageSize: number,
@@ -83,9 +71,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Insert new image
-   */
+
+  // Insert new image
   async insertImage(image: LocalImage): Promise<LocalImage> {
     await this.ensureInitialized();
     try {
@@ -98,9 +85,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Insert multiple images
-   */
+
+   // Insert multiple images
   async insertImages(images: LocalImage[]): Promise<LocalImage[]> {
     await this.ensureInitialized();
     try {
@@ -112,9 +98,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Update image metadata
-   */
+
+  // Update image metadata
   async updateImage(uuid: string, updates: Partial<LocalImage>): Promise<void> {
     await this.ensureInitialized();
     try {
@@ -125,9 +110,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Delete image by UUID
-   */
+
+  // Delete image by UUID
   async deleteImage(uuid: string): Promise<void> {
     await this.ensureInitialized();
     try {
@@ -138,11 +122,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Delete multiple images by UUIDs
-   * 
 
-   */
+  // Delete multiple images by UUIDs
   async deleteImages(uuids: string[]): Promise<void> {
     await this.ensureInitialized();
     try {
@@ -154,9 +135,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Get sync metadata
-   */
+
+  // Get sync metadata
   async getSyncMetadata(): Promise<SyncMetadata> {
     await this.ensureInitialized();
     try {
@@ -168,9 +148,7 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Update sync metadata
-   */
+  // Update sync metadata
   async updateSyncMetadata(metadata: { lastSyncSequence?: number; lastSyncTime?: string | null; lastSyncUUID?: string | null }): Promise<void> {
     await this.ensureInitialized();
     try {
@@ -182,10 +160,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Mark local state as modified by generating a new sync UUID
-   * This should be called whenever local data is changed (upload, delete, modify, etc.)
-   */
+
+  // Mark local state as modified by generating a new sync UUID
   async markLocalStateModified(): Promise<void> {
     await this.ensureInitialized();
     try {
@@ -200,9 +176,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Clear all images (for testing/reset)
-   */
+
+  // Clear all images
   async clearAllImages(): Promise<void> {
     await this.ensureInitialized();
     try {
@@ -213,9 +188,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Search images by filename
-   */
+
+  // Search images by filename
   async searchImages(query: string): Promise<LocalImage[]> {
     await this.ensureInitialized();
     try {
@@ -227,9 +201,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Get EXIF data for an image by UUID
-   */
+
+  // Get EXIF data for an image by UUID
   async getExifData(uuid: string): Promise<ExifData | null> {
     await this.ensureInitialized();
     try {
@@ -259,9 +232,8 @@ class LocalDatabaseService {
     }
   }
 
-  /**
-   * Get all images with EXIF data for LWW sync diff calculation
-   */
+ 
+  // Get all images with EXIF data for LWW sync diff calculation
   async getAllImagesWithExif(): Promise<LocalImage[]> {
     await this.ensureInitialized();
     try {
@@ -275,5 +247,5 @@ class LocalDatabaseService {
 
 }
 
-// Singleton instance
+
 export const localDatabase = new LocalDatabaseService();

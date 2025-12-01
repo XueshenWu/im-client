@@ -71,18 +71,17 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
         const processedImages = await Promise.all(
           result.images.map(async (img: LocalImage) => {
 
-            // 1. Try to get aspect ratio from DB first (fastest)
+            // Try to get aspect ratio from DB first
             let aspectRatio = img.width && img.height ? img.width / img.height : 0;
 
-            // 2. If DB misses dimensions, calculate them using the custom protocol (slower fallback)
-            //    This replaces the old blob logic.
+            // If DB misses dimensions, calculate them using the custom protocol
             if (!aspectRatio) {
               try {
                 const tempUrl = `local-image://${img.uuid}.${img.format}`;
                 aspectRatio = await new Promise<number>((resolve) => {
                   const image = new Image();
                   image.onload = () => resolve(image.width / image.height);
-                  image.onerror = () => resolve(1); // Default to square on error
+                  image.onerror = () => resolve(1);
                   image.src = tempUrl;
                 });
               } catch (e) {
@@ -137,7 +136,6 @@ const LocalPhotoWall: React.FC<LocalPhotoWallProps> = ({
     }
   }, [page, hasMore, sortBy, sortOrder]);
 
-  // ... (Sort handlers: handleSort, handleDrawerSort, handleResetSort remain exactly the same) ...
 const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt') => {
   // default fallback configuration
   const defaultSortBy = 'updatedAt';
@@ -152,12 +150,9 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
       // Toggle to Descending
       nextSortOrder = 'desc';
     } else {
-      // Currently Descending: deciding whether to reset or loop
       if (column === defaultSortBy) {
-        // If we are on the default column, just loop back to Asc
         nextSortOrder = 'asc';
       } else {
-        // Otherwise, reset to the default sort state
         nextSortBy = defaultSortBy;
         nextSortOrder = defaultSortOrder;
       }
@@ -168,11 +163,11 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
     nextSortOrder = 'asc';
   }
 
-  // 1. Update State
+  // Update State
   setSortBy(nextSortBy);
-  setSortOrder(nextSortOrder as 'asc' | 'desc'); // Type assertion if needed
+  setSortOrder(nextSortOrder as 'asc' | 'desc');
 
-  // 2. Reset List (This will now run correctly for all cases)
+  // Reset List
   setImages([]);
   setPage(1);
   setHasMore(true);
@@ -199,7 +194,6 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
     setHasMore(true);
   };
 
-  // ... (Selection and Export handlers remain exactly the same) ...
   const handleSelectImage = (imageId: string) => {
     setSelectedIds((prev) => {
       const newSet = new Set(prev);
@@ -269,7 +263,6 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
   // Listen for refresh
   useEffect(() => {
     if (refreshTrigger > 0) {
-      // Reset state and reload from page 1
       const resetAndReload = async () => {
         setImages([]);
         setHasMore(true);
@@ -372,12 +365,6 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
     };
   }, [images.length]);
 
-  // --- CRITICAL CHANGE --- 
-  // The 'useEffect' that was here (calling URL.revokeObjectURL) is REMOVED.
-  // We don't have blobs anymore, so we don't need to clean them up.
-  // This prevents the "broken image after resize" bug.
-
-  // ... (Column calculation logic remains the same) ...
   const [columnCount, setColumnCount] = useState(3);
   useEffect(() => {
     const updateColumnCount = () => {
@@ -403,7 +390,6 @@ const handleSort = (column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'
     columnHeights[shortestColumnIndex] += imageHeight + gap;
   });
 
-  // ... (SortButton and SortOption components remain the same) ...
   const SortButton = ({ column, label }: { column: 'name' | 'size' | 'type' | 'updatedAt' | 'createdAt'; label: string }) => {
     const isActive = sortBy === column;
     const Icon = !isActive ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown;

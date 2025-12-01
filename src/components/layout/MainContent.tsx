@@ -130,7 +130,6 @@ export default function MainContent() {
 
       {/* Gallery Section */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Toolbar */}
         <div className="border-b border-gray-200 dark:border-gray-700" style={{ paddingLeft: '24px', paddingRight: '24px', paddingTop: '16px', paddingBottom: '16px' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

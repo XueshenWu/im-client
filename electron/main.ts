@@ -101,7 +101,6 @@ function createWindow() {
   })
 
   // Set Content Security Policy to allow API connections
-  // CSP DISABLED - Uncomment block below to re-enable
   
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -138,7 +137,6 @@ function createWindow() {
     mainWindow.close()
   })
 
-  // Set window title
   ipcMain.on('set-window-title', (_event, title: string) => {
     mainWindow.setTitle(title)
   })
@@ -146,13 +144,11 @@ function createWindow() {
 
   ipcMain.handle('tiff:load-buffer', async (_, buffer: Uint8Array) => {
     try {
-      // A. Get metadata to find total pages
-      // Sharp reads the header efficiently without decoding all pixels
+      // Get metadata to find total pages
       const metadata = await sharp(buffer).metadata();
       const pageCount = metadata.pages || 1;
 
-      // B. Split the multi-page TIFF into individual TIFF buffers using Sharp
-      // We use Promise.all to process pages in parallel for speed
+      // Split the multi-page TIFF into individual TIFF buffers using Sharp
       const splitPromises = [];
       for (let i = 0; i < pageCount; i++) {
         splitPromises.push(
@@ -182,12 +178,9 @@ function createWindow() {
     try {
       const currentBuffer = pageBuffers[pageIndex];
 
-      // A. Read metadata from the specific page buffer
+      // Read metadata from the specific page buffer
       const metadata = await sharp(currentBuffer).metadata();
 
-      // B. Apply the exact logic from your snippet
-      // Note: We don't need { page: pageIndex } here because currentBuffer
-      // is ALREADY a single page we extracted during load.
       const previewBuffer = await sharp(currentBuffer)
         .rotate() // Auto-rotate based on EXIF
         .resize({
@@ -205,7 +198,6 @@ function createWindow() {
         metadata: {
           width: metadata.width,
           height: metadata.height,
-          // The individual buffer thinks it has 1 page, so we use the global array length
           totalPages: pageBuffers.length,
           currentPage: pageIndex
         }
@@ -225,9 +217,9 @@ function createWindow() {
     try {
       const currentBuffer = pageBuffers[pageIndex];
 
-      // First, create the preview PNG (same logic as getPreview)
+      // create the preview PNG
       const previewPngBuffer = await sharp(currentBuffer)
-        .rotate() // Auto-rotate based on EXIF
+        .rotate()
         .resize({
           width: 2000,
           height: 2000,
@@ -281,7 +273,6 @@ function createWindow() {
     }
 
     try {
-      // Replace the page in the buffer array
       pageBuffers[pageIndex] = newPageBuffer;
       return { success: true };
     } catch (error: any) {
@@ -311,7 +302,7 @@ function createWindow() {
 
       const pages = [];
 
-      // 1. Decode and prepare raw IFDs
+      // Decode and prepare raw IFDs
       for (let i = 0; i < pageBuffers.length; i++) {
         const buffer = pageBuffers[i];
         const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
@@ -337,12 +328,10 @@ function createWindow() {
         });
       }
 
-      // --- HELPER: Sort Keys Numerically ---
-      // TIFF spec requires tags to be written in ascending order (256 < 257 < ... < 273)
+      // TIFF spec requires tag s to be written in ascending order (256 < 257 < ... < 273)
       const getSortedIfd = (unsortedIfd: any) => {
         const sorted = Object.create(null);
         const keys = Object.keys(unsortedIfd).sort((a, b) => {
-          // "t256" -> 256
           return parseInt(a.slice(1)) - parseInt(b.slice(1));
         });
 
@@ -352,7 +341,6 @@ function createWindow() {
         return sorted;
       };
 
-      // 2. Calculate Offsets
 
       // Set fixed ByteCounts (t279)
       pages.forEach(p => {
@@ -363,7 +351,6 @@ function createWindow() {
       pages.forEach(p => p.ifd.t273 = [0]);
 
       // SORT BEFORE DUMMY ENCODE
-      // We must sort here so the dummy header size matches the final header size
       let ifdList = pages.map(p => getSortedIfd(p.ifd));
 
       const dummyHeader = utif.encode(ifdList);
@@ -371,20 +358,18 @@ function createWindow() {
 
       console.log(`Metadata Header Size: ${headerSize} bytes`);
 
-      // 3. Update Real Offsets
+      // Update Real Offsets
       let currentOffset = headerSize;
       pages.forEach(p => {
         p.ifd.t273 = [currentOffset];
         currentOffset += p.data.length;
       });
 
-      // 4. Final Sort and Encode
-      // Re-sort because we modified t273, and we want to be absolutely sure of the order
+      // Re-sort and encode
       ifdList = pages.map(p => getSortedIfd(p.ifd));
 
       const finalHeaderBuffer = Buffer.from(utif.encode(ifdList));
 
-      // 5. Stitch
       const parts = [finalHeaderBuffer];
       pages.forEach(p => {
         parts.push(p.data);
@@ -392,7 +377,6 @@ function createWindow() {
 
       const finalBuffer = Buffer.concat(parts);
 
-      // 6. Extract metadata for all pages
       const pageDimensions = pages.map(p => ({
         width: p.ifd.t256[0],
         height: p.ifd.t257[0]
@@ -417,7 +401,7 @@ function createWindow() {
 
   ipcMain.handle('tiff:cleanup', async () => {
     try {
-      // Clear the page buffers to free memory
+      // free memory
       pageBuffers = [];
       return { success: true };
     } catch (error: any) {
@@ -425,13 +409,12 @@ function createWindow() {
       return { success: false, error: error.message };
     }
   });
-  // Updated Handler
+
   ipcMain.handle('expand-path', async (event, targetPath, recursive = false) => {
     try {
       const stats = await fs.stat(targetPath);
 
       if (stats.isDirectory()) {
-        // Existing logic for folders
         return await getFilePaths(targetPath, recursive);
       } else {
         // Check if it's a valid supported file (image, zip, or json)
@@ -446,13 +429,12 @@ function createWindow() {
 
   ipcMain.handle('read-local-file', async (event, filePath) => {
     try {
-      // Security Check: Ensure it's actually a string
       if (typeof filePath !== 'string') {
         console.error('Invalid path received');
         return null;
       }
 
-      // Read the file from disk using Node.js
+      // Read the file from disk
       const buffer = await fs.readFile(filePath);
       return buffer;
     } catch (error) {
@@ -564,14 +546,13 @@ function createWindow() {
       // Get AppData directory for this app
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
 
-      // Ensure the directory exists
       await fs.mkdir(appDataPath, { recursive: true });
 
       const savedFiles: string[] = [];
 
       for (const file of files) {
         try {
-          // Normalize the format to ensure consistency (jpeg not jpg, tiff not tif)
+          // Normalize the format to ensure consistency
           const normalizedFormat = normalizeFormat(file.format);
           const destPath = path.join(appDataPath, `${file.uuid}.${normalizedFormat}`);
 
@@ -602,7 +583,6 @@ function createWindow() {
       const { limit = 20, offset = 0 } = options;
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
 
-      // Ensure the directory exists
       await fs.mkdir(appDataPath, { recursive: true });
 
       // Read all files in the directory
@@ -625,7 +605,7 @@ function createWindow() {
           })
       );
 
-      // Sort by creation date (newest first)
+      // Sort by creation date
       imageFiles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       // Apply pagination
@@ -650,12 +630,10 @@ function createWindow() {
   });
   ipcMain.handle('get-device-id', async () => {
     try {
-      // 1. Get Hardware UUID (Motherboard/System UUID)
+      // Get Hardware UUID
       const systemData = await si.uuid();
       const rawId = systemData.os || systemData.hardware;
 
-      // 2. Hash it for privacy and format consistency
-      // Result looks like a UUID: "a1b2c3d4..."
       return crypto.createHash('sha256').update(rawId + 'my-salt').digest('hex');
     } catch (error) {
       console.error('Hardware ID failed, falling back to random UUID', error);
@@ -686,16 +664,12 @@ function createWindow() {
       const appDataPath = path.join(app.getPath('appData'), 'image-management', 'images');
       await fs.mkdir(appDataPath, { recursive: true });
 
-      // 1. Normalize and clean the format (jpeg not jpg, tiff not tif)
       const normalizedFormat = normalizeFormat(format);
       const filePath = path.join(appDataPath, `${uuid}.${normalizedFormat}`);
 
-      // 2. EXPLICITLY DELETE (UNLINK) IF EXISTS
-      // This releases the file handle if Windows has locked it "pending deletion"
       try {
         await fs.unlink(filePath);
       } catch (error: any) {
-        // Ignore if file doesn't exist (ENOENT)
         // Throw if strictly locked/permission error (EBUSY/EPERM)
         if (error.code !== 'ENOENT') {
           console.error('Error deleting old image:', error);
@@ -703,7 +677,7 @@ function createWindow() {
         }
       }
 
-      // 3. Write the new image file
+      // Write the new image file
       await fs.writeFile(filePath, Buffer.from(buffer));
 
       return filePath;
@@ -742,7 +716,7 @@ function createWindow() {
           const imagePath = path.join(imagesPath, `${uuid}.${normalizedFormat}`);
           const thumbnailPath = path.join(thumbnailsPath, `${uuid}.jpeg`);
 
-          // Delete image file
+          // Delete file
           try {
             await fs.unlink(imagePath);
           } catch (error: any) {
@@ -751,7 +725,6 @@ function createWindow() {
             }
           }
 
-          // Delete thumbnail file
           try {
             await fs.unlink(thumbnailPath);
           } catch (error: any) {
@@ -778,11 +751,10 @@ function createWindow() {
   ipcMain.handle('dialog:open', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Select Images',
-      defaultPath: app.getPath('pictures'), // Optional: Start in Pictures folder
+      defaultPath: app.getPath('pictures'), // Start in Pictures folder
       properties: [
-        'openFile',        // ✅ Priority: Select Files
-        'multiSelections', // ✅ Allow picking multiple
-        // 'openDirectory' // ❌ REMOVE THIS to make files visible again on Windows
+        'openFile',        
+        'multiSelections',
       ],
       filters: [
         { name: 'Supported Files', extensions: ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'zip', 'json'] }
@@ -796,7 +768,6 @@ function createWindow() {
     }
   });
 
-  // ========== Database IPC Handlers ==========
   ipcMain.handle('db:initialize', async () => {
     try {
       await initializeDatabase();
@@ -1049,12 +1020,8 @@ function createWindow() {
 
       const thumbnailPath = path.join(appDataPath, `${uuid}.jpeg`);
       let imageBuffer: Buffer;
-      // Read the original image
-
-
 
       if (metadata.format === 'tiff') {
-
 
         imageBuffer = await sharp(sourcePath, { page: 0 })
           .resize({ width: 300 })
@@ -1219,7 +1186,7 @@ function createWindow() {
           );
         });
 
-        // Count deletes (deletedAt matches this date)
+        // Count deletes
         const deleteCount = await new Promise<number>((resolve, reject) => {
           db.get(
             `SELECT COUNT(*) as count FROM images
@@ -1321,12 +1288,10 @@ function createWindow() {
         );
       });
 
-      // For now, we'll assume remoteSequence needs to be fetched from the sync service
-      // This is a placeholder - you'll need to implement actual remote sequence fetching
       return {
         localSequence: metadata.lastSyncSequence || 0,
-        remoteSequence: metadata.lastSyncSequence || 0, // TODO: Fetch from server
-        isInSync: true, // TODO: Compare with actual remote sequence
+        remoteSequence: metadata.lastSyncSequence || 0, 
+        isInSync: true,
         lastSyncTime: metadata.lastSyncTime,
       };
     } catch (error) {
@@ -1340,8 +1305,7 @@ function createWindow() {
     }
   });
 
-  // In development mode, load from Vite dev server
-  // In production, load from built files
+
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools()
@@ -1355,12 +1319,9 @@ function createWindow() {
 
 app.whenReady().then(async () => {
 
-
-
   // Protocol for full-size images: local-image://{uuid}.{format}
   protocol.handle('local-image', (request) => {
     try {
-      // request.url will look like: "local-image://{uuid}.{format}"
       let fileNameWithExt = request.url.slice('local-image://'.length);
       if (fileNameWithExt.endsWith('/')) {
         fileNameWithExt = fileNameWithExt.slice(0, -1);
@@ -1390,16 +1351,13 @@ app.whenReady().then(async () => {
   // Protocol for thumbnails: local-thumbnail://{uuid}?t={timestamp}
   protocol.handle('local-thumbnail', (request) => {
     try {
-      // request.url will look like: "local-thumbnail://{uuid}/?t=1234567890" or "local-thumbnail://{uuid}?t=1234567890"
       let uuid = request.url.slice('local-thumbnail://'.length);
 
-      // Remove query parameters first (cache-busting timestamp)
       const queryIndex = uuid.indexOf('?');
       if (queryIndex !== -1) {
         uuid = uuid.substring(0, queryIndex);
       }
 
-      // Remove trailing slash if present
       if (uuid.endsWith('/')) {
         uuid = uuid.slice(0, -1);
       }

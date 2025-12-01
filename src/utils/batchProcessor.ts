@@ -2,9 +2,8 @@ import JSZip from 'jszip';
 import { ImageManifest } from "@/types/upload";
 import { normalizeFormat } from './formatNormalizer';
 
-// Helper to get correct MIME type based on file extension
+// Get correct MIME type based on file extension
 const getMimeType = (ext: string): string => {
-    // Normalize the extension first
     const normalizedExt = normalizeFormat(ext);
 
     const mimeMap: Record<string, string> = {
@@ -17,7 +16,7 @@ const getMimeType = (ext: string): string => {
     return mimeMap[normalizedExt] || `application/${normalizedExt}`;
 };
 
-// --- Helper: Read files from disk using Electron ---
+// Read files from disk using Electron
 export const readFilesFromPaths = async (paths: string[]): Promise<File[]> => {
     // Guard check
     if (!window.electronAPI) return [];
@@ -50,14 +49,13 @@ export const readFilesFromPaths = async (paths: string[]): Promise<File[]> => {
     return results.filter((f): f is File => f !== null);
 };
 
-// --- Main Batch Processor ---
+// Main Batch Processor
 export const processBatchDrop = async (
     droppedFiles: File[],
     recursive: boolean = false
 ): Promise<File[]> => {
     let extractedImages: File[] = [];
 
-    // 1. STRICT GUARD: Capture API to a variable for TS type narrowing
     const api = window.electronAPI;
 
     // Regex for allowed image types (Excluding PDF/TXT)
@@ -65,7 +63,7 @@ export const processBatchDrop = async (
 
     for (const file of droppedFiles) {
 
-        // --- A. ZIP Handling ---
+        // ZIP Handling 
         if (file.type === 'application/zip' || file.name.endsWith('.zip')) {
             try {
                 const zip = await JSZip.loadAsync(file);
@@ -92,7 +90,6 @@ export const processBatchDrop = async (
                             try {
                                 const tempPath = await api.writeTempFile(fileName, arrayBuffer);
                                 if (tempPath) {
-                                    // Attach path properties
                                     Object.defineProperty(imageFile, 'path', { value: tempPath });
                                     (imageFile as any).sourcePath = tempPath;
                                 }
@@ -114,9 +111,9 @@ export const processBatchDrop = async (
             }
         }
 
-        // --- B. JSON Manifest Handling ---
+        // JSON Manifest Handling
         else if (file.type === 'application/json' || file.name.endsWith('.json')) {
-            if (!api) continue; // Skip if no Electron API
+            if (!api) continue;
 
             try {
                 const text = await file.text();
@@ -139,17 +136,12 @@ export const processBatchDrop = async (
             }
         }
 
-        // --- C. Standard Files & Folders ---
+        // Standard Files & Folders
         else {
-            // ✅ CHECK 1: Basic Extension Check (Optimization)
-            // If it has an extension, and that extension is NOT an image or supported format,
-            // we can likely skip it immediately unless it's a folder (which usually has no ext).
             const isLikelyFile = file.name.includes('.');
             const isImage = file.name.match(IMAGE_EXT_REGEX);
             const isValidNonImage = file.name.match(/\.(zip|json)$/i);
 
-            // If it looks like a file (has dot) but isn't an image or supported format, SKIP IT.
-            // This catches 'notes.txt', 'manual.pdf' immediately but allows ZIP and JSON through.
             if (isLikelyFile && !isImage && !isValidNonImage) {
                 console.warn(`Skipping unsupported file: ${file.name}`);
                 continue;
@@ -165,7 +157,6 @@ export const processBatchDrop = async (
 
             if (filePath && api) {
                 try {
-                    // Ask Electron to check (Electron will now also double-check due to Fix #1)
                     const expandedPaths = await api.expandPath(filePath, recursive);
 
                     if (expandedPaths && expandedPaths.length > 0) {
@@ -183,7 +174,6 @@ export const processBatchDrop = async (
                     }
                 }
             } else {
-                // Fallback for non-Electron web drag or when path is unavailable
                 if (file.type.match(/^image\//)) {
                     extractedImages.push(file);
                 }
