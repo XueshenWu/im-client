@@ -1,4 +1,4 @@
-port { localDatabase } from './localDatabase.service';
+import { localDatabase } from './localDatabase.service';
 import { LocalImage } from '../types/local';
 import { Image, ExifData } from '../types/api';
 
