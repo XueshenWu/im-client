@@ -11,6 +11,7 @@ todo.md
 node_modules
 .pnpm-store
 release
+.vscode
 
 # Build outputs
 dist

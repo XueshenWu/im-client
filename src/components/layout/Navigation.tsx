@@ -63,7 +63,7 @@ export default function Navigation() {
       {/* Logo */}
       <div className={`${isExpanded ? 'w-full flex items-center gap-3 px-3' : 'w-12 h-12'} mb-8 transition-all duration-300`}>
         <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-          <span className="text-white font-bold text-lg">E</span>
+          <span className="text-white font-bold text-lg">I</span>
         </div>
         {isExpanded && (
           <span className="text-gray-900 dark:text-white font-semibold text-xs whitespace-nowrap overflow-hidden">
