@@ -10,7 +10,7 @@ import {
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useImageViewerStore } from '@/stores/imageViewerStore';
+import { useImageViewerFilerobotStore } from '@/stores/imageViewerFilerobotStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { localImageService } from '@/services/localImage.service';
 import { getImageUrl, getThumbnailUrl } from '@/utils/imagePaths';
@@ -35,7 +35,7 @@ const LocalPhotoCard: React.FC<LocalPhotoCardProps> = ({
   onStartSelection
 }) => {
   const { t } = useTranslation();
-  const { openViewer } = useImageViewerStore();
+  const { openEditor: openViewer } = useImageViewerFilerobotStore();
   const { openTiffViewer } = useTiffImageViewerStore();
   const { triggerRefresh } = useGalleryRefreshStore();
   const { openEditor } = useExifEditorStore();

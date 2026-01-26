@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Image } from '@/types/api';
 import { ImageWithSource } from '@/types/gallery';
 
-type ViewMode = 'view' | 'crop';
+type ViewMode = 'view' | 'crop'| 'filter';
 
 
 interface ImageViewerStore {
@@ -19,6 +19,8 @@ interface ImageViewerStore {
   setCurrentIndex: (index: number) => void;
   enterCropMode: () => void;
   exitCropMode: () => void;
+  enterFilterMode:()=>void;
+  exitFilterMode: ()=>void;
 }
 
 export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
@@ -43,7 +45,16 @@ export const useImageViewerStore = create<ImageViewerStore>((set, get) => ({
       readOnly
     });
   },
-
+  enterFilterMode:()=>{
+    set({
+      viewMode:'filter'
+    })
+  },
+  exitFilterMode:()=>{
+    set({
+      viewMode:'view'
+    })
+  },
   closeViewer: () => {
     set({
       isOpen: false,

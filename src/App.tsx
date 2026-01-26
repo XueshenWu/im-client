@@ -7,7 +7,9 @@ import Gallery from './pages/Gallery'
 import Sync from './pages/Sync'
 import Activity from './pages/Activity'
 import Settings from './pages/Settings'
-import { ImageViewer } from './components/viewer/ImageViewer'
+import { ImageViewerV2 } from './components/viewer/ImageViewerV2'
+import { cropTool, createFilterTool, filerobotTool } from './components/viewer/tools'
+import { ImageViewerFilerobot } from './components/viewer/ImageViewerFilerobot'
 import { TiffImageViewer } from './components/viewer/tiffImageViewer'
 import ExifEditor from './components/gallery/ExifEditor'
 import { useSettingsStore } from './stores/settingsStore'
@@ -55,7 +57,8 @@ function App() {
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
-      <ImageViewer />
+      <ImageViewerV2 tools={[cropTool, createFilterTool(), filerobotTool]} />
+      <ImageViewerFilerobot />
       <TiffImageViewer/>
       <ExifEditor />
       <Toaster />

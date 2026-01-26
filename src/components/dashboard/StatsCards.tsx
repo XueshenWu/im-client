@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { getImageStats } from '@/services/images.service';
-import { ImageIcon, HardDrive, ArrowUpRight } from 'lucide-react';
+import {ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Stats {

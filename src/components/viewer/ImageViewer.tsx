@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { applyFilter, type FilterType } from '@/utils/grayscaleFilter';
+
 import { useTranslation } from 'react-i18next';
 import {
   X,
@@ -13,7 +15,8 @@ import {
   Crop as CropIcon,
   Check,
   Save,
-  Trash2
+  Trash2,
+  Filter
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -54,6 +57,8 @@ export const ImageViewer: React.FC = () => {
     previousImage,
     enterCropMode,
     exitCropMode,
+    enterFilterMode,
+    exitFilterMode
   } = useImageViewerStore();
 
   const [zoom, setZoom] = useState(1);
@@ -61,7 +66,8 @@ export const ImageViewer: React.FC = () => {
   const [showInfo, setShowInfo] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [cloudImageUrl, setCloudImageUrl] = useState<string>('');
-
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>('grayscale')
+  const [isFiltering, setIsFiltering] = useState(false)
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [isCropping, setIsCropping] = useState(false);
@@ -144,6 +150,87 @@ export const ImageViewer: React.FC = () => {
     setCompletedCrop(undefined);
   };
 
+  const handleEnterFilterMode = () => {
+    enterFilterMode()
+    setSelectedFilter('grayscale')
+  }
+
+  const handleCancelFilter = () => {
+    exitFilterMode()
+  }
+
+  const handleSaveFilter = async (replaceOriginal: boolean) => {
+    if (!currentImage || !imgRef.current) return;
+    setIsFiltering(true);
+
+    try {
+      const format = currentImage.format === 'png' ? 'png' : 'jpeg'
+      const filteredBlob = await applyFilter(
+        imgRef.current,
+        selectedFilter,
+        format
+      )
+      const fileName = replaceOriginal ? currentImage.filename : `${selectedFilter}_${currentImage.filename}`;
+
+      const filteredFile = blobToFile(filteredBlob, fileName)
+
+      const imageWidth = imgRef.current.naturalWidth;
+      const imageHeight = imgRef.current.naturalHeight;
+      const isLocalImage = 'source' in currentImage && currentImage.source === 'local'
+
+      if (isLocalImage) {
+        const arrayBuffer = await filteredFile.arrayBuffer();
+        const imageUuid = replaceOriginal ? currentImage.uuid : uuidv4();
+        const savedPath = await window.electronAPI?.saveImageBuffer(
+          imageUuid,
+          format === 'png' ? 'png' : 'jpeg',
+          arrayBuffer
+        )
+        if (!savedPath) {
+          throw new Error('failed to save filtered image')
+        }
+
+        const thumbnailResult = await generateThumbnail(savedPath, imageUuid, 300);
+        if (replaceOriginal) {
+          await localImageService.updateImage(currentImage.uuid, {
+            fileSize: filteredFile.size,
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          const newImage: LocalImage = {
+            uuid: imageUuid,
+            filename: fileName,
+            fileSize: filteredFile.size,
+            format: (format === 'png' ? 'png' : 'jpeg') as any,
+            width: imageWidth,
+            height: imageHeight,
+            hash: '',
+            mimeType: filteredFile.type,
+            isCorrupted: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null,
+            pageCount: 1,
+            exifData: currentImage.exifData,
+          }
+          await localImageService.addImage(newImage);
+        }
+      } else {
+        if (replaceOriginal) {
+          const result = await replaceImages([{
+            uuid: currentImage.uuid,
+            file: filteredFile
+          }])
+        } else {
+          const newUuid = uuidv4();
+
+        }
+      }
+    }catch(e:any){
+      console.log('failed to save filtered image')
+    }
+  }
+
   // Handle saving cropped image
   const handleSaveCrop = async (replaceOriginal: boolean) => {
     if (!currentImage || !completedCrop || !imgRef.current) return;
@@ -222,8 +309,8 @@ export const ImageViewer: React.FC = () => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             deletedAt: null,
-            pageCount:1,
-            exifData:currentImage.exifData
+            pageCount: 1,
+            exifData: currentImage.exifData
           };
           await localImageService.addImage(newImage);
         }
@@ -283,7 +370,7 @@ export const ImageViewer: React.FC = () => {
             hash,
             mimeType: croppedFile.type,
             isCorrupted: false,
-          }]);
+          }] as any);
 
           if (!presignedURLs || presignedURLs.length === 0) {
             throw new Error('Failed to get presigned URLs');
@@ -525,6 +612,18 @@ export const ImageViewer: React.FC = () => {
                       <CropIcon className="h-5 w-5" />
                     </Button>
                   )}
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleEnterFilterMode}
+                      className="text-white hover:bg-white/20"
+                      title="Apply Filter"
+                    >
+                      <Filter className="h-4 w-4" />
+                    </Button>
+                  )}
+
 
                   {/* Download - Hide in readonly mode */}
                   {!readOnly && (
@@ -572,7 +671,7 @@ export const ImageViewer: React.FC = () => {
                     <X className="h-5 w-5" />
                   </Button>
                 </>
-              ) : (
+              ) : viewMode === 'crop' ? (
                 // Crop mode controls
                 <>
                   <Button
@@ -603,7 +702,34 @@ export const ImageViewer: React.FC = () => {
                     {isCropping ? t('viewer.processing') : t('viewer.replaceOriginal')}
                   </Button>
                 </>
-              )}
+              ) : <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                    className="text-white hover:bg-white/20"
+                  onClick={handleCancelFilter}
+                  title="Cancel Filter"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Preview: Grayscale Filter
+                </span>
+                <Button
+                  onClick={() => handleSaveFilter(false)}
+                  disabled={isFiltering}
+                    className="text-white hover:bg-white/20"
+                >
+                  Save As New
+                </Button>
+                <Button
+                  onClick={() => handleSaveFilter(true)}
+                  disabled={isFiltering}
+                    className="text-white hover:bg-white/20"
+                >
+                  Replace Original
+                </Button>
+              </>}
             </div>
           </div>
         </div>

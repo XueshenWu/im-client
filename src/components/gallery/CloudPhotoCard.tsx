@@ -12,7 +12,7 @@ import {
 
 import { deleteImages } from '@/services/images.service';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useImageViewerStore } from '@/stores/imageViewerStore';
+import { useImageViewerFilerobotStore } from '@/stores/imageViewerFilerobotStore';
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { getCloudImagePresignedUrlEndpoint, getCloudThumbnailUrl } from '@/utils/imagePaths';
 import { useTiffImageViewerStore } from '@/stores/tiffImageViewerStore';
@@ -34,7 +34,7 @@ const CloudPhotoCard: React.FC<CloudPhotoCardProps> = ({
   onStartSelection
 }) => {
   const { t } = useTranslation();
-  const { openViewer } = useImageViewerStore();
+  const { openEditor: openViewer } = useImageViewerFilerobotStore();
   const { triggerRefresh } = useGalleryRefreshStore();
   const { openTiffViewer } = useTiffImageViewerStore();
   const { openEditor } = useExifEditorStore()

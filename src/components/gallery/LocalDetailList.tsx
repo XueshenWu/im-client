@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useTranslation } from 'react-i18next'
-import { useImageViewerStore } from '@/stores/imageViewerStore'
+import { useImageViewerFilerobotStore } from '@/stores/imageViewerFilerobotStore'
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
 import { localDatabase } from '@/services/localDatabase.service'
 import { localImageService } from '@/services/localImage.service'
@@ -330,7 +330,7 @@ const createLocalColumns = (
 
 export default function LocalDetailList() {
   const { t } = useTranslation()
-  const { openViewer } = useImageViewerStore()
+  const { openEditor: openViewer } = useImageViewerFilerobotStore()
   const { openTiffViewer } = useTiffImageViewerStore()
   const { refreshTrigger } = useGalleryRefreshStore()
   const [sorting, setSorting] = React.useState<SortingState>([])

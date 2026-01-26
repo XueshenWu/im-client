@@ -16,7 +16,7 @@ import {
 } from "@tanstack/react-table"
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, MoreHorizontal, Download, Trash2, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, FileArchive, Copy, Edit } from "lucide-react"
 import JSZip from 'jszip'
-import { useImageViewerStore } from '@/stores/imageViewerStore'
+import { useImageViewerFilerobotStore } from '@/stores/imageViewerFilerobotStore'
 import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore'
 import { deleteImages } from '@/services/images.service'
 import {
@@ -34,8 +34,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -363,7 +361,7 @@ export const createColumns = (
 
 export default function DetailList() {
   const { t } = useTranslation()
-  const { openViewer } = useImageViewerStore()
+  const { openEditor: openViewer } = useImageViewerFilerobotStore()
   const { openTiffViewer } = useTiffImageViewerStore()
   const { refreshTrigger } = useGalleryRefreshStore()
   const [sorting, setSorting] = React.useState<SortingState>([])
