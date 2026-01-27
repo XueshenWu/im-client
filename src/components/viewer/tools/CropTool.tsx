@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { Crop as CropIcon, X, Save, Check } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -122,7 +122,7 @@ const CropCanvas: React.FC<{ ctx: ToolContext }> = ({ ctx }) => {
         className="max-h-full max-w-full"
       >
         <img
-          ref={ctx.imageRef}
+          ref={ctx.imageRef as React.RefObject<HTMLImageElement>}
           src={ctx.imageUrl}
           alt={ctx.image.filename}
           style={{

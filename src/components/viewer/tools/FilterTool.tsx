@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Filter, X, Save, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
@@ -152,10 +152,34 @@ const FilterCanvas: React.FC<FilterToolProps> = ({ ctx, filters }) => {
     return selectedFilter.cssFilter(toolState.filterParams);
   }, [selectedFilter, toolState.filterParams]);
 
+  // Show loading if image URL is not ready
+  if (!ctx.imageUrl) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center w-full h-full">
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* Image preview with filter applied */}
+      <img
+        ref={ctx.imageRef as React.RefObject<HTMLImageElement>}
+        src={ctx.imageUrl}
+        alt={ctx.image.filename}
+        style={{
+          maxWidth: 'calc(95vw - 8rem)',
+          maxHeight: 'calc(95vh - 12rem)',
+          objectFit: 'contain',
+          filter: previewFilter,
+          transition: 'filter 0.2s ease',
+        }}
+        crossOrigin="anonymous"
+      />
+
       {/* Filter selector panel */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 bg-black/80 rounded-lg p-4 max-w-xl">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-black/80 rounded-lg p-4 max-w-xl">
         {/* Filter buttons */}
         <div className="flex flex-wrap gap-2 justify-center mb-3">
           {filters.map((filter) => (
@@ -195,25 +219,6 @@ const FilterCanvas: React.FC<FilterToolProps> = ({ ctx, filters }) => {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Image preview with filter applied */}
-      <div className="flex items-center justify-center w-full h-full">
-        <img
-          ref={ctx.imageRef}
-          src={ctx.imageUrl}
-          alt={ctx.image.filename}
-          style={{
-            width: 'auto',
-            height: 'auto',
-            maxWidth: 'calc(95vw - 8rem)',
-            maxHeight: 'calc(95vh - 12rem)',
-            objectFit: 'contain',
-            filter: previewFilter,
-            transition: 'filter 0.2s ease',
-          }}
-          crossOrigin="anonymous"
-        />
       </div>
     </div>
   );

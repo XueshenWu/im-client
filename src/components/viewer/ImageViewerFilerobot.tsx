@@ -84,7 +84,7 @@ export const ImageViewerFilerobot: React.FC = () => {
   }, [imageUrl, closeEditor]);
 
   const handleSave = useCallback(
-    async (editedImageObject: any, designState: any) => {
+    async (editedImageObject: any, _designState: any) => {
       if (!currentImage) return;
 
       try {

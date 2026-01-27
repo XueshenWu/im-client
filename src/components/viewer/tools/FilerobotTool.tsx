@@ -1,4 +1,3 @@
-import React from 'react';
 import { Wand2 } from 'lucide-react';
 import { useImageViewerFilerobotStore } from '@/stores/imageViewerFilerobotStore';
 import type { ImageEditorTool } from '../types';

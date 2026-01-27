@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   X,
@@ -20,7 +20,7 @@ import { useGalleryRefreshStore } from '@/stores/galleryRefreshStore';
 import { deleteImages } from '@/services/images.service';
 import { format } from 'date-fns';
 import { localImageService } from '@/services/localImage.service';
-import { getImageUrl, getCloudImagePresignedUrlEndpoint } from '@/utils/imagePaths';
+import { getCloudImagePresignedUrlEndpoint } from '@/utils/imagePaths';
 import type { ImageEditorTool, ToolContext } from './types';
 
 const formatBytes = (bytes: number) => {
@@ -59,7 +59,7 @@ export const ImageViewerV2: React.FC<ImageViewerV2Props> = ({
   const [rotation, setRotation] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [cloudImageUrl, setCloudImageUrl] = useState<string>('');
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string>('');
   const imgRef = useRef<HTMLImageElement>(null);
 
   const { triggerRefresh } = useGalleryRefreshStore();
@@ -69,41 +69,58 @@ export const ImageViewerV2: React.FC<ImageViewerV2Props> = ({
   // Find the currently active tool
   const activeTool = tools.find((t) => t.id === activeToolId) || null;
 
-  // Fetch presigned URL for cloud images
+  // Load image URL - convert local images to blob URLs for canvas compatibility
   useEffect(() => {
-    if (!currentImage || isLocalImage) {
-      setCloudImageUrl('');
+    if (!currentImage || !isOpen) {
+      setResolvedImageUrl('');
       return;
     }
 
-    const fetchPresignedUrl = async () => {
+    let blobUrl = '';
+
+    const loadImage = async () => {
       try {
-        const endpoint = getCloudImagePresignedUrlEndpoint(currentImage.uuid);
-        const response = await fetch(endpoint);
-        if (!response.ok) {
-          console.error('Failed to fetch presigned URL');
-          return;
-        }
-        const data = await response.json();
-        if (data.success && data.data.presignedUrl) {
-          setCloudImageUrl(data.data.presignedUrl);
+        if (isLocalImage) {
+          // Load local image as blob URL (canvas can't handle custom protocols)
+          const buffer = await window.electronAPI?.loadLocalImage(
+            currentImage.uuid,
+            currentImage.format
+          );
+          if (buffer) {
+            const blob = new Blob([buffer as unknown as BlobPart], {
+              type: currentImage.mimeType || 'image/jpeg',
+            });
+            blobUrl = URL.createObjectURL(blob);
+            setResolvedImageUrl(blobUrl);
+          }
+        } else {
+          // Fetch presigned URL for cloud images
+          const endpoint = getCloudImagePresignedUrlEndpoint(currentImage.uuid);
+          const response = await fetch(endpoint);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data.presignedUrl) {
+              setResolvedImageUrl(data.data.presignedUrl);
+            }
+          }
         }
       } catch (error) {
-        console.error('Error fetching presigned URL:', error);
+        console.error('Error loading image:', error);
       }
     };
 
-    fetchPresignedUrl();
-  }, [currentImage, isLocalImage]);
+    loadImage();
 
-  // Determine the image URL to use
-  const imageUrl = useMemo(() => {
-    if (!currentImage) return '';
-    if (isLocalImage) {
-      return getImageUrl(currentImage.uuid, currentImage.format);
-    }
-    return cloudImageUrl;
-  }, [currentImage, isLocalImage, cloudImageUrl]);
+    // Cleanup blob URL on unmount or image change
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [currentImage, isLocalImage, isOpen]);
+
+  // Use the resolved URL
+  const imageUrl = resolvedImageUrl;
 
   // Reset state when image changes
   useEffect(() => {
