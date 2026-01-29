@@ -3,7 +3,7 @@ import { LocalImage } from '../types/local';
 import { Image, ExifData } from '../types/api';
 
 
-class LocalImageService {
+export class LocalImageService {
 
   // Add images to local storage
   async addImages(images: LocalImage[]): Promise<LocalImage[]> {
