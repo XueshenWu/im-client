@@ -14,9 +14,7 @@ import { toast } from 'sonner';
 import type { LocalImage } from '@/types/local';
 
 export const ImageViewerTUI: React.FC = () => {
-  // ---------------------------------------------------------------------------
-  // Functional Logic (Unchanged)
-  // ---------------------------------------------------------------------------
+
   const { isOpen, currentImage, isLocalImage, closeEditor } =
     useImageViewerFilerobotStore();
   const { triggerRefresh } = useGalleryRefreshStore();
@@ -195,7 +193,7 @@ export const ImageViewerTUI: React.FC = () => {
     [currentImage, isLocalImage, triggerRefresh, handleClose]
   );
 
-  // Initialize TUI Image Editor
+
   useEffect(() => {
     if (!containerRef.current || !imageUrl || isLoading) return;
 

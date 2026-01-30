@@ -78,7 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }
 })
 
-// Also expose a simpler electron namespace for dashboard
+
 contextBridge.exposeInMainWorld('electron', {
   invoke: (channel: string, ...args: any[]) => {
     const allowedChannels = [
