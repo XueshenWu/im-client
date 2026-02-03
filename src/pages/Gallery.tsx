@@ -6,12 +6,14 @@ import HybridPhotoWall from "@/components/gallery/HybridPhotoWall";
 import HomeLink from '@/components/common/home-link'
 import { ViewSwitch, type View } from "@/components/gallery/ViewSwitch";
 import HybridDetailList from "@/components/gallery/HybridDetailList";
-
+import { usePhotoviewStore } from "@/stores/photoviewStore";
 
 export default function Gallery() {
   const { t } = useTranslation()
-  const [view, setView] = useState<View>("photowall");
-
+  // const [view, setView] = useState<View>("photowall");
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'type' | 'updatedAt' | 'createdAt' | null>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const photoviewStore = usePhotoviewStore()
 
 
   return (
@@ -24,7 +26,7 @@ export default function Gallery() {
                   {t('navigation.gallery')}
                 </h1>
 
-                <ViewSwitch onViewChange={setView} />
+                <ViewSwitch onViewChange={{onViewChange:photoviewStore.setView}} />
               </div>
 
             </div>
